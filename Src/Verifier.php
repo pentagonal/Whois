@@ -43,11 +43,6 @@ class Verifier
     $~x';
 
     /**
-     * @var string
-     */
-    protected $urlTLDs = 'https://publicsuffix.org/list/effective_tld_names.dat';
-
-    /**
      * Regex Global Domain
      */
     const REGEX_GLOBAL = '/[^a-z0-9\-\P{Latin}\P{Hebrew}\P{Greek}\P{Cyrillic}
