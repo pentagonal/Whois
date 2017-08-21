@@ -1,0 +1,25 @@
+sudo: false
+
+# Operating System
+os : linux
+group: stable
+dist: precise
+
+# Script Language
+language: php
+
+# Php Tests version
+php:
+  - 5.6
+  - 7.0
+  - 7.1
+
+before_script:
+    - composer install -o -vv
+
+script:
+    - ./vendor/bin/phpcs
+    - ./vendor/bin/phpunit --configuration phpunit.xml.dist --coverage-text --testdox
+
+matrix:
+  fast_finish: true

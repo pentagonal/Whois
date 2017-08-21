@@ -1,0 +1,28 @@
+{
+  "name": "pentagonal/whois",
+  "description": "Whois check for domain and network identity",
+  "type": "project",
+  "require": {
+    "php": ">= 5.6",
+    "ext-intl": ">= 1"
+  },
+  "require-dev": {
+    "squizlabs/php_codesniffer": "2.*",
+    "phpunit/phpunit": "^5"
+  },
+  "license": "GPL-3.0",
+  "authors": [
+    {
+      "name": "pentagonal",
+      "email": "org@pentagonal.org"
+    }
+  ],
+  "autoload" : {
+    "psr-4" : {
+      "\\Pentagonal\\WhoIs\\": "Src/"
+    },
+    "classmap": [
+      "Src/"
+    ]
+  }
+}
