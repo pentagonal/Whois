@@ -3,7 +3,7 @@ sudo: false
 # Operating System
 os : linux
 group: stable
-dist: precise
+# dist: precise
 
 # Script Language
 language: php
