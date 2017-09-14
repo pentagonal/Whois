@@ -26,12 +26,20 @@ class DataGetterTest extends TestCase
      */
     protected $getter;
 
+    /**
+     * DataGetterTest constructor.
+     *
+     * {@inheritdoc}
+     */
     public function __construct($name = null, array $data = [], $dataName = '')
     {
         parent::__construct($name, $data, $dataName);
         $this->getter = new DataGetter();
     }
 
+    /**
+     * Test Extension lists that is not empty data
+     */
     public function testExtensionLists()
     {
         $this->assertNotEmpty(
@@ -40,6 +48,9 @@ class DataGetterTest extends TestCase
         );
     }
 
+    /**
+     * Test set & unset extensions
+     */
     public function testExtensionSet()
     {
         $newGetter = clone $this->getter;

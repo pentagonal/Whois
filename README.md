@@ -14,6 +14,23 @@ Php Domain / ASN / IP WhoIs Checker
     # please contribute or just read the code
     # or just use IDE (eg: jetbrains phpstorm) to get auto complete
 
+```php
+<?php
+use Pentagonal\WhoIs\WhoIs;
+use Pentagonal\WhoIs\Util\DataGetter;
+
+$who = new WhoIs(new DataGetter());
+// get data from whois with fully detail per registrant data
+$who->getWhoIsWithArrayDetail('example.com'); # array
+// get data from whois with include alternative if there was alternative will be returning 2 array data
+$who->getWhoIs('example.com'); # array
+// get server address for whois from domain
+$who->getWhoIsServer('example.com'); # string
+// get ip data result
+$who->getIpData('127.0.0.1'); # string
+// ... do your
+```
+
 ## USED FOR
 
 - Email Validator By Given Extensions

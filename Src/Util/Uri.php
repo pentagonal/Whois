@@ -22,7 +22,9 @@ use InvalidArgumentException;
 class Uri
 {
     /**
-     * @var array port default
+     * Default Port List For Available Uri
+     *
+     * @var array
      */
     private static $defaultPorts = [
         ''      => 80,
@@ -41,60 +43,76 @@ class Uri
 
     /**
      * Base Scheme
+     *
      * @var string
      */
     protected $scheme = '';
 
     /**
+     * Stored Auth User Uri
+     *
      * @var string
      */
     protected $user = '';
 
     /**
+     * Stored Auth Password Uri
      * @var string
      */
     protected $password = '';
 
     /**
+     * Stored Uri Host
+     *
      * @var string
      */
     protected $host = '';
 
     /**
+     * Stored Uri Port
+     *
      * @var int|null
      */
     protected $port;
 
     /**
+     * Base Path Of Uri
+     *
      * @var string
      */
     protected $basePath = '';
 
     /**
+     * Stored Uri Path
+     *
      * @var string
      */
     protected $path = '';
 
     /**
+     * Stored Query String
+     *
      * @var string
      */
     protected $query = '';
 
     /**
+     * Stored Fragment Uri
+     *
      * @var string
      */
     protected $fragment = '';
 
     /**
      * Uri constructor.
-     * @param string $scheme
-     * @param string $host
-     * @param int|null $port
-     * @param string $path
-     * @param string $query
-     * @param string $fragment
-     * @param string $user
-     * @param string $password
+     * @param string $scheme    uri scheme (eg: http)
+     * @param string $host      uri host (eg: example.com)
+     * @param int|null $port    uri port (eg: 8080)
+     * @param string $path      uri path (eg: /path/)
+     * @param string $query     uri query (eg: query=1&query_2=2)
+     * @param string $fragment  uri fragment (eg: fragment)
+     * @param string $user      uri user auth
+     * @param string $password  uri password auth for user
      */
     public function __construct(
         $scheme,
@@ -117,6 +135,8 @@ class Uri
     }
 
     /**
+     * Create generate Object @uses Uri from uri string
+     *
      * @param string $uri
      * @return Uri
      */
@@ -140,7 +160,9 @@ class Uri
     }
 
     /**
-     * {@inheritdoc}
+     * Get Scheme
+     *
+     * @return string
      */
     public function getScheme()
     {
@@ -148,6 +170,8 @@ class Uri
     }
 
     /**
+     * Create new cloned object by scheme
+     *
      * @param string $scheme
      *
      * @return Uri Cloned Uri with new Scheme
@@ -238,7 +262,11 @@ class Uri
     }
 
     /**
-     * {@inheritdoc}
+     * Create new cloned object by host
+     *
+     * @param string $host
+     *
+     * @return Uri
      */
     public function withHost($host)
     {
@@ -249,7 +277,9 @@ class Uri
     }
 
     /**
-     * {@inheritdoc}
+     * Get port if available
+     *
+     * @return int|null
      */
     public function getPort()
     {
@@ -257,7 +287,11 @@ class Uri
     }
 
     /**
-     * {@inheritdoc}
+     * Create new cloned object by port
+     *
+     * @param int $port
+     *
+     * @return Uri
      */
     public function withPort($port)
     {
@@ -384,7 +418,9 @@ class Uri
     }
 
     /**
-     * {@inheritdoc}
+     * Get fragment from uri eg: http://example.uri/path/#this-fragment
+     *
+     * @return string
      */
     public function getFragment()
     {
@@ -392,7 +428,11 @@ class Uri
     }
 
     /**
-     * {@inheritdoc}
+     * Create cloned object Uri with new fragment instead
+     *
+     * @param string $fragment  fragment to add
+     *
+     * @return Uri
      */
     public function withFragment($fragment)
     {
@@ -407,7 +447,8 @@ class Uri
     }
 
     /**
-     * Magic Method
+     * Magic Method if there was object (this) print into string
+     *
      * @return string
      */
     public function __toString()

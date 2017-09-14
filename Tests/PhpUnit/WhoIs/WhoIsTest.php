@@ -28,13 +28,23 @@ class WhoIsTest extends TestCase
      */
     protected $whoIs;
 
+    /**
+     * WhoIsTest constructor.
+     *
+     * {@inheritdoc}
+     */
     public function __construct($name = null, array $data = [], $dataName = '')
     {
         parent::__construct($name, $data, $dataName);
         $this->whoIs = new WhoIs(new DataGetter());
     }
 
-    public function testVerifierFromWhoisObject()
+    /**
+     * Test WhoIs Object
+     * @uses Verifier
+     * @uses WhoIs
+     */
+    public function testVerifierFromWhoIsObject()
     {
         $this->assertInstanceOf(
             Verifier::class,
@@ -47,6 +57,9 @@ class WhoIsTest extends TestCase
         );
     }
 
+    /**
+     * Test Thrown throwable
+     */
     public function testThrown()
     {
         try {
@@ -65,6 +78,9 @@ class WhoIsTest extends TestCase
         }
     }
 
+    /**
+     * Test WhoIs Result check
+     */
     public function testWhoIs()
     {
         try {

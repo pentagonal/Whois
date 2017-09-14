@@ -20,6 +20,9 @@ use Pentagonal\WhoIs\Util\DataGetter;
  */
 class Verifier
 {
+    /**
+     * Regex Validator IPv4
+     */
     const IPV4_REGEX = '~^
         # start with 0. to 255.
         (?:0|[1-9][0-9]?|1[0-9]{0,2}|2[0-5]{0,2})
@@ -27,6 +30,9 @@ class Verifier
         (?:\.(?:0|[1-9][0-9]?|1[0-9]{0,2}|2[0-5]{0,2})){3}
     $~x';
 
+    /**
+     * Regex Validator IPv4 local / private IP address
+     */
     const IPV4_LOCAL_REGEX = '~^
         (?:
             (?:
@@ -49,6 +55,8 @@ class Verifier
         \P{Han}\P{Arabic}\P{Gujarati}\P{Armenian}\P{Hiragana}\P{Thai}]/x';
 
     /**
+     * List for regex test
+     *
      * @var array
      */
     protected $regexExtension = [
@@ -74,6 +82,8 @@ class Verifier
     const SELECTOR_SUB_DOMAIN_NAME = 'sub_domain';
 
     /**
+     * Stored Data Getter
+     *
      * @var DataGetter
      */
     protected $dataGetter;
@@ -89,6 +99,8 @@ class Verifier
     }
 
     /**
+     * Get Object DataGetter
+     *
      * @return DataGetter
      */
     public function getDataGetter()
@@ -97,6 +109,8 @@ class Verifier
     }
 
     /**
+     * Get available extensions
+     *
      * @return array
      */
     public function getExtensionList()
@@ -105,8 +119,10 @@ class Verifier
     }
 
     /**
+     * Get Extension by idn
+     *
      * @param string $string
-     * @return bool|string
+     * @return bool|string      false if fail / no exists
      */
     public function getExtensionIDN($string)
     {
@@ -122,6 +138,8 @@ class Verifier
     }
 
     /**
+     * Check if extension exists
+     *
      * @param string $string
      * @return bool
      */
@@ -131,8 +149,10 @@ class Verifier
     }
 
     /**
+     * Validate domain for sanitation
+     *
      * @param string $domainName
-     * @return array|bool
+     * @return array|bool           returning array detail for domain otherwise false if fail
      */
     public function validateDomain($domainName)
     {
@@ -189,6 +209,8 @@ class Verifier
     }
 
     /**
+     * Check if valid domain name
+     *
      * @param string $domainName
      * @return bool
      */
@@ -198,8 +220,10 @@ class Verifier
     }
 
     /**
+     * Validate if domain is a top level domain
+     *
      * @param string $domainName
-     * @return bool|array
+     * @return bool|array           returning array detail for domain otherwise false if fail
      */
     public function validateTopDomain($domainName)
     {
@@ -220,6 +244,8 @@ class Verifier
     }
 
     /**
+     * Check if domain top level domain
+     *
      * @param string $domainName
      * @return bool
      */
@@ -229,8 +255,10 @@ class Verifier
     }
 
     /**
+     * Validate email address
+     *
      * @param string $email
-     * @return bool|array
+     * @return bool|array   returning array detail for email & domain otherwise false if fail
      */
     public function validateEmail($email)
     {
@@ -303,6 +331,8 @@ class Verifier
     }
 
     /**
+     * Sanitize the domain name
+     *
      * @param string $domain
      *
      * @return bool|string
@@ -318,6 +348,8 @@ class Verifier
     }
 
     /**
+     * Check if valid IPv4
+     *
      * @param string $ip
      * @return bool
      */
@@ -349,6 +381,8 @@ class Verifier
     }
 
     /**
+     * Validate ASN
+     *
      * @param string|int $name
      * @return bool|string
      */

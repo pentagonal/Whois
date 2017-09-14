@@ -16,6 +16,8 @@ namespace Pentagonal\WhoIs\Util;
  * Class StreamSocketTransport
  * @package Pentagonal\WhoIs\Util
  *
+ * - This class for internal use only.
+ *
  * @method void close();
  * @method resource|null detach();
  * @method int getSize();
@@ -34,21 +36,29 @@ namespace Pentagonal\WhoIs\Util;
 class StreamSocketTransport
 {
     /**
+     * Stored Stream object
+     *
      * @var Stream
      */
     protected $stream;
 
     /**
+     * Time out process & connection
+     *
      * @var int
      */
     protected $timeout = 5;
 
     /**
+     * Error Code if there was an error
+     *
      * @var int
      */
     protected $errorCode;
 
     /**
+     * Error Message if there was an error
+     *
      * @var string
      */
     protected $errorMessage;
@@ -81,9 +91,12 @@ class StreamSocketTransport
     }
 
     /**
+     * Magic method for instance call @uses Stream
+     *
      * @param string $name
      * @param array $arguments
      * @return mixed
+     * @throws \BadMethodCallException
      */
     public function __call($name, array $arguments)
     {
@@ -106,6 +119,8 @@ class StreamSocketTransport
     }
 
     /**
+     * Get Timeout set
+     *
      * @return int
      */
     public function getTimeout()
@@ -114,7 +129,9 @@ class StreamSocketTransport
     }
 
     /**
-     * @return int
+     * Get Error Code if there was an error
+     *
+     * @return int|null null or int 0 if there are no error
      */
     public function getErrorCode()
     {
@@ -122,7 +139,9 @@ class StreamSocketTransport
     }
 
     /**
-     * @return string
+     * Get Error Message if there was an error
+     *
+     * @return string|null  null if there are no error
      */
     public function getErrorMessage()
     {
@@ -130,7 +149,9 @@ class StreamSocketTransport
     }
 
     /**
-     * @return bool
+     * Check if connection / process has an error
+     *
+     * @return bool true if there was error
      */
     public function isError()
     {
@@ -138,6 +159,8 @@ class StreamSocketTransport
     }
 
     /**
+     * Get Stream Object
+     *
      * @return Stream
      */
     public function getStream()
@@ -146,6 +169,8 @@ class StreamSocketTransport
     }
 
     /**
+     * Magic Method if there was object (this) print into string
+     *
      * @return string
      */
     public function __toString()
@@ -154,7 +179,7 @@ class StreamSocketTransport
     }
 
     /**
-     * Destruct
+     * Magic Method Destruct when object done
      */
     public function __destruct()
     {

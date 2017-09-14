@@ -16,7 +16,8 @@ namespace Pentagonal\WhoIs\Util;
  * Class DataGetter
  * @package Pentagonal\Whois\Util
  * For some reason I was found (on certain time) that iana does not include special
- * characters (idn) domain name
+ * characters (idn) domain name. So, before regenerated please make sure you have been check it
+ * before.
  */
 class DataGetter
 {
@@ -25,16 +26,22 @@ class DataGetter
     const TLD_PUBLIC_SUFFIX_URL = 'https://publicsuffix.org/list/effective_tld_names.dat';
 
     /**
+     * TLD Lists
+     *
      * @var array
      */
     protected $tldList;
 
     /**
+     * File that stored extension (json file)
+     *
      * @var string
      */
     protected $jsonDataFile;
 
     /**
+     * Determine whether use default
+     *
      * @var bool
      */
     private $useDefault = false;
@@ -48,7 +55,7 @@ class DataGetter
     public function __construct($jsonDataFile = null)
     {
         if ($jsonDataFile !== null && !is_string($jsonDataFile)) {
-            throw new \Exception(
+            throw new \InvalidArgumentException(
                 sprintf(
                     'Json data file must be as a string %s given',
                     gettype($jsonDataFile)
@@ -57,10 +64,23 @@ class DataGetter
         }
 
         if (!$jsonDataFile) {
-            $this->useDefault = true;
+            $this->setDefault(true);
         }
-        // this last (10 august 2017) data
+
+        /**
+         * set json file for extension
+         */
         $this->jsonDataFile = $jsonDataFile?: __DIR__ .'/Data/extension.json';
+    }
+
+    /**
+     * Set Default for generated data
+     *
+     * @param bool $isDefault
+     */
+    public function setDefault($isDefault)
+    {
+        $this->useDefault = (bool) $isDefault;
     }
 
     /**
@@ -106,6 +126,8 @@ class DataGetter
     }
 
     /**
+     * Get TLD Lists
+     *
      * @return array
      */
     public function getTLDList()
@@ -134,6 +156,8 @@ class DataGetter
     }
 
     /**
+     * Callback to filtering Result
+     *
      * @param StreamSocketTransport|Stream $stream
      * @param $type
      */
@@ -174,7 +198,10 @@ class DataGetter
     }
 
     /**
-     * Build For Data
+     * Build For Data Extension
+     *
+     * @return array|bool
+     * @throws \Exception
      */
     public function createNewRecordExtension()
     {
@@ -238,7 +265,10 @@ class DataGetter
             }
 
             fclose($socket);
+            return $this->tldList;
         }
+
+        return false;
     }
 
     /**

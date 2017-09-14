@@ -27,12 +27,20 @@ class VerifierTest extends TestCase
      */
     protected $verifier;
 
+    /**
+     * VerifierTest constructor.
+     *
+     * {@inheritdoc}
+     */
     public function __construct($name = null, array $data = [], $dataName = '')
     {
         parent::__construct($name, $data, $dataName);
         $this->verifier = new Verifier(new DataGetter());
     }
 
+    /**
+     * Test Getter @uses DataGetter
+     */
     public function testInstanceGetter()
     {
         $this->assertInstanceOf(
@@ -46,6 +54,11 @@ class VerifierTest extends TestCase
         );
     }
 
+    /**
+     * Test Extension lists
+     * @uses DataGetter::getTLDList()
+     * @uses Verifier::getExtensionList()
+     */
     public function testExtensionListArray()
     {
         $this->assertEquals(
@@ -59,6 +72,10 @@ class VerifierTest extends TestCase
         );
     }
 
+    /**
+     * Test for validation domain & email address
+     * @uses Verifier
+     */
     public function testValidationDomainAndEmail()
     {
         $this->assertTrue(
@@ -106,6 +123,11 @@ class VerifierTest extends TestCase
             'example.invalid must be not valid domain'
         );
     }
+
+    /**
+     * Test for sanitation & validation domain & email address
+     * @uses Verifier
+     */
     public function testDomainAndEmailSanity()
     {
         $domain = $this->verifier->validateDomain('examPle.ID');
@@ -189,6 +211,11 @@ class VerifierTest extends TestCase
             )
         );
     }
+
+    /**
+     * Test IPv4
+     * @uses Verifier
+     */
     public function testIPV4()
     {
         $this->assertTrue(

@@ -29,16 +29,22 @@ use Exception;
 class WhoIs
 {
     /**
+     * Stored object cached whois server on property from result
+     *
      * @var array
      */
     protected $cachedWhoIsServers = [];
 
     /**
+     * Stored cached result
+     *
      * @var array
      */
     protected $cachedWhoIsDomain = [];
 
     /**
+     * Stored Verifier Object
+     *
      * @var Verifier
      */
     protected $verifier;
@@ -62,8 +68,10 @@ class WhoIs
     }
 
     /**
-     * @param string $domain
-     * @param string $server
+     * Run process stream connection
+     *
+     * @param string $domain    domain name
+     * @param string $server    server url host
      * @return string
      */
     protected function runStreamConnection($domain, $server)
@@ -92,6 +100,8 @@ class WhoIs
     }
 
     /**
+     * Clean result data for unwanted
+     *
      * @param string $data
      * @return string
      */
@@ -122,6 +132,8 @@ class WhoIs
     }
 
     /**
+     * Get Alternative result from additional server host if exists
+     *
      * @param string $domainName
      * @param string $data
      * @param string $oldServer
@@ -160,12 +172,17 @@ class WhoIs
     }
 
     /**
+     * Internal Use only
+     *
      * @var bool
      */
     protected $allowNonDomain = false;
+
     /**
+     * Get whois server from given domain name
+     *
      * @param string $domain
-     * @return mixed
+     * @return mixed|string
      * @throws \UnexpectedValueException
      * @throws \DomainException
      */
@@ -201,6 +218,8 @@ class WhoIs
     }
 
     /**
+     * Get whois result detail from given domain name
+     *
      * @param string $domainName
      * @return array[]
      */
@@ -215,6 +234,8 @@ class WhoIs
     }
 
     /**
+     * Parse data from Result
+     * @internal
      * @param string $string
      * @return array
      */
@@ -234,6 +255,9 @@ class WhoIs
     }
 
     /**
+     * Convert to uppercase on first name for data detail
+     *
+     * @internal
      * @param string $name
      * @return string
      */
@@ -246,6 +270,8 @@ class WhoIs
     }
 
     /**
+     * Get Whois Detail
+     *
      * @param string $domainName
      * @return array
      */
@@ -260,6 +286,9 @@ class WhoIs
     }
 
     /**
+     * Clean result from ASN data
+     *
+     * @internal
      * @param string $asnResult
      * #param string $asn , $asn
      * @return string
@@ -326,6 +355,8 @@ class WhoIs
     }
 
     /**
+     * Get IP detail
+     *
      * @param string $address
      * @return array
      */
@@ -336,7 +367,7 @@ class WhoIs
 
     /**
      * Helper Parser
-     *
+     * @internal
      * @param string $dataResult
      * @return array
      */

@@ -15,6 +15,10 @@ namespace Pentagonal\WhoIs\Util;
 /**
  * Class Stream
  * @package Pentagonal\Whois\Util
+ *
+ * Stream Handler for WhoIs usage & data getter,
+ * this property only used for internal only but you can implement on other application
+ * if you prefer.
  */
 class Stream
 {
@@ -22,36 +26,50 @@ class Stream
     const TYPE_WRITE = 'write';
 
     /**
+     * Stream resource data property
+     *
      * @var resource
      */
     private $stream;
 
     /**
+     * Size of stream
+     *
      * @var int
      */
     private $size;
 
     /**
+     * Stored property if data is seekable
+     *
      * @var bool
      */
     private $seekable;
 
     /**
+     * Stored property if data is readable
+     *
      * @var bool
      */
     private $readable;
 
     /**
+     * Stored property if data is writable
+     *
      * @var bool
      */
     private $writable;
 
     /**
+     * Stored uri metadata
+     *
      * @var array|mixed
      */
     private $uri;
 
     /**
+     * Stored Custom Metadata
+     *
      * @var array|mixed
      */
     private $customMetadata;
@@ -61,12 +79,18 @@ class Stream
      * Collection Mode Of resource
      */
     private static $readWriteModes = [
+        /**
+         * Readable Mode
+         */
         self::TYPE_READ => [
             'r', 'w+', 'r+', 'x+', 'c+',
             'rb', 'w+b', 'r+b', 'x+b',
             'c+b', 'rt', 'w+t', 'r+t',
             'x+t', 'c+t', 'a+'
         ],
+        /**
+         * Writable Mode
+         */
         self::TYPE_WRITE => [
             'w', 'w+', 'rw', 'r+', 'x+',
             'c+', 'wb', 'w+b', 'r+b',
@@ -78,8 +102,8 @@ class Stream
     /**
      * Stream constructor.
      *
-     * @param $stream
-     * @param array $options
+     * @param resource $stream  stream resource (eg `fopen`)
+     * @param array $options    options configuration
      */
     public function __construct($stream, $options = [])
     {
@@ -109,7 +133,11 @@ class Stream
     }
 
     /**
-     * @param string $name
+     * Magic Method for backward compatibility
+     *
+     * @param string $name  property name
+     * @throws \RuntimeException
+     * @throws \BadMethodCallException
      */
     public function __get($name)
     {
@@ -121,7 +149,7 @@ class Stream
     }
 
     /**
-     * Closes the stream when the destructed
+     * Magic Method that to Closes the stream when the destructed
      */
     public function __destruct()
     {
@@ -129,7 +157,9 @@ class Stream
     }
 
     /**
-     * @return string
+     * Magic Method if there was object (this) print into string
+     *
+     * @return string content data
      */
     public function __toString()
     {
@@ -142,7 +172,9 @@ class Stream
     }
 
     /**
-     * @return bool|string
+     * Getting contents from stream
+     *
+     * @return bool|string  returning string if has content bool false if failed
      */
     public function getContents()
     {
@@ -170,7 +202,9 @@ class Stream
     }
 
     /**
-     * @return null|resource
+     * Detach stream from object resource
+     *
+     * @return null|resource    returning null if stream has not been attached yet otherwise resource
      */
     public function detach()
     {
@@ -190,7 +224,9 @@ class Stream
     }
 
     /**
-     * @return int|null
+     * Get Size of content buffers
+     *
+     * @return int|null     returning integer byte size otherwise null if stream has not been attached yet
      */
     public function getSize()
     {
@@ -217,7 +253,9 @@ class Stream
     }
 
     /**
-     * @return bool
+     * Check if stream is readable
+     *
+     * @return bool     true if stream readable
      */
     public function isReadable()
     {
@@ -225,6 +263,8 @@ class Stream
     }
 
     /**
+     * Check if stream is writable
+     *
      * @return bool
      */
     public function isWritable()
@@ -233,6 +273,8 @@ class Stream
     }
 
     /**
+     * Check if stream is seekable
+     *
      * @return bool
      */
     public function isSeekable()
@@ -241,6 +283,8 @@ class Stream
     }
 
     /**
+     * Check if stream is end of file / end resource line
+     *
      * @return bool
      */
     public function eof()
@@ -249,7 +293,10 @@ class Stream
     }
 
     /**
-     * @return bool|int
+     * Tell the stream
+     *
+     * @return bool|int     bool false if failed otherwise integer
+     * @throws \RuntimeException
      */
     public function tell()
     {
@@ -271,8 +318,11 @@ class Stream
     }
 
     /**
+     * Seek data by offset
+     *
      * @param int $offset
      * @param int $whence
+     * @throws \RuntimeException
      */
     public function seek($offset, $whence = SEEK_SET)
     {
@@ -289,9 +339,11 @@ class Stream
     }
 
     /**
-     * @param int $length
+     * Read data from stream
      *
-     * @return bool|string
+     * @param int $length   byte size to read
+     * @return bool|string  boolean false if no content (end of) and string if there are exists
+     * @throws \RuntimeException
      */
     public function read($length)
     {
@@ -315,9 +367,11 @@ class Stream
     }
 
     /**
-     * @param string $string
+     * Write data into stream
      *
-     * @return bool|int
+     * @param string $string    data to put
+     * @return bool|int         integer size of written into stream
+     * @throws \RuntimeException
      */
     public function write($string)
     {
@@ -337,8 +391,9 @@ class Stream
     }
 
     /**
-     * @param string $key
+     * Get metadata from stream
      *
+     * @param string $key   key of metadata
      * @return array|mixed|null
      */
     public function getMetadata($key = null)
