@@ -12,6 +12,16 @@
 
 namespace Pentagonal\WhoIs\Util;
 
+use Exception;
+use Pentagonal\WhoIs\Exceptions\ConnectionException;
+use Pentagonal\WhoIs\Exceptions\ConnectionRefuseException;
+use Pentagonal\WhoIs\Exceptions\HttpBadAddressException;
+use Pentagonal\WhoIs\Exceptions\HttpException;
+use Pentagonal\WhoIs\Exceptions\HttpExpiredException;
+use Pentagonal\WhoIs\Exceptions\HttpPermissionException;
+use Pentagonal\WhoIs\Exceptions\TimeOutException;
+use RuntimeException;
+
 /**
  * Class StreamSocketTransport
  * @package Pentagonal\WhoIs\Util
@@ -61,7 +71,7 @@ class StreamSocketTransport
      *
      * @var string
      */
-    protected $errorMessage;
+    protected $errorMessage = '';
 
     /**
      * SocketTransport constructor.
@@ -80,14 +90,47 @@ class StreamSocketTransport
             $this->errorMessage,
             $this->timeout
         );
+
         if (!$socket) {
-            throw new \Exception(
+            $throwable = $this->determineErrorException($this->errorCode, HttpException::class);
+            throw new $throwable(
                 $this->errorMessage,
                 $this->errorCode
             );
         }
 
         $this->stream = new Stream($socket);
+    }
+
+    /**
+     * @param int $code
+     * @param string $default
+     * @return string
+     */
+    private function determineErrorException($code, $default = Exception::class)
+    {
+        switch ($code) {
+            case SOCKET_ETIMEDOUT:
+                return TimeOutException::class;
+            case SOCKET_ETIME:
+                return HttpExpiredException::class;
+            case SOCKET_ECONNREFUSED:
+                return ConnectionRefuseException::class;
+            case SOCKET_EACCES:
+                return HttpPermissionException::class;
+            case SOCKET_EFAULT:
+                return HttpBadAddressException::class;
+            case SOCKET_EPROTONOSUPPORT:
+            case SOCKET_EPROTO:
+            case SOCKET_EPROTOTYPE:
+                return ConnectionException::class;
+            case SOCKET_EINVAL:
+            case SOCKET_EINTR:
+                return RuntimeException::class;
+        }
+
+        // default http exception
+        return $default;
     }
 
     /**
@@ -108,6 +151,7 @@ class StreamSocketTransport
                 )
             );
         }
+
         if ($this->stream) {
             return call_user_func_array([$this->stream, $name], $arguments);
         }

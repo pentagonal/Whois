@@ -12,9 +12,14 @@
 
 namespace Pentagonal\WhoIs;
 
+use Pentagonal\WhoIs\Exceptions\TimeOutException;
+use Pentagonal\WhoIs\Interfaces\CacheInterface;
+use Pentagonal\WhoIs\Util\Collection;
 use Pentagonal\WhoIs\Util\DataGetter;
+use Pentagonal\WhoIs\Util\ExtensionStorage;
 use Pentagonal\WhoIs\Util\StreamSocketTransport;
 use Exception;
+use InvalidArgumentException;
 
 /**
  * Class WhoIs
@@ -28,19 +33,27 @@ use Exception;
  */
 class WhoIs
 {
+    const REGEX_GET_SERVER = '/(Whois(\s+Server)?):\s*(?P<server>[^\s]+)/i';
+    const SERVER_PORT = 43;
+    const CACHE_PREFIX_SERVER = 'Pentagonal_WhoIs_Server_';
+    const CACHE_PREFIX_DOMAIN = 'Pentagonal_WhoIs_Domain_';
+
     /**
      * Stored object cached whois server on property from result
      *
-     * @var array
+     * @var array|ExtensionStorage[]
      */
-    protected $cachedWhoIsServers = [];
+    protected $temporaryCachedWhoIsServers = [];
 
     /**
-     * Stored cached result
-     *
-     * @var array
+     * @var int
      */
-    protected $cachedWhoIsDomain = [];
+    protected $cacheTimeOut = 3600;
+
+    /**
+     * @var CacheInterface
+     */
+    protected $cache;
 
     /**
      * Stored Verifier Object
@@ -50,13 +63,22 @@ class WhoIs
     protected $verifier;
 
     /**
+     * Internal Use only
+     *
+     * @var bool
+     */
+    private $allowNonDomain = false;
+
+    /**
      * WhoIs constructor.
      *
      * @param DataGetter $getter
+     * @param CacheInterface $cache
      */
-    public function __construct(DataGetter $getter)
+    public function __construct(DataGetter $getter, CacheInterface $cache = null)
     {
         $this->verifier = new Verifier($getter);
+        $this->cache = $cache;
     }
 
     /**
@@ -68,18 +90,102 @@ class WhoIs
     }
 
     /**
+     * @return CacheInterface
+     */
+    public function getCache()
+    {
+        return $this->cache;
+    }
+
+    /**
+     * @param int $timeout
+     */
+    public function setCacheTimeOut($timeout)
+    {
+        if (!is_numeric($timeout)) {
+            throw new InvalidArgumentException(
+                'Argument must be as an integer'
+            );
+        }
+        $this->cacheTimeOut = (int) $timeout;
+    }
+
+    /**
+     * @param string $identifier
+     * @param mixed  $value
+     * @return bool
+     */
+    protected function putCache($identifier, $value)
+    {
+        if ($this->cache) {
+            $this->cache->put($identifier, $value, $this->cacheTimeOut);
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * @param string $identifier
+     *
+     * @return mixed|null
+     */
+    protected function getFromCache($identifier)
+    {
+        if ($this->cache && $this->cache->exist($identifier)) {
+            return $this->cache->get($identifier);
+        }
+
+        return null;
+    }
+
+    /**
+     * @param string $identifier
+     */
+    protected function deleteCache($identifier)
+    {
+        if ($this->cache) {
+            $this->cache->delete($identifier);
+        }
+    }
+
+    /**
+     * @return array
+     */
+    public function getTemporaryCachedWhoIsServers()
+    {
+        return $this->temporaryCachedWhoIsServers;
+    }
+
+    /**
      * Run process stream connection
      *
      * @param string $domain    domain name
      * @param string $server    server url host
      * @return string
+     * @throws Exception
      */
-    protected function runStreamConnection($domain, $server)
+    protected function getResultFromStream($domain, $server)
     {
+        if (!is_string($domain)) {
+            throw new InvalidArgumentException(
+                'Domain name or IP must be as a string'
+            );
+        }
+
+        $server = $this->parseWhoIsServer($server);
+        $identifier = self::CACHE_PREFIX_DOMAIN . md5($domain . $server);
+        $cache = $this->getFromCache($identifier);
+        if (is_string($cache)) {
+            return $cache;
+        }
+
         try {
             $stream = new StreamSocketTransport($server);
-        } catch (Exception $exception) {
+        } catch (TimeOutException $exception) {
             $stream = new StreamSocketTransport($server);
+        } catch (Exception $exception) {
+            throw $exception;
         }
 
         if (!$stream->write("{$domain}\r\n")) {
@@ -89,14 +195,75 @@ class WhoIs
                 E_ERROR
             );
         }
+
         $data = '';
         while (!$stream->eof()) {
             $data .= $stream->read(4096);
         }
+
+        // close stream
         $stream->close();
         unset($stream);
-
+        // clean for whitespace on first
+        $data = $this->cleanWhiteSpaceFirst($data);
+        $this->putCache($identifier, $data);
         return $data;
+    }
+
+    /**
+     * @param string $data
+     *
+     * @return string
+     */
+    protected function cleanWhiteSpaceFirst($data)
+    {
+        if (!is_string($data)) {
+            throw new InvalidArgumentException(
+                sprintf(
+                    'Data must be as as string %s given.',
+                    gettype($data)
+                ),
+                E_WARNING
+            );
+        }
+
+        $data = preg_replace(
+            [
+                '/^(\s)+/sm', # clean each line start with whitespace
+                '/(\s)+/sm'   # clean multiple whitespace
+            ],
+            [
+                '',
+                '$1'
+            ],
+            $data
+        );
+
+        return trim($data);
+    }
+
+    /**
+     * @param string $domainName IP - ASN - Domain name
+     * @param string $server
+     *
+     * @return string
+     */
+    public function getFromServer($domainName, $server)
+    {
+        if ($this->verifier->isIPv4($domainName) || $this->verifier->validateASN($domainName)) {
+            $this->allowNonDomain = true;
+        }
+
+        if (! $this->verifier->isTopDomain($domainName) && ! $this->allowNonDomain) {
+            throw new \DomainException(
+                "Domain is not valid!",
+                E_ERROR
+            );
+        }
+
+        // reset
+        $this->allowNonDomain = false;
+        return $this->getResultFromStream($domainName, $server);
     }
 
     /**
@@ -105,14 +272,22 @@ class WhoIs
      * @param string $data
      * @return string
      */
-    private function cleanData($data)
+    public static function cleanResultData($data)
     {
+        if (!is_string($data)) {
+            throw new \InvalidArgumentException(
+                'Data must be as a string %s given.',
+                gettype($data)
+            );
+        }
+
         $data = trim($data);
         $data = preg_replace(
-            '/(\>\>\>|URL\s+of\s+the\s+ICANN\s+WHOIS).*/is',
-            '',
+            ['/(\>\>\>|URL\s+of\s+the\s+ICANN\s+WHOIS).*/is', '/([\n])+/s'],
+            ['', '$1'],
             $data
         );
+
         if (strpos($data, '#') !== false || strpos($data, '%') !== false) {
             $data = implode(
                 "\n",
@@ -132,51 +307,111 @@ class WhoIs
     }
 
     /**
-     * Get Alternative result from additional server host if exists
+     * @param string $server
      *
-     * @param string $domainName
-     * @param string $data
-     * @param string $oldServer
-     * @return array
+     * @return string
      */
-    protected function getForWhoIsServerAlternative(
-        $domainName,
-        $data,
-        $oldServer
-    ) {
-        try {
-            $data = $this->cleanData($data);
-            preg_match('/Whois\s+Server:\s*(?P<server>[^\s]+)/i', $data, $match);
-            if (empty($match['server'])) {
-                return [
-                    $oldServer => $data
-                ];
-            }
-
-            $data2 = $this->runStreamConnection($domainName, "{$match['server']}:43");
-            if (!empty($data2)) {
-                $array = explode('.', $domainName);
-                $this->cachedWhoIsServers[end($array)] = $match['server'];
-                $data2 = $this->cleanData($data2);
-                return [
-                    $oldServer => $data,
-                    $match['server'] => $data2
-                ];
-            }
-        } catch (\Exception $e) {
+    public function parseWhoIsServer($server)
+    {
+        if (!is_string($server)) {
+            throw new InvalidArgumentException(
+                'Server must be as a string'
+            );
         }
 
-        return [
-            $oldServer => $data
-        ];
+        $server = !preg_match('/^[a-z]+\:\/\//', $server)
+            ? 'whois://'. $server
+            : $server;
+        $server = parse_url($server, PHP_URL_HOST);
+        return $server . ':' . self::SERVER_PORT;
     }
 
     /**
-     * Internal Use only
+     * @param string $stringDomain
      *
-     * @var bool
+     * @return string
+     * @throws InvalidArgumentException
      */
-    protected $allowNonDomain = false;
+    protected function getParsedExtension($stringDomain)
+    {
+        if (!is_string($stringDomain)) {
+            throw new InvalidArgumentException(
+                'Domain name must be as a string'
+            );
+        }
+
+        $arr = explode('.', $stringDomain);
+        $ext = end($arr);
+        $ext = $ext ? $ext : null;
+        if (!$ext || trim($ext) == '') {
+            throw new \DomainException(
+                sprintf(
+                    'Invalid domain name for %s',
+                    $stringDomain
+                ),
+                E_WARNING
+            );
+        }
+
+        // fix
+        return strtolower(trim($ext));
+    }
+
+    /**
+     * @param string $extension
+     *
+     * @return mixed|null|ExtensionStorage
+     */
+    private function getExtensionCache($extension)
+    {
+        if (isset($this->temporaryCachedWhoIsServers[$extension])) {
+            return $this->temporaryCachedWhoIsServers[$extension];
+        }
+
+        $identifier = self::CACHE_PREFIX_SERVER .  $extension;
+        $extensionCache = $this->getFromCache($identifier);
+        if (!is_string($extensionCache)) {
+            return null;
+        }
+        $data = @unserialize($extensionCache);
+        if ($data instanceof ExtensionStorage) {
+            $this->temporaryCachedWhoIsServers[$extension] = $data;
+        }
+
+        $this->deleteCache($identifier);
+        return null;
+    }
+
+    /**
+     * @param string $extension
+     * @param ExtensionStorage $data
+     */
+    private function putExtensionCache($extension, ExtensionStorage $data)
+    {
+        $identifier = self::CACHE_PREFIX_SERVER .  $extension;
+        $this->putCache($identifier, $data);
+    }
+
+    /**
+     * @param string $data
+     *
+     * @return null|string
+     * @throws InvalidArgumentException
+     */
+    protected function parseWhoIsServerFromData($data)
+    {
+        if (!is_string($data)) {
+            throw new InvalidArgumentException(
+                sprintf(
+                    'Data must be as a string %s given',
+                    gettype($data)
+                )
+            );
+        }
+
+        preg_match(self::REGEX_GET_SERVER, $data, $match);
+        return isset($match['server']) ? $match['server'] : null;
+    }
 
     /**
      * Get whois server from given domain name
@@ -188,27 +423,23 @@ class WhoIs
      */
     public function getWhoIsServer($domain)
     {
-        if (!$this->verifier->isTopDomain($domain) && !$this->allowNonDomain) {
-            throw new \DomainException(
-                "Domain is not valid!",
-                E_ERROR
-            );
+        $extension = $this->getParsedExtension($domain);
+        $extensions = $this->getExtensionCache($extension);
+        if ($extension && count($extensions) > 0) {
+            return $extensions->reset();
         }
 
-        $this->allowNonDomain = false;
-        $array = explode('.', $domain);
-        if (! isset($this->cachedWhoIsServers[end($array)])) {
-            $this->cachedWhoIsServers[end($array)] = false;
-            $body = $this->runStreamConnection($domain, DataGetter::BASE_ORG_URL . ":43");
-            preg_match('/whois:\s*(?P<server>[^\n]+)/i', $body, $match);
-            if (!empty($match['server']) && ($server = trim($match['server']) != '')) {
-                $this->cachedWhoIsServers[end($array)] = $match['server'];
-                return $match['server'];
+        $this->temporaryCachedWhoIsServers[$extension] = new ExtensionStorage();
+        $body = $this->getFromServer($domain, DataGetter::BASE_ORG_URL);
+        if (is_string($body) && trim($body) != '') {
+            $server = $this->parseWhoIsServerFromData($body);
+            if ($server) {
+                $this->temporaryCachedWhoIsServers[$extension]->clear();
+                $this->temporaryCachedWhoIsServers[$extension]->add($server);
+                $this->putExtensionCache($extension, $this->temporaryCachedWhoIsServers[$extension]);
+
+                return $server;
             }
-        }
-
-        if ($this->cachedWhoIsServers[end($array)]) {
-            return $this->cachedWhoIsServers[end($array)];
         }
 
         throw new \UnexpectedValueException(
@@ -218,14 +449,61 @@ class WhoIs
     }
 
     /**
+     * Get Alternative result from additional server host if exists
+     *
+     * @param string $domainName
+     * @param string $data
+     * @param bool $clean
+     * @return string[]|Collection
+     */
+    private function getFromAlternativeServer($domainName, $data, $clean = false)
+    {
+        $extension = $this->getParsedExtension($domainName);
+        $extensions = $this->temporaryCachedWhoIsServers[$extension];
+        $reset     = $extensions->reset();
+        if (count($extensions) > 1) {
+            $newServer = $extensions->next();
+            $extensions->clear();
+            $extensions->merge([$reset, $newServer]);
+        } else {
+            preg_match(self::REGEX_GET_SERVER, $data, $match);
+            if (empty($match['server'])) {
+                return new Collection([$reset => $data]);
+            }
+
+            $newServer = $match['server'];
+            $extensions->clear();
+            $extensions->merge([$reset, $newServer]);
+            $this->putExtensionCache($extension, $extensions);
+        }
+        $this->temporaryCachedWhoIsServers[$extension] = $extensions;
+        try {
+            $data2 = $this->getFromServer($domainName, $newServer);
+            if ($clean) {
+                $data2 = $this->cleanResultData($data2);
+            }
+
+            if (!empty($data2)) {
+                return new Collection([
+                    $reset     => $data,
+                    $newServer => $data2
+                ]);
+            }
+        } catch (\Exception $e) {
+        }
+
+        return new Collection([$reset => $data]);
+    }
+
+    /**
      * Get whois result detail from given domain name
      *
      * @param string $domainName
-     * @return array[]
+     * @return Collection|Collection[]
      */
     public function getWhoIsWithArrayDetail($domainName)
     {
-        $whoIs = $this->getWhoIs($domainName);
+        $whoIs = $this->getWhoIs($domainName, true, true);
         foreach ($whoIs as $key => $value) {
             $whoIs[$key] = $this->parseDataDetail($value);
         }
@@ -237,7 +515,7 @@ class WhoIs
      * Parse data from Result
      * @internal
      * @param string $string
-     * @return array
+     * @return Collection
      */
     private function parseDataDetail($string)
     {
@@ -251,7 +529,7 @@ class WhoIs
             }
         }
 
-        return $data;
+        return new Collection($data);
     }
 
     /**
@@ -270,18 +548,27 @@ class WhoIs
     }
 
     /**
-     * Get Whois Detail
-     *
      * @param string $domainName
-     * @return array
+     * @param bool $clean
+     * @param bool $followWhoIs
+     *
+     * @return string[]|Collection
      */
-    public function getWhoIs($domainName)
+    public function getWhoIs($domainName, $clean = false, $followWhoIs = false)
     {
         $whoIsServer = $this->getWhoIsServer($domainName);
-        return $this->getForWhoIsServerAlternative(
+        $result = $this->getResultFromStream($domainName, $whoIsServer);
+        if ($clean) {
+            $result = $this->cleanResultData($result);
+        }
+        if (!$followWhoIs) {
+            return new Collection([$whoIsServer => $result]);
+        }
+
+        return $this->getFromAlternativeServer(
             $domainName,
-            $this->runStreamConnection($domainName, "{$whoIsServer}:43"),
-            $whoIsServer
+            $result,
+            $clean
         );
     }
 
@@ -300,15 +587,17 @@ class WhoIs
         if (!empty($match['data'])) {
             $asnResult = trim($match['data']);
         }*/
-        $asnResult = $this->cleanData($asnResult);
+        $asnResult = $this->cleanResultData($asnResult);
         return $asnResult;
     }
 
     /**
      * @param string $asn
-     * @return string
+     * @param bool $clean
+     *
+     * @return array|Collection
      */
-    public function getASNData($asn)
+    public function getASNData($asn, $clean = false)
     {
         $asn = $this->verifier->validateASN($asn);
         if (!$asn) {
@@ -317,27 +606,38 @@ class WhoIs
                 E_USER_ERROR
             );
         }
+
         $this->allowNonDomain = true;
         $whoIsServer = $this->getWhoIsServer($asn);
-        return $this->cleanASN(
-            $this->runStreamConnection($asn, "{$whoIsServer}:43")
-        );
+        $result = $this->getFromServer($asn, $whoIsServer);
+        if (!$clean) {
+            return new Collection([
+                $whoIsServer => $result
+            ]);
+        }
+
+        return new Collection([$whoIsServer => $this->cleanASN($result)]);
     }
 
     /**
      * @param string $asn
-     * @return array
+     * @param bool $clean
+     *
+     * @return Collection|Collection[]
      */
-    public function getASNWithArrayDetail($asn)
+    public function getASNWithArrayDetail($asn, $clean = false)
     {
-        return $this->parseForNicData($this->getASNData($asn));
+        $result = $this->getASNData($asn, $clean);
+        $key = key($result);
+        return new Collection([$key => $this->parseForNicData($result[$key])]);
     }
 
     /**
      * @param string $data
-     * @return string
+     * @param bool   $clean
+     * @return Collection|Collection[]
      */
-    public function getIpData($data)
+    public function getIpData($data, $clean = false)
     {
         $ipData = @gethostbyaddr(@gethostbyname($data));
         if (!$ipData) {
@@ -349,27 +649,36 @@ class WhoIs
 
         $this->allowNonDomain = true;
         $whoIsServer = $this->getWhoIsServer($ipData);
-        return $this->cleanASN(
-            $this->runStreamConnection($ipData, "{$whoIsServer}:43")
-        );
+        $result = $this->getFromServer($ipData, $whoIsServer);
+
+        if (!$clean) {
+            return new Collection([$whoIsServer => $result]);
+        }
+
+        return new Collection([$whoIsServer => $this->cleanASN($result)]);
     }
 
     /**
      * Get IP detail
      *
      * @param string $address
-     * @return array
+     * @param bool $clean
+     * @return Collection|Collection[]
      */
-    public function getIPWithArrayDetail($address)
+    public function getIPWithArrayDetail($address, $clean = false)
     {
-        return $this->parseForNicData($this->getIpData($address));
+        $result = $this->getIpData($address, $clean);
+        $key = key($result);
+        return new Collection([
+            $key => $this->parseForNicData($result[$key])
+        ]);
     }
 
     /**
      * Helper Parser
      * @internal
      * @param string $dataResult
-     * @return array
+     * @return Collection
      */
     private function parseForNicData($dataResult)
     {
@@ -415,6 +724,6 @@ class WhoIs
             }
         }
 
-        return $data2;
+        return new Collection($data2);
     }
 }

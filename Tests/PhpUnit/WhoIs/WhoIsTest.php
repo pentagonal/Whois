@@ -90,15 +90,24 @@ class WhoIsTest extends TestCase
             $this->assertNotEmpty(
                 $whoIsArray,
                 sprintf(
-                    '%s::getWhoIsWithArrayDetail() with value `google.com` success must be return array',
+                    '%s::getWhoIsWithArrayDetail() with value `google.com` success must be return iterable',
                     WhoIs::class
                 )
             );
             $this->assertNotEmpty(
                 reset($whoIsArray),
                 sprintf(
-                    '%s::getWhoIsWithArrayDetail() with value `google.com` success must be return array',
+                    '%s::getWhoIsWithArrayDetail() with value `google.com` success must be return iterable',
                     WhoIs::class
+                )
+            );
+            $this->assertInstanceOf(
+                \ArrayObject::class,
+                $whoIsArray,
+                sprintf(
+                    '%1$s::getWhoIsWithArrayDetail() with value `google.com` success must be return %2$s',
+                    WhoIs::class,
+                    \ArrayObject::class
                 )
             );
             $counted = count($whoIsArray);

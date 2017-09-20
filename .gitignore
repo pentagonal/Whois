@@ -86,3 +86,6 @@ composer.phar
 
 # add exclude vendor
 vendor
+
+# add exclude build
+build

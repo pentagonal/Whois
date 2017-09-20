@@ -16,18 +16,22 @@ Php Domain / ASN / IP WhoIs Checker
 
 ```php
 <?php
+/**
+ * WhoIs detail returning server as key
+ * returning @uses \ArrayObject 
+ */
 use Pentagonal\WhoIs\WhoIs;
 use Pentagonal\WhoIs\Util\DataGetter;
 
 $who = new WhoIs(new DataGetter());
 // get data from whois with fully detail per registrant data
-$who->getWhoIsWithArrayDetail('example.com'); # array
+$who->getWhoIsWithArrayDetail('example.com'); # instance of ArrayObject
 // get data from whois with include alternative if there was alternative will be returning 2 array data
-$who->getWhoIs('example.com'); # array
+$who->getWhoIs('example.com'); # instance of ArrayObject
 // get server address for whois from domain
-$who->getWhoIsServer('example.com'); # string
+$who->getWhoIsServer('example.com'); # instance of ArrayObject
 // get ip data result
-$who->getIpData('127.0.0.1'); # string
+$who->getIpData('127.0.0.1'); # instance of ArrayObject
 // ... do your
 ```
 
