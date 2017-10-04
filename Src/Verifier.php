@@ -180,7 +180,7 @@ class Verifier
         $extension = idn_to_ascii($result[self::SELECTOR_EXTENSION_NAME]);
 
         if (!isset($this->getExtensionList()[$extension])
-            || $result[self::SELECTOR_DOMAIN_NAME] > 63
+            || strlen($result[self::SELECTOR_DOMAIN_NAME]) > 63
             /* just make sure example.(com|org) not used */
             /* || result[1] === 'example' && ['com', 'org'].indexOf(result.extension_domain) > -1 */
         ) {
