@@ -33,8 +33,12 @@ use InvalidArgumentException;
  */
 class WhoIs
 {
-    const REGEX_GET_SERVER = '/(Whois(\s+Server)?):\s*(?P<server>[^\s]+)/i';
+    const REGEX_GET_SERVER  = '/(Whois(\s+Server)?):\s*(?P<server>[^\s]+)/i';
     const SERVER_PORT = 43;
+
+    /**
+     * Cache Prefix Name
+     */
     const CACHE_PREFIX_SERVER = 'Pentagonal_WhoIs_Server_';
     const CACHE_PREFIX_DOMAIN = 'Pentagonal_WhoIs_Domain_';
 
@@ -499,11 +503,13 @@ class WhoIs
      * Get whois result detail from given domain name
      *
      * @param string $domainName
-     * @return Collection|Collection[]
+     * @param bool $followWhoIs
+     *
+     * @return Collection|string[]
      */
-    public function getWhoIsWithArrayDetail($domainName)
+    public function getWhoIsWithArrayDetail($domainName, $followWhoIs = false)
     {
-        $whoIs = $this->getWhoIs($domainName, true, true);
+        $whoIs = $this->getWhoIs($domainName, true, $followWhoIs);
         foreach ($whoIs as $key => $value) {
             $whoIs[$key] = $this->parseDataDetail($value);
         }
@@ -573,11 +579,161 @@ class WhoIs
     }
 
     /**
+     * @param string $domainName
+     *
+     * @return bool|null null if unknown result or maybe empty result or bool if registered or not
+     */
+    public function isDomainRegistered($domainName)
+    {
+        if (!is_string($domainName)) {
+            throw new \InvalidArgumentException(
+                sprintf(
+                    'Invalid domain name. Domain name must be as a string %s given',
+                    gettype($domainName)
+                ),
+                E_WARNING
+            );
+        }
+        if (!$this->getVerifier()->isTopDomain($domainName)) {
+            throw new \InvalidArgumentException(
+                sprintf(
+                    'The %s is not valid domain name',
+                    $domainName
+                ),
+                E_WARNING
+            );
+        }
+
+        $data = $this->getWhoIs($domainName, false)->getArrayCopy();
+        $data = reset($data);
+        if (!is_string($data)) {
+            return null;
+        }
+
+        return $this->isDomainRegisteredParser($data);
+    }
+
+    /**
+     * Domain Parser Registered or Not Callback
+     *
+     * @param string $data
+     *
+     * @return bool|null null if unknown result or maybe empty result / limit exceeded or bool if registered or not
+     * @throws InvalidArgumentException
+     */
+    protected function isDomainRegisteredParser($data)
+    {
+        if (!is_string($data)) {
+            throw new \InvalidArgumentException(
+                sprintf(
+                    'Invalid data. Data must be as a string %s given',
+                    gettype($data)
+                ),
+                E_WARNING
+            );
+        }
+
+        $cleanData = trim($this->cleanResultData($data));
+        // check if empty result
+        if ($cleanData === '') {
+            // if cleanData is empty & data is not empty check entries
+            if ($data && preg_match('/No\s+entries(?:\s+found)?|Not(?:hing)?\s+found/i', $data)) {
+                return false;
+            }
+            return null;
+        }
+
+        // array check for detailed content only that below is not registered
+        $matchUnRegistered = [
+            'domain not found',
+            'not found',
+            'no data found',
+            'no match',
+            'this domain name has not been registered',
+            'the queried object does not exist'
+        ];
+        // clean dot on both side
+        $cleanData = trim($cleanData, '.');
+        if (in_array(strtolower($cleanData), $matchUnRegistered)) {
+            return false;
+        }
+
+        /**
+         * First word that match of given domain
+         */
+        $firstTagRegex = '/^(?:
+            No\s+match\s+for
+            | No\s+Match
+            | Not\s+found\s*\:?
+            | No\s*Data\s+Found
+            | Domain\s+not\s+found
+            | Invalid\s+query\s+or\s+domain
+            | The\s+queried\s+object\s+does\s+not\s+exist
+            | (?:Th(?:is|e))\s+domain(?:\s*name)?\s+has\s*not\s+been\s+register
+        )/ix';
+        $lastRegex = '/^(?:.+)\s*(?:No\s+match|not\s+exist\s+[io]n\s+database(?:[\!]+)?)$/';
+        // check
+        if (preg_match($firstTagRegex, $cleanData) # regex not match or not found
+            || preg_match(
+                '/Domain\s+Status\s*\:\s*(available|No\s+Object\s+Found)/im',
+                $cleanData
+            )
+            # match for queried object
+            || preg_match($lastRegex, $cleanData)
+            # match domain with name and with status available extension for eg: .be
+            || preg_match('/Domain\s*\:(?:[\n]+)/i', $cleanData)
+            && preg_match('/(?:Domain\s+)?Status\s*\:\s*(?:AVAILABLE|(?:No\s+Object|Not)\s+Found)/i', $cleanData)
+        ) {
+            return false;
+        }
+
+        /**
+         * Regex Collection
+         */
+        # Contact , tech or billing detail
+        $regexContactAndStatus = '/
+            (
+                Registr(?:ar|y|nt)\s[^\:]+
+                | Whois\s+Server
+                | (?:Phone|Registrar|Contact|(?:admin|tech)-c|Organisations?)
+            )\s*\:\s*(?<data>[\n]+)
+        /ix';
+        # Name Server
+        $regexNameServer = '/(?:(?:Name\s+Servers?|nserver)\s*\:\s*)(?P<server>[^\n]+)/i';
+        # Reserved Domain
+        $regexReserved = '/^\s*Reserved\s*By/i';
+        if (preg_match($regexReserved, $cleanData) # -> reserved domain so it will be registered
+            # else check contact or status billing, tech or contact
+            || preg_match($regexContactAndStatus, $cleanData, $matchData)
+            && !empty($matchData['data'])
+            && (
+                # match for name server
+                preg_match($regexNameServer, $cleanData, $matchServer)
+                && !empty($matchServer['server'])
+                # match for billing
+                || preg_match(
+                    '/(?:Billing|Tech)\s+Email\s*:(?P<data>[^\n]+)/i',
+                    $cleanData,
+                    $matchDataResult
+                ) && !empty($matchDataResult['data'])
+           )
+        ) {
+            return true;
+        }
+
+        # check if on limit whois check
+        if (preg_match('/exceeded\s(.+)?limit|limit\s+exceed/i', $cleanData)) {
+            return null;
+        }
+
+        return false;
+    }
+
+    /**
      * Clean result from ASN data
      *
      * @internal
      * @param string $asnResult
-     * #param string $asn , $asn
      * @return string
      */
     private function cleanASN($asnResult)
