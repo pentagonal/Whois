@@ -372,20 +372,20 @@ class VerifierTest extends TestCase
             $verifier->sanitizeDomain('domain.invalid')
         );
         $this->assertFalse(
-            $verifier->validateASN('Invalid')
+            $verifier->sanitizeASN('Invalid')
         );
         $this->assertFalse(
-            $verifier->validateASN(true)
+            $verifier->sanitizeASN(true)
         );
         $this->assertFalse(
-            $verifier->validateASN('ABC12345')
+            $verifier->sanitizeASN('ABC12345')
         );
         $this->assertEquals(
-            $verifier->validateASN('AS12345'),
+            $verifier->sanitizeASN('AS12345'),
             '12345'
         );
         $this->assertEquals(
-            $verifier->validateASN('12345'),
+            $verifier->sanitizeASN('12345'),
             '12345'
         );
         $extensionInvalid = $verifier->getExtensionIDN(true);

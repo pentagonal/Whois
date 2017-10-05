@@ -254,7 +254,7 @@ class WhoIs
      */
     public function getFromServer($domainName, $server)
     {
-        if ($this->verifier->isIPv4($domainName) || $this->verifier->validateASN($domainName)) {
+        if ($this->verifier->isIPv4($domainName) || $this->verifier->sanitizeASN($domainName)) {
             $this->allowNonDomain = true;
         }
 
@@ -766,7 +766,7 @@ class WhoIs
      */
     public function getASNData($asn, $clean = false)
     {
-        $asn = $this->verifier->validateASN($asn);
+        $asn = $this->verifier->sanitizeASN($asn);
         if (!$asn) {
             throw new \InvalidArgumentException(
                 'Invalid asn number.',

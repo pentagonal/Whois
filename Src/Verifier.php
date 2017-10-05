@@ -387,7 +387,7 @@ class Verifier
      * @param string|int $name
      * @return bool|string
      */
-    public function validateASN($name)
+    public function sanitizeASN($name)
     {
         if (! is_numeric($name) && ! is_string($name)) {
             return false;
