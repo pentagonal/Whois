@@ -18,6 +18,46 @@ class Collection extends \ArrayObject implements \JsonSerializable
     }
 
     /**
+     * Get First Value
+     *
+     * @return mixed
+     */
+    public function first()
+    {
+        return reset($this);
+    }
+
+    /**
+     * Get First Value
+     *
+     * @return mixed
+     */
+    public function last()
+    {
+        return end($this);
+    }
+
+    /**
+     * Get Next Offset
+     *
+     * @return mixed
+     */
+    public function next()
+    {
+        return next($this);
+    }
+
+    /**
+     * Previous Data
+     *
+     * @return mixed
+     */
+    public function prev()
+    {
+        return prev($this);
+    }
+
+    /**
      * @return array
      */
     public function jsonSerialize()
