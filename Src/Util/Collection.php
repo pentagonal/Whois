@@ -48,6 +48,16 @@ class Collection extends \ArrayObject implements \JsonSerializable
     }
 
     /**
+     * Current Offset
+     *
+     * @return mixed
+     */
+    public function current()
+    {
+        return current($this);
+    }
+
+    /**
      * Previous Data
      *
      * @return mixed

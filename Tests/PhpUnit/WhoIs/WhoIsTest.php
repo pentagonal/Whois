@@ -12,6 +12,7 @@
 
 namespace Pentagonal\Tests\PhpUnit\WhoIs;
 
+use Pentagonal\WhoIs\Util\Collection;
 use Pentagonal\WhoIs\Util\DataGetter;
 use Pentagonal\WhoIs\Verifier;
 use Pentagonal\WhoIs\WhoIs;
@@ -37,24 +38,6 @@ class WhoIsTest extends TestCase
     {
         parent::__construct($name, $data, $dataName);
         $this->whoIs = new WhoIs(new DataGetter());
-    }
-
-    /**
-     * Test WhoIs Object
-     * @uses Verifier
-     * @uses WhoIs
-     */
-    public function testVerifierFromWhoIsObject()
-    {
-        $this->assertInstanceOf(
-            Verifier::class,
-            $this->whoIs->getVerifier(),
-            sprintf(
-                'Result of %s::getVerifier() must be instance of %s',
-                WhoIs::class,
-                Verifier::class
-            )
-        );
     }
 
     /**
@@ -110,7 +93,16 @@ class WhoIsTest extends TestCase
                     \ArrayObject::class
                 )
             );
-            $counted = count($whoIsArray);
+            $whoIsArraySecond = $this->whoIs->getWhoIsWithArrayDetail(
+                'google.com',
+                true
+            );
+            $this->assertNotEquals(
+                $whoIsArray->last(),
+                $whoIsArraySecond->last()
+            );
+
+            $counted = count($whoIsArraySecond);
             if ($counted > 1) {
                 $this->assertEquals(
                     $counted,
@@ -130,6 +122,10 @@ class WhoIsTest extends TestCase
                     'Google result use whois.markmonitor.com as whois server'
                     .' so its maybe if success will be returned 2 data array with different result'
                 );
+                $this->assertTrue(
+                    $this->whoIs->isDomainRegistered('google.com'),
+                    'Use method isDomainRegistered() Google.com with result is true'
+                );
             }
         } catch (\Exception $e) {
             $this->assertInstanceOf(
@@ -138,5 +134,118 @@ class WhoIsTest extends TestCase
                 'Error there was problem.'
             );
         }
+    }
+
+    public function testOtherContext()
+    {
+        $this->assertInstanceOf(
+            Verifier::class,
+            $this->whoIs->getVerifier(),
+            sprintf(
+                'Result of %s::getVerifier() must be instance of %s',
+                WhoIs::class,
+                Verifier::class
+            )
+        );
+
+        $result = $this->whoIs->getWhoIs('google.com');
+        $this->assertInstanceOf(
+            Collection::class,
+            $result,
+            sprintf(
+                'Get whois mustbe instanceof %s',
+                Collection::class
+            )
+        );
+        $resultSecond = $this->whoIs->getWhoIs('google.com', true);
+        $this->assertNotEquals(
+            $result->first(),
+            $resultSecond->first(),
+            'Clean result and result is not same'
+        );
+
+        $resultThird = $this->whoIs->getWhoIs('google.com', true, true);
+        if (count($resultThird) > 1) {
+            $this->assertNotEquals(
+                $resultThird->first(),
+                $resultThird->last(),
+                'Clean result and result is not same'
+            );
+        }
+
+        $this->assertNotEquals(
+            $resultThird->first(),
+            $resultThird->next(),
+            'Clean result and result is not same'
+        );
+
+        $this->assertNotEquals(
+            $resultThird->current(),
+            $resultThird->prev(),
+            'Clean result and result is not same'
+        );
+        $this->assertJson(
+            json_encode($result),
+            'Result of who is is json serialize-able'
+        );
+        $this->assertEquals(
+            json_encode($result),
+            json_encode($result->getArrayCopy()),
+            'Result of who is is json serialize-able same with array copy'
+        );
+        $this->assertEquals(
+            json_encode($result),
+            json_encode((array) $result),
+            'Result of who is is json serialize-able same with array copy'
+        );
+        $whoIsServer = $this->whoIs->parseWhoIsServerFromData($result->first());
+        $this->assertContains(
+            'whois.',
+            $whoIsServer,
+            'Google use whois.markmonitor.com for followed whois.'
+        );
+
+        $parsedServer = $this->whoIs->parseWhoIsServer($whoIsServer);
+        $this->assertContains(
+            ':'.WhoIs::SERVER_PORT,
+            $parsedServer,
+            'Parsed Whois server for '
+        );
+        $this->assertArrayHasKey(
+            'com',
+            $this->whoIs->getTemporaryCachedWhoIsServers()
+        );
+        try {
+            WhoIs::cleanResultData(null);
+        } catch (\InvalidArgumentException $e) {
+            $this->assertInstanceOf(
+                \InvalidArgumentException::class,
+                $e
+            );
+        }
+        // clean
+        $data = WhoIs::cleanResultData('URL of the ICANN Whois Inaccuracy Complaint Form: ');
+        $this->assertEquals(
+            '',
+            $data
+        );
+        // clean
+        $data = WhoIs::cleanResultData('# Text Must Be deleted');
+        $this->assertEquals(
+            '',
+            $data
+        );
+        // clean
+        $data = WhoIs::cleanResultData('% Text Must Be deleted');
+        $this->assertEquals(
+            '',
+            $data
+        );
+        // clean
+        $data = WhoIs::cleanResultData('>>> Text Must Be deleted');
+        $this->assertEquals(
+            '',
+            $data
+        );
     }
 }

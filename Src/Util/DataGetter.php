@@ -200,7 +200,7 @@ class DataGetter
     /**
      * Build For Data Extension
      *
-     * @return array|bool
+     * @return array
      * @throws \Exception
      */
     public function createNewRecordExtension()
@@ -268,7 +268,7 @@ class DataGetter
             return $this->tldList;
         }
 
-        return false;
+        return $this->tldList;
     }
 
     /**

@@ -193,10 +193,8 @@ class Verifier
                 $result[self::SELECTOR_DOMAIN_NAME],
                 $match,
                 PREG_NO_ERROR
-            )
+            ) || !preg_match('/^[a-z0-9]+(?:(?:[a-z0-9-]+)?[a-z0-9]$)?/', $result[self::SELECTOR_DOMAIN_NAME])
         ) {
-            return false;
-        } elseif (!preg_match('/^[a-z0-9]+(?:(?:[a-z0-9-]+)?[a-z0-9]$)?/', $result[self::SELECTOR_DOMAIN_NAME])) {
             return false;
         }
 
@@ -269,7 +267,7 @@ class Verifier
         }
 
         $email = trim(strtolower($email));
-        if (preg_match('/(?:^@)|(?:@$)/', $email, $match)) {
+        if (substr($email, 0, 1) === '@' || substr($email, -1) === '@') {
             return false;
         }
 
@@ -279,8 +277,10 @@ class Verifier
         }
         // sanity on global domains
         if (in_array($domainArray[self::SELECTOR_EXTENSION_NAME], ['de', 'ru', 'co', 'net', 'com'])) {
-            if (! empty($domainArray[self::SELECTOR_SUB_DOMAIN_NAME])) {
-                return in_array($domainArray[self::SELECTOR_DOMAIN_NAME], $this->commonEmailProvider);
+            if (! empty($domainArray[self::SELECTOR_SUB_DOMAIN_NAME])
+                && in_array($domainArray[self::SELECTOR_DOMAIN_NAME], $this->commonEmailProvider)
+            ) {
+                return false;
             }
         }
 
@@ -355,9 +355,10 @@ class Verifier
      */
     public function isIPv4($ip)
     {
-        if (strlen($ip) > 15) {
+        if (! is_string($ip) || strlen($ip) > 15) {
             return false;
         }
+
         return (bool) preg_match(
             self::IPV4_REGEX,
             $ip
@@ -370,7 +371,7 @@ class Verifier
      */
     public function isLocalIPv4($ip)
     {
-        if (strlen($ip) > 15) {
+        if (! is_string($ip) || strlen($ip) > 15) {
             return false;
         }
 
@@ -388,11 +389,11 @@ class Verifier
      */
     public function validateASN($name)
     {
-        if (!is_numeric($name) && is_string($name)) {
+        if (! is_numeric($name) && ! is_string($name)) {
             return false;
         }
 
-        if (preg_match('/^(?:AS)?(?P<number>[0-9]{1,7})$/i', $name, $match)) {
+        if (preg_match('/^(?:ASN?)?\s*(?P<number>[0-9]{1,7})$/i', $name, $match)) {
             return $match['number'];
         }
 

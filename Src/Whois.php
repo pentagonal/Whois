@@ -280,14 +280,17 @@ class WhoIs
     {
         if (!is_string($data)) {
             throw new \InvalidArgumentException(
-                'Data must be as a string %s given.',
-                gettype($data)
+                sprintf(
+                    'Data must be as a string %s given.',
+                    gettype($data)
+                ),
+                E_WARNING
             );
         }
 
         $data = trim($data);
         $data = preg_replace(
-            ['/(\>\>\>|URL\s+of\s+the\s+ICANN\s+WHOIS).*/is', '/([\n])+/s'],
+            ['/(\>\>\>?|URL\s+of\s+the\s+ICANN\s+WHOIS).*/is', '/([\n])+/s'],
             ['', '$1'],
             $data
         );
@@ -402,14 +405,15 @@ class WhoIs
      * @return null|string
      * @throws InvalidArgumentException
      */
-    protected function parseWhoIsServerFromData($data)
+    public function parseWhoIsServerFromData($data)
     {
         if (!is_string($data)) {
             throw new InvalidArgumentException(
                 sprintf(
                     'Data must be as a string %s given',
                     gettype($data)
-                )
+                ),
+                E_WARNING
             );
         }
 
