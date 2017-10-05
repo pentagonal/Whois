@@ -84,3 +84,20 @@ If there was crash or other damage
 All of risks being your responsibilities.
 
 ```
+
+## USING COMPOSER TO INSTALL
+
+```json
+{
+ // ... other
+  "require": {
+    // ... other repo
+    "pentagonal/whois": "dev-master"
+  }
+}
+```
+or
+
+```bash
+composer require pentagonal/whois
+```
