@@ -640,6 +640,7 @@ class WhoIs
             if ($data && preg_match('/No\s+entries(?:\s+found)?|Not(?:hing)?\s+found/i', $data)) {
                 return false;
             }
+
             return null;
         }
 
@@ -680,11 +681,17 @@ class WhoIs
             )
             # match for queried object
             || preg_match($lastRegex, $cleanData)
-            # match domain with name and with status available extension for eg: .be
-            || preg_match('/Domain\s*\:(?:[\n]+)/i', $cleanData)
-            && preg_match('/(?:Domain\s+)?Status\s*\:\s*(?:AVAILABLE|(?:No\s+Object|Not)\s+Found)/i', $cleanData)
         ) {
             return false;
+        }
+        # match domain with name and with status available extension for eg: .be
+        if (preg_match('/Domain\s*\:(?:[^\n]+)/i', $cleanData)) {
+            if (preg_match('/(?:Domain\s+)?Status\s*\:\s*(?:AVAILABLE|(?:No\s+Object|Not)\s+Found)/i', $cleanData)) {
+                return false;
+            }
+            if (preg_match('/(?:Domain\s+)?Status\s*\:\s*NOT\s*AVAILABLE/i', $cleanData)) {
+                return true;
+            }
         }
 
         /**
@@ -696,10 +703,11 @@ class WhoIs
                 Registr(?:ar|y|nt)\s[^\:]+
                 | Whois\s+Server
                 | (?:Phone|Registrar|Contact|(?:admin|tech)-c|Organisations?)
-            )\s*\:\s*(?<data>[\n]+)
+            )\s*\:\s*(?<data>[^\n]+)
         /ix';
+
         # Name Server
-        $regexNameServer = '/(?:(?:Name\s+Servers?|nserver)\s*\:\s*)(?P<server>[^\n]+)/i';
+        $regexNameServer = '/(?:(?:Name\s+Servers?|n(?:ame)?servers?)\s*\:\s*)(?P<server>[^\n]+)/i';
         # Reserved Domain
         $regexReserved = '/^\s*Reserved\s*By/i';
         if (preg_match($regexReserved, $cleanData) # -> reserved domain so it will be registered
@@ -720,7 +728,6 @@ class WhoIs
         ) {
             return true;
         }
-
         # check if on limit whois check
         if (preg_match('/exceeded\s(.+)?limit|limit\s+exceed/i', $cleanData)) {
             return null;
