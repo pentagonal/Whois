@@ -703,7 +703,7 @@ class WhoIs
                 Registr(?:ar|y|nt)\s[^\:]+
                 | Whois\s+Server
                 | (?:Phone|Registrar|Contact|(?:admin|tech)-c|Organisations?)
-            )\s*\:\s*(?<data>[^\n]+)
+            )\s*\:\s*(?P<data>[^\n]+)
         /ix';
 
         # Name Server
