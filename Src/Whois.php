@@ -557,6 +557,10 @@ class WhoIs
      */
     private function getFromAlternativeServer($domainName, $data, $clean = false)
     {
+        $data  = $data instanceof Collection
+            ? $data->first()
+            : $data;
+
         $extension = $this->getParsedExtension($domainName);
         $extensions = $this->temporaryCachedWhoIsServers[$extension];
         $reset     = $extensions->reset();

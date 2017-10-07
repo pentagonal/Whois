@@ -2,6 +2,10 @@
 
 Php Domain / ASN / IP WhoIs Checker
 
+[![Build Status](https://travis-ci.org/pentagonal/Whois.svg?branch=master)](https://travis-ci.org/pentagonal/Whois)
+[![Coverage Status](https://coveralls.io/repos/github/pentagonal/Whois/badge.svg?branch=master)](https://coveralls.io/github/pentagonal/Whois?branch=master)
+
+
 ## REQUIREMENT
 
 - php 5.6 or later (>= 7 is recommended)
