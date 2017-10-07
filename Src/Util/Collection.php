@@ -68,6 +68,28 @@ class Collection extends \ArrayObject implements \JsonSerializable
     }
 
     /**
+     * Fill values
+     *
+     * @param array $array
+     */
+    public function replace(array $array)
+    {
+        foreach ($array as $key => $value) {
+            $this[$key] = $value;
+        }
+    }
+
+    /**
+     * Clear data
+     */
+    public function clear()
+    {
+        foreach ((array) $this as $key => $value) {
+            unset($this[$key]);
+        }
+    }
+
+    /**
      * @return array
      */
     public function jsonSerialize()
