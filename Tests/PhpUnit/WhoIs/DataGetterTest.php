@@ -195,5 +195,12 @@ class DataGetterTest extends TestCase
             $newGetter->getTLDList(),
             $getter->createNewRecordExtension()
         );
+        // at least remove
+        if (file_exists($jsonPath)) {
+            unlink($jsonPath);
+        }
+        if (is_dir($tmpPath)) {
+            rmdir($tmpPath);
+        }
     }
 }
