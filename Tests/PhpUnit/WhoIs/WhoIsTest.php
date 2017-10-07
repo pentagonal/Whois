@@ -12,6 +12,8 @@
 
 namespace Pentagonal\Tests\PhpUnit\WhoIs;
 
+use Pentagonal\WhoIs\ArrayCache;
+use Pentagonal\WhoIs\Interfaces\CacheInterface;
 use Pentagonal\WhoIs\Util\Collection;
 use Pentagonal\WhoIs\Util\DataGetter;
 use Pentagonal\WhoIs\Verifier;
@@ -37,7 +39,7 @@ class WhoIsTest extends TestCase
     public function __construct($name = null, array $data = [], $dataName = '')
     {
         parent::__construct($name, $data, $dataName);
-        $this->whoIs = new WhoIs(new DataGetter());
+        $this->whoIs = new WhoIs(new DataGetter(), new ArrayCache());
     }
 
     /**
@@ -146,6 +148,11 @@ class WhoIsTest extends TestCase
                 WhoIs::class,
                 Verifier::class
             )
+        );
+
+        $this->assertInstanceOf(
+            CacheInterface::class,
+            $this->whoIs->getCache()
         );
 
         $result = $this->whoIs->getWhoIs('google.com');

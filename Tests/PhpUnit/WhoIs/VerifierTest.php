@@ -25,7 +25,7 @@ class VerifierTest extends TestCase
     /**
      * Test DataGetter instance
      */
-    public function testInstance()
+    public function testInstanceFromDataGetter()
     {
         $verifier = new Verifier(new DataGetter());
         $this->assertInstanceOf(
@@ -42,7 +42,7 @@ class VerifierTest extends TestCase
     /**
      * Test Extension lists
      */
-    public function testExtensionListArray()
+    public function testExtensionListArrayFromDataGetterAndMethodGetTLDList()
     {
         $verifier = new Verifier(new DataGetter());
         $this->assertNotEmpty(
@@ -52,6 +52,7 @@ class VerifierTest extends TestCase
                 Verifier::class
             )
         );
+
         $this->assertNotEmpty(
             $verifier->getExtensionList(),
             sprintf(
@@ -59,6 +60,7 @@ class VerifierTest extends TestCase
                 Verifier::class
             )
         );
+
         $this->assertEquals(
             $verifier->getExtensionList(),
             $verifier->getDataGetter()->getTLDList(),
@@ -70,30 +72,59 @@ class VerifierTest extends TestCase
     }
 
     /**
-     * Test for validation domain & email address
+     * Test Domain validation
      */
-    public function testValidationDomainAndEmail()
+    public function testIsValidDomain()
     {
         $verifier = new Verifier(new DataGetter());
+
+        /**
+         * Test Domain Validity
+         */
         $this->assertTrue(
             $verifier->isDomain('example.id'),
             'example.id must be valid domain'
         );
 
+        $this->assertFalse(
+            $verifier->isDomain('example.invalid'),
+            'example.invalid is not a valid domain'
+        );
+
+        /**
+         * Test Top Domain
+         */
         $this->assertTrue(
             $verifier->isTopDomain('example.id'),
             'example.id must be valid top level domain'
         );
 
+        /**
+         * Test Top Domain
+         */
         $this->assertTrue(
-            $verifier->isDomain('example.co.id'),
-            'example.co.id must be valid domain'
+            $verifier->isTopDomain('example.com'),
+            'example.com must be valid top level domain'
         );
 
+        // tes for sub TLD
         $this->assertTrue(
             $verifier->isTopDomain('example.co.id'),
             'example.co.id must be valid top level domain'
         );
+        // tes for invalid Top Domain
+        $this->assertFalse(
+            $verifier->isTopDomain('example.invalid.id'),
+            'example.invalid.id is not a valid top domain'
+        );
+    }
+
+    /**
+     * Test for validation email address
+     */
+    public function testIsValidEmail()
+    {
+        $verifier = new Verifier(new DataGetter());
 
         $this->assertTrue(
             $verifier->isEmail('admin@example.id'),
@@ -114,20 +145,41 @@ class VerifierTest extends TestCase
             $verifier->isEmail('admin@example'),
             'admin@example is must be not email'
         );
-
-        $this->assertFalse(
-            $verifier->isDomain('example.invalid'),
-            'example.invalid must be not valid domain'
-        );
     }
 
     /**
-     * Test for sanitation & validation domain & email address
+     * Test Validation of Domain
      */
-    public function testDomainAndEmailSanity()
+    public function testDomainValidation()
     {
         $verifier = new Verifier(new DataGetter());
+        $this->assertFalse(
+            $verifier->validateDomain(true),
+            sprintf(
+                '%s::validateDomain() must be as a string',
+                Verifier::class
+            )
+        );
+
+        $this->assertFalse(
+            $verifier->validateDomain(' '),
+            sprintf(
+                '%s::validateDomain can not contains whitespace only',
+                Verifier::class
+            )
+        );
+
+        $this->assertFalse(
+            $verifier->validateDomain(str_repeat('A', 256)),
+            sprintf(
+                '%s::validateDomain() can not more than 255 characters length',
+                Verifier::class
+            )
+        );
+
+        // valid domain
         $domain = $verifier->validateDomain('examPle.ID');
+
         $this->assertNotEmpty(
             $domain,
             sprintf(
@@ -148,17 +200,20 @@ class VerifierTest extends TestCase
             )
         );
 
-        $this->assertFalse(
-            $verifier->validateDomain('examPle.ID.ids'),
+        $this->assertArrayHasKey(
+            Verifier::SELECTOR_DOMAIN_NAME,
+            $domain,
             sprintf(
-                '%s::ValidateDomain() with value `examPle.ID.ids` must be not valid and return false',
+                'Result of %1$s::ValidateDomain() of `examPle.ID` must be contain %1$s::SELECTOR_DOMAIN_NAME',
                 Verifier::class
             )
         );
-        $this->assertFalse(
-            $verifier->validateDomain('_examPledomain.cz'),
+
+        $this->assertArrayHasKey(
+            Verifier::SELECTOR_SUB_DOMAIN_NAME,
+            $domain,
             sprintf(
-                '%s::ValidateDomain() with value `_examPledomain.cz` must be not valid and return false',
+                'Result of %1$s::ValidateDomain() of `examPle.ID` must be contain %1$s::SELECTOR_SUB_DOMAIN_NAME',
                 Verifier::class
             )
         );
@@ -178,8 +233,71 @@ class VerifierTest extends TestCase
             sprintf(
                 'Result %s::ValidateDomain() with value %s must be empty null type',
                 Verifier::class,
-                '`examPle.ID.ids`'
+                '`examPle.ID.id`'
             )
+        );
+
+        // invalid domain
+        $this->assertFalse(
+            $verifier->validateDomain('examPle.ID.ids'),
+            sprintf(
+                '%s::ValidateDomain() with value `examPle.ID.ids` must be invalid and return false',
+                Verifier::class
+            )
+        );
+
+        $this->assertFalse(
+            $verifier->validateDomain('_examPledomain.cz'),
+            sprintf(
+                '%s::ValidateDomain() with value `_examPledomain.cz` must be invalid and return false',
+                Verifier::class
+            )
+        );
+
+        /**
+         * Sanitize Domain Name
+         */
+        $this->assertEquals(
+            'example.com',
+            $verifier->sanitizeDomain('ExampLe.com'),
+            sprintf(
+                '%s::sanitizeDomain() with value `ExampLe.com` must be equals with example.com',
+                Verifier::class
+            )
+        );
+
+        $this->assertFalse(
+            $verifier->sanitizeDomain('domain.invalid'),
+            sprintf(
+                '%s::sanitizeDomain() with value `domain.invalid` must be return false',
+                Verifier::class
+            )
+        );
+    }
+
+    /**
+     * Test for sanitation & validation domain & email address
+     */
+    public function testEmailValidation()
+    {
+        $verifier = new Verifier(new DataGetter());
+
+        $this->assertFalse(
+            $verifier->validateEmail(true),
+            sprintf(
+                '%s::validateEmail() value must be as a string',
+                Verifier::class
+            )
+        );
+
+        $this->assertFalse(
+            $verifier->isEmail('__-admin@example.com'),
+            '__-admin@example.com is not a valid email and return false'
+        );
+
+        $this->assertTrue(
+            $verifier->isEmail('admin@example.com'),
+            'admin@example.com is a valid email returning boolean'
         );
 
         $email = $verifier->validateEmail('admin@exampLE.com');
@@ -220,6 +338,71 @@ class VerifierTest extends TestCase
                 'admin@exampLE.com'
             )
         );
+
+        $this->assertArrayHasKey(
+            Verifier::SELECTOR_EMAIL_NAME,
+            $verifier->validateEmail('admin@example.com'),
+            sprintf(
+                '%1$s::validateEmail() is returning array if valid with contain key %1$s::SELECTOR_EMAIL_NAME',
+                Verifier::class
+            )
+        );
+
+        $this->assertFalse(
+            $verifier->validateEmail('admin.invalid@example'),
+            sprintf(
+                '%s::validateEmail() with value `admin.invalid@example` is not a valid email',
+                Verifier::class
+            )
+        );
+
+        $this->assertFalse(
+            $verifier->validateEmail('ABC.id'),
+            sprintf(
+                '%s::validateEmail() with value `ABC.id` is not a valid email',
+                Verifier::class
+            )
+        );
+
+        $this->assertFalse(
+            $verifier->validateEmail('@example_email_invalid.com'),
+            sprintf(
+                '%s::validateEmail() email can not start with @',
+                Verifier::class
+            )
+        );
+
+        $this->assertFalse(
+            $verifier->validateEmail('example_email_invalid.com@'),
+            sprintf(
+                '%s::validateEmail() email can not end with @',
+                Verifier::class
+            )
+        );
+
+        $this->assertFalse(
+            $verifier->validateEmail('invalid@sub.gmail.com'),
+            sprintf(
+                '%s::validateEmail() common email eg : gmail have no sub domain',
+                Verifier::class
+            )
+        );
+
+        $this->assertFalse(
+            $verifier->sanitizeEmail('admin.invalid@example'),
+            sprintf(
+                '%s::sanitizeEmail() with value `admin.invalid@example` is invalid and returning false',
+                Verifier::class
+            )
+        );
+        $this->assertEquals(
+            'admin@example.com',
+            $verifier->sanitizeEmail('admin@eXAMPLE.COM'),
+            sprintf(
+                '%s::sanitizeEmail() with value `admin@eXAMPLE.COM` is equals with `admin@example.com`',
+                Verifier::class
+            )
+        );
     }
 
     /**
@@ -228,6 +411,12 @@ class VerifierTest extends TestCase
     public function testIPV4()
     {
         $verifier = new Verifier(new DataGetter());
+
+        $this->assertFalse(
+            $verifier->isIPv4(true),
+            'IPv4 must be as a string'
+        );
+
         $this->assertTrue(
             $verifier->isIPv4('192.168.100.1'),
             sprintf(
@@ -236,11 +425,24 @@ class VerifierTest extends TestCase
             )
         );
 
+        $this->assertTrue(
+            $verifier->isIPv4('127.0.0.1'),
+            '127.0.0.1 is local address also valid as IPv4'
+        );
+
         $this->assertFalse(
             $verifier->isIPv4('::1'),
             '::1 is not an IPV 4'
         );
 
+        $this->assertFalse(
+            $verifier->isIPv4('123.456.789.112.345.67'),
+            'Length of IP must be less than 15 characters length'
+        );
+
+        /**
+         * Local
+         */
         $this->assertTrue(
             $verifier->isLocalIPv4('192.168.100.1'),
             sprintf(
@@ -249,9 +451,27 @@ class VerifierTest extends TestCase
             )
         );
 
+        $this->assertTrue(
+            $verifier->isLocalIPv4('127.0.0.1'),
+            sprintf(
+                '%s::isLocalIPv4() with value `127.0.0.1` must be valid local Ipv4',
+                Verifier::class
+            )
+        );
+
+        $this->assertFalse(
+            $verifier->isLocalIPv4(true),
+            'Local IPv4 must be as a string'
+        );
+
         $this->assertFalse(
             $verifier->isLocalIPv4('8.8.8.8'),
             '8.8.8.8 is not a local IPV4'
+        );
+
+        $this->assertFalse(
+            $verifier->isLocalIPv4('123.456.789.112.345.67'),
+            'Length of IP must be less than 15 characters length'
         );
     }
 
@@ -307,159 +527,117 @@ class VerifierTest extends TestCase
     }
 
     /**
-     * Test All context
+     * Test ASN
      */
-    public function testAllContext()
+    public function testASNValidation()
     {
         $verifier = new Verifier(new DataGetter());
 
         $this->assertFalse(
-            $verifier->isIPv4('::1')
-        );
-        $this->assertFalse(
-            $verifier->isIPv4('12345678911234567')
-        );
-        $this->assertFalse(
-            $verifier->isIPv4(true)
-        );
-        $this->assertTrue(
-            $verifier->isIPv4('127.0.0.1')
+            $verifier->sanitizeASN(true),
+            sprintf(
+                '%s::sanitizeASN() must be numeric or string numeric',
+                Verifier::class
+            )
         );
 
         $this->assertFalse(
-            $verifier->isLocalIPv4('8.8.8.8')
-        );
-        $this->assertFalse(
-            $verifier->isLocalIPv4(true)
-        );
-        $this->assertFalse(
-            $verifier->isLocalIPv4('12345678911234567')
-        );
-        $this->assertTrue(
-            $verifier->isLocalIPv4('127.0.0.1')
-        );
-        $this->assertFalse(
-            $verifier->isTopDomain('example.invalid')
-        );
-        $this->assertTrue(
-            $verifier->isTopDomain('example.com')
-        );
-        $this->assertArrayHasKey(
-            Verifier::SELECTOR_DOMAIN_NAME,
-            $verifier->validateDomain('example.com')
-        );
-        $this->assertFalse(
-            $verifier->validateDomain(true)
-        );
-        $this->assertFalse(
-            $verifier->validateDomain(' ')
-        );
-        $this->assertFalse(
-            $verifier->validateDomain(str_repeat('A', 256))
+            $verifier->sanitizeASN('Invalid'),
+            sprintf(
+                '%s::sanitizeASN() with value `invalid` must be return false',
+                Verifier::class
+            )
         );
 
+
         $this->assertFalse(
-            $verifier->isDomain('example.invalid')
+            $verifier->sanitizeASN('ABC12345'),
+            sprintf(
+                '%s::sanitizeASN() must be start with `AS` or `ASN` or numeric',
+                Verifier::class
+            )
         );
-        $this->assertTrue(
-            $verifier->isDomain('example.com')
-        );
-        $this->assertEquals(
-            'example.com',
-            $verifier->sanitizeDomain('ExampLe.com')
-        );
-        $this->assertFalse(
-            $verifier->sanitizeDomain('domain.invalid')
-        );
-        $this->assertFalse(
-            $verifier->sanitizeASN('Invalid')
-        );
-        $this->assertFalse(
-            $verifier->sanitizeASN(true)
-        );
-        $this->assertFalse(
-            $verifier->sanitizeASN('ABC12345')
-        );
+
         $this->assertEquals(
             $verifier->sanitizeASN('AS12345'),
-            '12345'
+            '12345',
+            sprintf(
+                '%s::sanitizeASN() with value `AS12345` is a valid ASN with return `12345`',
+                Verifier::class
+            )
         );
+
+        $this->assertEquals(
+            $verifier->sanitizeASN('ASN12345'),
+            '12345',
+            sprintf(
+                '%s::sanitizeASN() with value `ASN12345` is a valid ASN with return `12345`',
+                Verifier::class
+            )
+        );
+
         $this->assertEquals(
             $verifier->sanitizeASN('12345'),
-            '12345'
+            '12345',
+            sprintf(
+                '%s::sanitizeASN() with value string `12345` is a valid ASN with return `12345`',
+                Verifier::class
+            )
         );
-        $extensionInvalid = $verifier->getExtensionIDN(true);
-        $this->assertFalse(
-            $extensionInvalid
-        );
+
         $this->assertEquals(
-            $extensionInvalid,
-            false
+            $verifier->sanitizeASN(12345),
+            '12345',
+            sprintf(
+                '%s::sanitizeASN() with value integer `12345` is a valid ASN with return `12345`',
+                Verifier::class
+            )
+        );
+    }
+
+    /**
+     * Test Extension IDN
+     */
+    public function testExtensionIDN()
+    {
+        $verifier = new Verifier(new DataGetter());
+        $this->assertFalse(
+            $verifier->getExtensionIDN(true),
+            sprintf(
+                '%s::getExtensionIDN() must be value string',
+                Verifier::class
+            )
         );
 
         $this->assertFalse(
-            $verifier->getExtensionIDN('       a')
-        );
-        $this->assertFalse(
-            $verifier->getExtensionIDN('invalid')
-        );
-        $this->assertEquals(
-            $verifier->getExtensionIDN('com'),
-            'com'
-        );
-        $this->assertFalse(
-            $verifier->isEmail('__-admin@example.com')
-        );
-        $this->assertTrue(
-            $verifier->isEmail('admin@example.com')
-        );
-        $this->assertTrue(
-            $verifier->isExtensionExist('com')
-        );
-        $this->assertFalse(
-            $verifier->isExtensionExist('invalid')
-        );
-        $this->assertArrayHasKey(
-            Verifier::SELECTOR_EMAIL_NAME,
-            $verifier->validateEmail('admin@example.com')
-        );
-        $this->assertFalse(
-            $verifier->validateEmail('admin.invalid@example')
-        );
-        $this->assertFalse(
-            $verifier->validateEmail(true)
-        );
-        $this->assertFalse(
-            $verifier->validateEmail('ABC.d')
-        );
-        $this->assertFalse(
-            $verifier->validateEmail('@example_email_invalid.com')
-        );
-        $this->assertFalse(
-            $verifier->validateEmail('example_email_invalid.com@')
-        );
-        $this->assertFalse(
-            $verifier->validateEmail('invalid@sub.gmail.com')
+            $verifier->getExtensionIDN('       a '),
+            sprintf(
+                '%s::getExtensionIDN() with white space on start or end will be trimming and character must be more than 1',
+                Verifier::class
+            )
         );
 
         $this->assertFalse(
-            $verifier->sanitizeEmail('admin.invalid@example')
+            $verifier->getExtensionIDN('invalid'),
+            '`invalid` is not a valid Extension'
         );
         $this->assertEquals(
-            'admin@example.com',
-            $verifier->sanitizeEmail('admin@example.com')
-        );
-        $this->assertInstanceOf(
-            DataGetter::class,
-            $verifier->getDataGetter()
-        );
-        $this->assertEquals(
-            $verifier->getDataGetter()->getTLDList(),
-            $verifier->getExtensionList()
-        );
-        $this->assertArrayHasKey(
+            $verifier->getExtensionIDN('COM'),
             'com',
-            $verifier->getExtensionList()
+            '`COM` is equals with `com` of valid Extension'
+        );
+
+        /**
+         * Extension list
+         */
+        $this->assertTrue(
+            $verifier->isExtensionExist('com'),
+            'com is on extension list and exists'
+        );
+
+        $this->assertFalse(
+            $verifier->isExtensionExist('invalid'),
+            '`invalid` is not a valid extension and does not exists'
         );
     }
 }

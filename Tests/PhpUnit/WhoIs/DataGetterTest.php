@@ -22,20 +22,8 @@ use PHPUnit\Framework\TestCase;
 class DataGetterTest extends TestCase
 {
     /**
-     * @var DataGetter
+     * Test Instance Invalid
      */
-    protected $getter;
-
-    /**
-     * DataGetterTest constructor.
-     *
-     * {@inheritdoc}
-     */
-    public function __construct($name = null, array $data = [], $dataName = '')
-    {
-        parent::__construct($name, $data, $dataName);
-        $this->getter = new DataGetter();
-    }
     public function testInstance()
     {
         try {
@@ -54,53 +42,10 @@ class DataGetterTest extends TestCase
      */
     public function testExtensionLists()
     {
+        $getter = new DataGetter();
         $this->assertNotEmpty(
-            $this->getter,
+            $getter->getTLDList(),
             'DataGetter::getTLDList() must be not empty as default'
-        );
-    }
-
-    /**
-     * Test set & unset extensions
-     */
-    public function testExtensionSet()
-    {
-        $extension = $this->getter->createNewRecordExtension();
-        $newGetter = clone $this->getter;
-        $newTld = $newGetter->getTLDList();
-        $this->assertEquals(
-            $this->getter->getTLDList(),
-            $extension
-        );
-        $this->assertArrayHasKey(
-            'net',
-            $extension,
-            'Create new Record Extensions'
-        );
-        $this->assertArrayHasKey(
-            'net',
-            $newTld,
-            'Create new Record Extensions'
-        );
-        unset($newTld['net']);
-        /** @noinspection PhpVoidFunctionResultUsedInspection */
-        $setVoid = $newGetter->setTldList($newTld);
-        $this->assertEmpty(
-            $setVoid,
-            sprintf(
-                '%s::setTldList is returning void',
-                DataGetter::class
-            )
-        );
-        $this->assertArrayNotHasKey(
-            'net',
-            $newGetter->getTLDList(),
-            'DataGetter::getTLDList() must be not contain `net` as key after unset'
-        );
-        $this->assertNotSameSize(
-            $this->getter->getTLDList(),
-            $newGetter->getTLDList(),
-            'DataGetter::getTLDList() must be not same counted as key after unset'
         );
     }
 
@@ -176,6 +121,79 @@ class DataGetterTest extends TestCase
         );
         $this->assertEmpty(
             $getter->getTLDList()
+        );
+    }
+    /**
+     * Test set & unset extensions
+     */
+    public function testExtensionSet()
+    {
+        $getter = new DataGetter();
+        $newGetter = new DataGetter();
+        $extension = $getter->createNewRecordExtension();
+        $newTld = $newGetter->getTLDList();
+        $this->assertEquals(
+            $getter->getTLDList(),
+            $extension
+        );
+        $this->assertArrayHasKey(
+            'net',
+            $extension,
+            'Create new Record Extensions'
+        );
+        $this->assertArrayHasKey(
+            'net',
+            $newTld,
+            'Create new Record Extensions'
+        );
+        unset($newTld['net']);
+
+        try {
+            $newGetter->setTldList('string');
+        } catch (\InvalidArgumentException $e) {
+            $this->assertInstanceOf(
+                \InvalidArgumentException::class,
+                $e
+            );
+        }
+
+        /** @noinspection PhpVoidFunctionResultUsedInspection */
+        $setVoid = $newGetter->setTldList($newTld);
+        $this->assertEmpty(
+            $setVoid,
+            sprintf(
+                '%s::setTldList is returning void',
+                DataGetter::class
+            )
+        );
+        $this->assertArrayNotHasKey(
+            'net',
+            $newGetter->getTLDList(),
+            'DataGetter::getTLDList() must be not contain `net` as key after unset'
+        );
+        $this->assertNotSameSize(
+            $getter->getTLDList(),
+            $newGetter->getTLDList(),
+            'DataGetter::getTLDList() must be not same counted as key after unset'
+        );
+
+        // set default to false
+        $getter->setDefault(false);
+        $tmpPath = sys_get_temp_dir() ?: __DIR__ . DIRECTORY_SEPARATOR . 'tmp';
+        $tmpPath = $tmpPath .'/extensionDir';
+        $jsonPath = $tmpPath . '/extension_list_tmp.json';
+        if (file_exists($jsonPath)) {
+            unlink($jsonPath);
+        }
+
+        if (is_dir($tmpPath)) {
+            rmdir($tmpPath);
+        }
+
+        $newGetter = new DataGetter($jsonPath);
+        $this->assertEquals(
+            $newGetter->getTLDList(),
+            $getter->createNewRecordExtension()
         );
     }
 }
