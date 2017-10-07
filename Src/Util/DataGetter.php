@@ -12,6 +12,8 @@
 
 namespace Pentagonal\WhoIs\Util;
 
+use InvalidArgumentException;
+
 /**
  * Class DataGetter
  * @package Pentagonal\Whois\Util
@@ -45,6 +47,11 @@ class DataGetter
      * @var bool
      */
     private $useDefault = false;
+
+    /**
+     * @var array
+     */
+    protected static $tmpRemoteResultArray;
 
     /**
      * DataGetter constructor.
@@ -95,8 +102,18 @@ class DataGetter
      *      ]
      * @param array $tldList
      */
-    public function setTldList(array $tldList)
+    public function setTldList($tldList)
     {
+        if (!is_array($tldList)) {
+            throw new InvalidArgumentException(
+                sprintf(
+                    'TLD list must be as array %s given',
+                    gettype($tldList)
+                ),
+                E_WARNING
+            );
+        }
+
         $this->tldList = $tldList;
     }
 
@@ -149,7 +166,7 @@ class DataGetter
                 }
             }
 
-            $this->createNewRecordExtension();
+            return $this->createNewRecordExtension();
         }
 
         return $this->tldList;
@@ -214,43 +231,46 @@ class DataGetter
                         dirname($baseDir)
                     );
                 }
-            } elseif (! file_exists($this->jsonDataFile)) {
-                if (! is_writeable($baseDir)) {
-                    throw new \RuntimeException(
-                        'Json data can not being created. Data directory %s is not write able',
-                        $baseDir
-                    );
-                }
-            } elseif (! is_writeable($this->jsonDataFile)) {
+            } elseif (! file_exists($this->jsonDataFile) && ! is_writeable($baseDir)
+              || ! is_writeable($this->jsonDataFile)
+            ) {
                 throw new \RuntimeException(
-                    'Json data can not being renew. Json data file is not write able',
+                    ! is_writeable($baseDir)
+                        ? 'Json data can not being created. Data directory %s is not write able'
+                        : 'Json data can not being renew. Json data file is not write able',
                     $baseDir
                 );
             }
         }
 
-        try {
-            $this->registerTemporaryHandler();
-            $baseSocket = fopen(self::BASE_ORG_TLD_ALPHA_URL, 'r');
-        } catch (\Exception $e) {
-            $this->restoreTemporaryHandler();
-            throw $e;
+        if (empty(self::$tmpRemoteResultArray['list_tld'])) {
+            try {
+                $this->registerTemporaryHandler();
+                $baseSocket = fopen(self::BASE_ORG_TLD_ALPHA_URL, 'r');
+            } catch (\Exception $e) {
+                $this->restoreTemporaryHandler();
+                throw $e;
+            }
+
+            try {
+                $this->registerTemporaryHandler();
+                $socket = fopen(self::TLD_PUBLIC_SUFFIX_URL, 'r');
+            } catch (\Exception $e) {
+                $this->restoreTemporaryHandler();
+                fclose($baseSocket);
+                throw $e;
+            }
+
+            $baseSocket = new Stream($baseSocket, 5);
+            $socket     = new Stream($socket, 5);
+            // async
+            $this->callBackFilterArrayTLDS($baseSocket, 'iana');
+            $this->callBackFilterArrayTLDS($socket, 'sub');
+            self::$tmpRemoteResultArray['list_tld'] = !empty($this->tldList) ? $this->tldList : null;
+        } else {
+            $this->tldList = self::$tmpRemoteResultArray['list_tld'];
         }
 
-        try {
-            $this->registerTemporaryHandler();
-            $socket = fopen(self::TLD_PUBLIC_SUFFIX_URL, 'r');
-        } catch (\Exception $e) {
-            $this->restoreTemporaryHandler();
-            fclose($baseSocket);
-            throw $e;
-        }
-
-        $baseSocket = new Stream($baseSocket, 5);
-        $socket = new Stream($socket, 5);
-        // async
-        $this->callBackFilterArrayTLDS($baseSocket, 'iana');
-        $this->callBackFilterArrayTLDS($socket, 'sub');
         if (is_string($this->jsonDataFile) && ! $this->useDefault) {
             $socket = fopen($this->jsonDataFile, 'w+');
             $data = json_encode($this->tldList, JSON_PRETTY_PRINT);
