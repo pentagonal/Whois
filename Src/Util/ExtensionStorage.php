@@ -64,7 +64,7 @@ final class ExtensionStorage implements \JsonSerializable, \Serializable, \Count
         $server = strtolower($server);
         $key = array_search($server, $this->stored);
         if ($key !== false) {
-            unset($this->stored[$server]);
+            unset($this->stored[$key]);
             $this->stored = array_values($this->stored);
         }
 
@@ -76,10 +76,11 @@ final class ExtensionStorage implements \JsonSerializable, \Serializable, \Count
         if (!is_string($server)) {
             return;
         }
+
         $server = strtolower($server);
         $key = array_search($server, $this->stored);
         if ($key !== false) {
-            unset($this->stored[$server]);
+            unset($this->stored[$key]);
             $this->stored = array_values($this->stored);
         }
 
@@ -124,6 +125,14 @@ final class ExtensionStorage implements \JsonSerializable, \Serializable, \Count
     public function end()
     {
         return end($this->stored);
+    }
+
+    /**
+     * @return mixed
+     */
+    public function current()
+    {
+        return current($this->stored);
     }
 
     /**
