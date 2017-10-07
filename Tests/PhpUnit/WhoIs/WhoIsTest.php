@@ -49,7 +49,7 @@ class WhoIsTest extends TestCase
     {
         try {
             $this->whoIs->getWhoIsServer('test.invalid');
-        } catch (\Throwable $e) {
+        } catch (\DomainException $e) {
             $this->assertInstanceOf(
                 \DomainException::class,
                 $e,
@@ -178,19 +178,20 @@ class WhoIsTest extends TestCase
                 $resultThird->last(),
                 'Clean result and result is not same'
             );
+
+            $this->assertNotEquals(
+                $resultThird->first(),
+                $resultThird->next(),
+                'Clean result and result is not same'
+            );
+
+            $this->assertNotEquals(
+                $resultThird->current(),
+                $resultThird->prev(),
+                'Clean result and result is not same'
+            );
         }
 
-        $this->assertNotEquals(
-            $resultThird->first(),
-            $resultThird->next(),
-            'Clean result and result is not same'
-        );
-
-        $this->assertNotEquals(
-            $resultThird->current(),
-            $resultThird->prev(),
-            'Clean result and result is not same'
-        );
         $this->assertJson(
             json_encode($result),
             'Result of who is is json serialize-able'

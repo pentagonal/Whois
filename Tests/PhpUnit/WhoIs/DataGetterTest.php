@@ -146,7 +146,7 @@ class DataGetterTest extends TestCase
             $newTld,
             'Create new Record Extensions'
         );
-        unset($newTld['net']);
+        unset($newTld['net'], $newTld['info'], $newTld['cm']);
 
         try {
             $newGetter->setTldList('string');
