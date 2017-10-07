@@ -612,7 +612,8 @@ class VerifierTest extends TestCase
         $this->assertFalse(
             $verifier->getExtensionIDN('       a '),
             sprintf(
-                '%s::getExtensionIDN() with white space on start or end will be trimming and character must be more than 1',
+                '%s::getExtensionIDN() with white space on '
+                    . 'start or end will be trimming and character must be more than 1',
                 Verifier::class
             )
         );
