@@ -547,6 +547,7 @@ class WhoIs
                 ]);
             }
         } catch (\Exception $e) {
+            // pass
         }
 
         return new Collection([$reset => $data]);
@@ -750,11 +751,8 @@ class WhoIs
 
         $data = $this->getWhoIs($domainName, false)->getArrayCopy();
         $data = reset($data);
-        if (!is_string($data)) {
-            return null;
-        }
 
-        return $this->isDomainRegisteredParser($data);
+        return !is_string($data) ? null : $this->isDomainRegisteredParser($data);
     }
 
     /**
