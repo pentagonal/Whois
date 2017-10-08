@@ -33,7 +33,7 @@ final class ServerList
      */
     public static function getServers()
     {
-        if (!isset(static::$servers)) {
+        if (empty(static::$servers)) {
             static::$servers = require __DIR__ . '/Data/MainServers.php';
         }
 
