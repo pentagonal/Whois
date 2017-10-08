@@ -33,6 +33,11 @@ use InvalidArgumentException;
  */
 class WhoIs
 {
+    /**
+     * Version Release
+     */
+    const VERSION = '1.0.0';
+
     const REGEX_GET_SERVER  = '/(Whois(\s+Server)?):\s*(?P<server>[^\s]+)/i';
     const SERVER_PORT = 43;
 
@@ -74,84 +79,11 @@ class WhoIs
     private $allowNonDomain = false;
 
     /**
-     * List Of Default Alternated
-     *
-     * @var array
-     */
-    protected $alternativeServers = [
-        'cm'  => 'whois.netcom.cm',
-        'org' => 'whois.publicinterestregistry.net',
-        'ngo' => 'whois.publicinterestregistry.net',
-        'ong' => 'whois.publicinterestregistry.net',
-        'cn'  => 'whois.cnnic.net.cn',
-        'scot' => 'whois.scot.coreregistry.net',
-        'ec' => 'whois.lac.net',
-        'js' => 'whois.nic.ad.jp',
-        'mn' => 'whois.afilias-grs.info',
-        'how' => 'domain-registry-whois.l.google.com',
-        'soy' => 'domain-registry-whois.l.google.com',
-        'london' => 'whois-lon.mm-registry.com',
-    ];
-
-    /**
      * Cache whois server from set alternative server
      *
      * @var array
      */
     protected $currentSetServers = [];
-
-    /**
-     * Get Set Alternative Server on static context
-     *
-     * @return array
-     */
-    public function getAlternativeServers()
-    {
-        return $this->alternativeServers;
-    }
-
-    /**
-     * Add server Alternative if whois can not get server
-     *
-     * @param string $extension
-     * @param string $server
-     */
-    public function addAlternativeServerStatic($extension, $server)
-    {
-        if (is_string($extension)) {
-            throw new InvalidArgumentException(
-                sprintf(
-                    'Extension must be as a string %s given',
-                    gettype($extension)
-                ),
-                E_WARNING
-            );
-        }
-        if (is_string($server)) {
-            throw new InvalidArgumentException(
-                sprintf(
-                    'Server must be as a string %s given',
-                    gettype($extension)
-                ),
-                E_WARNING
-            );
-        }
-        if (strlen(trim($extension)) < 2) {
-            throw new InvalidArgumentException(
-                'Invalid extension given, extension too short.',
-                E_WARNING
-            );
-        }
-        if (!$this->verifier->isDomain($server)) {
-            throw new InvalidArgumentException(
-                'Invalid server given.',
-                E_WARNING
-            );
-        }
-
-        $extension                            = trim(strtolower($extension));
-        $this->alternativeServers[$extension] = strtolower(trim($server));
-    }
 
     /**
      * WhoIs constructor.
@@ -334,11 +266,7 @@ class WhoIs
      */
     public function getFromServer($domainName, $server)
     {
-        if ($this->verifier->isIPv4($domainName) || $this->verifier->sanitizeASN($domainName)) {
-            $this->allowNonDomain = true;
-        }
-
-        if (! $this->verifier->isTopDomain($domainName) && ! $this->allowNonDomain) {
+        if (! $this->allowNonDomain && ! $this->verifier->isTopDomain($domainName)) {
             throw new \DomainException(
                 "Domain is not valid!",
                 E_ERROR
@@ -426,7 +354,7 @@ class WhoIs
     {
         if (!is_string($stringDomain)) {
             throw new InvalidArgumentException(
-                'Domain name must be as a string'
+                'Domain name or extension must be as a string'
             );
         }
 
@@ -514,7 +442,25 @@ class WhoIs
      */
     public function getWhoIsServer($domain)
     {
-        $extension = $this->getParsedExtension($domain);
+        if (!$this->allowNonDomain) {
+            $extension = $this->getParsedExtension($domain);
+            if (!$this->verifier->isExtensionExist($extension)) {
+                throw new \RuntimeException(
+                    sprintf(
+                        '%s is not a valid domain extension',
+                        $extension
+                    ),
+                    E_WARNING
+                );
+            }
+            $server = ServerList::getServer($extension);
+            if ($server) {
+                return $server;
+            }
+        } else {
+            $extension = $domain;
+        }
+
         $extensions = $this->getExtensionCache($extension);
         if ($extension && count($extensions) > 0) {
             return $extensions->reset();
@@ -525,7 +471,7 @@ class WhoIs
         }
 
         $this->temporaryCachedWhoIsServers[$extension] = new ExtensionStorage();
-        $body = $this->getFromServer($domain, DataGetter::BASE_ORG_URL);
+        $body = $this->getResultFromStream($extension, DataGetter::BASE_ORG_URL);
         if (is_string($body) && trim($body) != '') {
             $server = $this->parseWhoIsServerFromData($body);
             if ($server) {
@@ -534,10 +480,13 @@ class WhoIs
                 $this->putExtensionCache($extension, $this->temporaryCachedWhoIsServers[$extension]);
 
                 return $server;
-            } elseif (isset($this->alternativeServers[$extension])) {
-                $server                              = $this->alternativeServers[$extension];
-                $this->currentSetServers[$extension] = $server;
-                return $server;
+            }
+        }
+
+        if (!$this->allowNonDomain) {
+            $alternative = ServerList::getAlternativeServers($extension);
+            if (is_array($alternative) && !empty($alternative)) {
+                return reset($alternative);
             }
         }
 
@@ -663,6 +612,16 @@ class WhoIs
      */
     public function getWhoIs($domainName, $clean = false, $followWhoIs = false)
     {
+        if (!$this->verifier->isTopDomain($domainName)) {
+            throw new \RuntimeException(
+                sprintf(
+                    '%s is not a valid domain name',
+                    $domainName
+                ),
+                E_WARNING
+            );
+        }
+
         $whoIsServer = $this->getWhoIsServer($domainName);
         $result = $this->getWhoIsWithServer($domainName, $whoIsServer, $clean);
         /**
@@ -678,7 +637,7 @@ class WhoIs
             if (is_string($extension)
                 && isset($this->alternativeServers[$extension])
             ) {
-                $newServer = $this->alternativeServers[$extension];
+                $newServer = ServerList::getAlternativeServers($extension);
                 if ($whoIsServer != $newServer) {
                     try {
                         $newResult  = $this->getWhoIsWithServer($domainName, $newServer, $clean);
@@ -723,6 +682,15 @@ class WhoIs
      */
     public function getWhoIsWithServer($domainName, $whoIsServer, $clean = false)
     {
+        if (!$this->verifier->isTopDomain($domainName)) {
+            throw new \RuntimeException(
+                sprintf(
+                    '%s is not a valid domain name',
+                    $domainName
+                ),
+                E_WARNING
+            );
+        }
         $result = $this->getResultFromStream($domainName, $whoIsServer);
         if ($clean) {
             $result = $this->cleanResultData($result);
@@ -816,6 +784,11 @@ class WhoIs
             return null;
         }
 
+        // if invalid domain
+        if (stripos($cleanData, 'Failure to locate a record in ') !== false) {
+            return null;
+        }
+
         // array check for detailed content only that below is not registered
         $matchUnRegistered = [
             'domain not found',
@@ -828,7 +801,10 @@ class WhoIs
         ];
         // clean dot on both side
         $cleanData = trim($cleanData, '.');
-        if (in_array(strtolower($cleanData), $matchUnRegistered)) {
+        if (in_array(strtolower($cleanData), $matchUnRegistered)
+            // for za domain eg: co.za
+            || stripos($cleanData, 'Available') === 0 && strpos($cleanData, 'Domain:')
+        ) {
             return false;
         }
 
@@ -940,7 +916,10 @@ class WhoIs
         }
         $cleanData = trim($cleanData);
         # check if on limit whois check
-        if (preg_match('/(?:Resource|Whois)\s+Limit|exceeded\s(.+)?limit|limit\s+exceed/i', $cleanData)) {
+        if (preg_match(
+            '/(?:Resource|Whois)\s+Limit|exceeded\s(.+)?limit|limit\s+exceed|allowed\s+queries\s+exceeded/i',
+            $cleanData
+        )) {
             return true;
         }
         return false;
