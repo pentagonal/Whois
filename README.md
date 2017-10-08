@@ -1,9 +1,11 @@
 # Php WhoIs
 
-Php Domain / ASN / IP WhoIs Checker
-
 [![Build Status](https://travis-ci.org/pentagonal/Whois.svg?branch=master)](https://travis-ci.org/pentagonal/Whois)
 [![Coverage Status](https://coveralls.io/repos/github/pentagonal/Whois/badge.svg?branch=master)](https://coveralls.io/github/pentagonal/Whois?branch=master)
+
+Php Domain / ASN / IP WhoIs Checker
+
+The most complete WhoIs Server Records Stored.
 
 
 ## REQUIREMENT
@@ -96,12 +98,19 @@ All of risks being your responsibilities.
  // ... other
   "require": {
     // ... other repo
-    "pentagonal/whois": "dev-master"
+    "pentagonal/whois": "^1.0"
   }
 }
 ```
 or
 
 ```bash
-composer require pentagonal/whois
+composer require pentagonal/whois "^1.0"
 ```
+
+## NOTE
+
+The whois server only support via socket only.
+
+Some domain does not know about server socket address.
+ 
