@@ -445,7 +445,7 @@ class WhoIs
         if (!$this->allowNonDomain) {
             $extension = $this->getParsedExtension($domain);
             if (!$this->verifier->isExtensionExist($extension)) {
-                throw new \RuntimeException(
+                throw new \DomainException(
                     sprintf(
                         '%s is not a valid domain extension',
                         $extension
@@ -455,6 +455,7 @@ class WhoIs
             }
             $server = ServerList::getServer($extension);
             if ($server) {
+                $this->temporaryCachedWhoIsServers[$extension] = new ExtensionStorage([$server]);
                 return $server;
             }
         } else {
@@ -511,8 +512,12 @@ class WhoIs
             : $data;
 
         $extension = $this->getParsedExtension($domainName);
-        $extensions = $this->temporaryCachedWhoIsServers[$extension];
-        $reset     = $extensions->reset();
+        $extensions = isset($this->temporaryCachedWhoIsServers[$extension])
+            ? $this->temporaryCachedWhoIsServers[$extension]
+            : new ExtensionStorage([
+                ServerList::getServer($extension)
+            ]);
+        $reset      = $extensions->reset();
         if (count($extensions) > 1) {
             $newServer = $extensions->next();
             $extensions->clear();
@@ -613,7 +618,7 @@ class WhoIs
     public function getWhoIs($domainName, $clean = false, $followWhoIs = false)
     {
         if (!$this->verifier->isTopDomain($domainName)) {
-            throw new \RuntimeException(
+            throw new \DomainException(
                 sprintf(
                     '%s is not a valid domain name',
                     $domainName
@@ -635,9 +640,8 @@ class WhoIs
         ) {
             $extension = $this->getParsedExtension($domainName);
             if (is_string($extension)
-                && isset($this->alternativeServers[$extension])
+                && ($newServer = ServerList::getAlternativeServer($extension))
             ) {
-                $newServer = ServerList::getAlternativeServers($extension);
                 if ($whoIsServer != $newServer) {
                     try {
                         $newResult  = $this->getWhoIsWithServer($domainName, $newServer, $clean);
@@ -1077,5 +1081,15 @@ class WhoIs
         }
 
         return new Collection($data2);
+    }
+
+    /**
+     * Magic Method Destruct
+     * // Reset
+     */
+    public function __destruct()
+    {
+        $this->temporaryCachedWhoIsServers = [];
+        $this->allowNonDomain = false;
     }
 }
