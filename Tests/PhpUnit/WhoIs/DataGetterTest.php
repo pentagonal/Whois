@@ -180,14 +180,14 @@ class DataGetterTest extends TestCase
         // set default to false
         $getter->setDefault(false);
         $tmpPath = sys_get_temp_dir() ?: __DIR__ . DIRECTORY_SEPARATOR . 'tmp';
-        $tmpPath = $tmpPath .'/extensionDir';
-        $jsonPath = $tmpPath . '/extension_list_tmp.json';
+        $tmpPathFix = $tmpPath .'/extensionDir';
+        $jsonPath = $tmpPathFix . '/extension_list_tmp.json';
         if (file_exists($jsonPath)) {
             unlink($jsonPath);
         }
 
-        if (is_dir($tmpPath)) {
-            rmdir($tmpPath);
+        if (is_dir($tmpPathFix)) {
+            rmdir($tmpPathFix);
         }
 
         $newGetter = new DataGetter($jsonPath);
@@ -199,8 +199,20 @@ class DataGetterTest extends TestCase
         if (file_exists($jsonPath)) {
             unlink($jsonPath);
         }
-        if (is_dir($tmpPath)) {
-            rmdir($tmpPath);
+        if (is_dir($tmpPathFix)) {
+            rmdir($tmpPathFix);
         }
+
+        $newFile = $tmpPath .'/extension_for_protected.json';
+        touch($newFile);
+        chmod($newFile, 0400);
+        $dataGetter = new DataGetter($newFile);
+        try {
+            $dataGetter->createNewRecordExtension();
+        } catch (\Exception $e) {
+            $this->assertInstanceOf(\RuntimeException::class, $e);
+        }
+        chmod($newFile, 777);
+        unlink($newFile);
     }
 }

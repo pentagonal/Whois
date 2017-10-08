@@ -227,8 +227,11 @@ class DataGetter
             if (! is_dir($baseDir)) {
                 if (! @mkdir($baseDir, 0777, true)) {
                     throw new \RuntimeException(
-                        'Json data directory can not being created. Directory %s is not write able',
-                        dirname($baseDir)
+                       sprintf(
+                           'Json data directory can not being created. Directory %s is not write able',
+                            dirname($baseDir)
+                       ),
+                       E_WARNING
                     );
                 }
             } elseif (! file_exists($this->jsonDataFile) && ! is_writeable($baseDir)
@@ -236,9 +239,9 @@ class DataGetter
             ) {
                 throw new \RuntimeException(
                     ! is_writeable($baseDir)
-                        ? 'Json data can not being created. Data directory %s is not write able'
+                        ? "Json data can not being created. Data directory {$baseDir} is not write able"
                         : 'Json data can not being renew. Json data file is not write able',
-                    $baseDir
+                    E_WARNING
                 );
             }
         }
