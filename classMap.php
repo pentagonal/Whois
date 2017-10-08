@@ -5,8 +5,9 @@
 $sourceDir = __DIR__ . DIRECTORY_SEPARATOR . 'Src' . DIRECTORY_SEPARATOR;
 return [
     'Pentagonal\WhoIs\ArrayCache' => $sourceDir . 'ArrayCache.php',
-    'Pentagonal\WhoIs\WhoIs'      => $sourceDir . 'Whois.php',
+    'Pentagonal\WhoIs\ServerList' => $sourceDir . 'ServerList.php',
     'Pentagonal\WhoIs\Verifier'   => $sourceDir . 'Verifier.php',
+    'Pentagonal\WhoIs\WhoIs'      => $sourceDir . 'Whois.php',
     'Pentagonal\WhoIs\Exceptions\ConnectionException' => $sourceDir . 'Exceptions' . DIRECTORY_SEPARATOR . 'ConnectionException.php',
     'Pentagonal\WhoIs\Exceptions\ConnectionRefuseException' => $sourceDir . 'Exceptions' . DIRECTORY_SEPARATOR . 'ConnectionRefuseException.php',
     'Pentagonal\WhoIs\Exceptions\HttpBadAddressException' => $sourceDir . 'Exceptions' . DIRECTORY_SEPARATOR . 'HttpBadAddressException.php',
