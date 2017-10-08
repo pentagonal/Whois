@@ -283,7 +283,7 @@ class WhoIsTest extends TestCase
             $this->whoIs->getIpData('domain.invalid');
         } catch (\Exception $e) {
             $this->assertInstanceOf(
-                \InvalidArgumentException::class,
+                \Exception::class,
                 $e
             );
         }
