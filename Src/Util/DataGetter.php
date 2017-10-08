@@ -77,7 +77,7 @@ class DataGetter
         /**
          * set json file for extension
          */
-        $this->jsonDataFile = $jsonDataFile?: __DIR__ .'/Data/extension.json';
+        $this->jsonDataFile = $jsonDataFile?: dirname(__DIR__) .'/Data/extensions.json';
     }
 
     /**
@@ -285,10 +285,76 @@ class DataGetter
             }
 
             fclose($socket);
+            // create
+            $this->createPhpAllExtensions();
             return $this->tldList;
         }
 
         return $this->tldList;
+    }
+
+    /**
+     * Create Extensions List
+     */
+    final protected function createPhpAllExtensions()
+    {
+        $fileJsonReal = new \SplFileInfo(dirname(__DIR__) .'/Data/extensions.json');
+        $fileJson = new \SplFileInfo($this->jsonDataFile);
+        if (!$fileJsonReal->getRealPath() ||
+            $fileJsonReal->getRealPath() !== $fileJson->getRealPath()
+        ) {
+            return;
+        }
+
+        $AllExt = dirname(__DIR__). '/Data/AllExtensions.php';
+        if (is_writeable(dirname($AllExt)) && !file_exists(file_exists($AllExt))
+            || file_exists($AllExt) && is_writeable($AllExt)
+        ) {
+            $arrPhp = "<?php\n";
+            $arrPhp .= "/**\n"
+                 . " * This package contains some code that reused by other repository(es) for private uses.\n"
+                 . " * But on some certain conditions, it will also allowed to used as commercials project.\n"
+                 . " * Some code & coding standard also used from other repositories as inspiration ideas.\n"
+                 . " * And also uses 3rd-Party as to be used as result value without "
+                    . "their permission but permit to be used.\n"
+                 . " *\n"
+                 . " * @license GPL-3.0  {@link https://www.gnu.org/licenses/gpl-3.0.en.html}\n"
+                 . " * @copyright (c) 2017. Pentagonal Development\n"
+                 . " * @author pentagonal <org@pentagonal.org>\n"
+                 . " */\n\n";
+            $arrPhp .= "/**\n * List of Whois Extensions\n";
+            $arrPhp .= " * Automatic Generation File\n */\n";
+            $arrPhp .= "return [\n";
+            foreach ($this->tldList as $extension => $list) {
+                $arrNow = " [";
+                $has    = false;
+                foreach ($list as $ext => $sub) {
+                    if (! $has) {
+                        $arrNow .= "\n";
+                    }
+                    $has    = true;
+                    $arrNow .= "        '{$sub}',\n";
+                }
+                $arrNow .= ($has ? "    " : '') . "],\n";
+                $arrPhp .= "    '{$extension}' => {$arrNow}";
+            }
+            $arrPhp .= "];\n";
+
+            $socket = @fopen($AllExt, 'w+');
+            if (! $socket) {
+                return;
+            }
+            $length  = strlen($arrPhp);
+            $written = 0;
+            while ($length > $written) {
+                $fWrite  = fwrite($socket, substr($arrPhp, $written, ($written + 1024)));
+                $written += (int)$fWrite;
+                if (! $fWrite) {
+                    break;
+                }
+            }
+            fclose($socket);
+        }
     }
 
     /**
