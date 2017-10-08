@@ -255,5 +255,82 @@ class WhoIsTest extends TestCase
             '',
             $data
         );
+
+        $this->assertNotEmpty(
+            $this->whoIs->getASNData('1234')
+        );
+
+        $this->assertInstanceOf(
+            Collection::class,
+            $this->whoIs->getASNWithArrayDetail('1234')
+        );
+
+        $this->assertInstanceOf(
+            Collection::class,
+            $this->whoIs->getASNWithArrayDetail('1234', true)
+        );
+
+        try {
+            $this->whoIs->getASNData('BBB1234');
+        } catch (\Exception $e) {
+            $this->assertInstanceOf(
+                \InvalidArgumentException::class,
+                $e
+            );
+        }
+
+        try {
+            $this->whoIs->getIpData('domain.invalid');
+        } catch (\Exception $e) {
+            $this->assertInstanceOf(
+                \InvalidArgumentException::class,
+                $e
+            );
+        }
+
+        try {
+            $this->whoIs->getIpData('123456');
+        } catch (\Exception $e) {
+            $this->assertInstanceOf(
+                \UnexpectedValueException::class,
+                $e
+            );
+        }
+
+        $this->assertInstanceOf(
+            Collection::class,
+            $this->whoIs->getIpData('8.8.8.8')
+        );
+
+        $this->assertInstanceOf(
+            Collection::class,
+            $this->whoIs->getIpData('8.8.8.8', true)
+        );
+
+        $this->assertInstanceOf(
+            Collection::class,
+            $this->whoIs->getIPWithArrayDetail('8.8.8.8')
+        );
+        $this->assertTrue(
+            $this->whoIs->isDomainRegistered('google.com')
+        );
+        try {
+            $this->whoIs->isDomainRegistered(true);
+        } catch (\Exception $e) {
+            $this->assertInstanceOf(
+                \InvalidArgumentException::class,
+                $e
+            );
+        }
+        try {
+            $this->whoIs->isDomainRegistered('domain');
+        } catch (\Exception $e) {
+            $this->assertInstanceOf(
+                \InvalidArgumentException::class,
+                $e
+            );
+        }
+
+        $this->whoIs->__destruct();
     }
 }
