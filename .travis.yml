@@ -19,12 +19,12 @@ before_script:
 
 script:
     - ./vendor/bin/phpcs
-#    - ./vendor/bin/phpunit --configuration phpunit.xml.dist --coverage-text
+    - ./vendor/bin/phpunit --configuration phpunit.xml.dist --coverage-text
 
 matrix:
   fast_finish: true
 
 # After Succeeded
 # Execute Coverall
-#after_success:
-#  - travis_retry php vendor/bin/coveralls -v --exclude-no-stmt
+after_success:
+  - travis_retry php vendor/bin/coveralls -v --exclude-no-stmt

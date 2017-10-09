@@ -17,6 +17,8 @@ namespace Pentagonal\WhoIs\App;
 /**
  * Class Validator
  * @package Pentagonal\WhoIs\App
+ *
+ * @todo completion for method
  */
 class Validator
 {
@@ -65,61 +67,8 @@ class Validator
      + ------------------------------------------------------ */
 
     /**
-     * Validate domain for sanitation
-     *
-     * @param string $domainName
-     * @return array|bool           returning array detail for domain otherwise false if fail
+     * @todo add Domain Validator
      */
-    public function validateDomain(string $domainName)
-    {
-        if (trim($domainName) === ''
-            || strlen($domainName) > 255
-            || ! strpos($domainName, '.')
-            || preg_match('/(?:^[\-\.])|[~!@#$%^&*()+`=\\|\'{}\[\\];":,\/<>?\s]|[\-]\.|\.\.|(?:[-.]$)/', $domainName)
-        ) {
-            return false;
-        }
-
-        $domainName = strtolower($domainName);
-        $result = [
-            self::SELECTOR_FULL_NAME  => $domainName,
-            self::SELECTOR_SUB_DOMAIN_NAME => null,
-            self::SELECTOR_DOMAIN_NAME => null,
-            self::SELECTOR_EXTENSION_NAME => null,
-        ];
-
-        $arrayDomain = explode('.', $domainName);
-        $arrayDomainLength = count($arrayDomain);
-        $result[self::SELECTOR_EXTENSION_NAME] = array_pop($arrayDomain);
-        $result[self::SELECTOR_DOMAIN_NAME]    = array_pop($arrayDomain);
-        $extension = idn_to_ascii($result[self::SELECTOR_EXTENSION_NAME]);
-
-        if (!isset($this->getExtensionList()[$extension])
-            || strlen($result[self::SELECTOR_DOMAIN_NAME]) > 63
-            /* just make sure example.(com|org) not used */
-            /* || result[1] === 'example' && ['com', 'org'].indexOf(result.extension_domain) > -1 */
-        ) {
-            return false;
-        }
-
-        if (isset($this->regexExtension[$extension])
-            && @preg_match(
-                preg_replace('/\s*/', '', $this->regexExtension[$extension]),
-                $result[self::SELECTOR_DOMAIN_NAME],
-                $match,
-                PREG_NO_ERROR
-            ) || !preg_match('/^[a-z0-9]+(?:(?:[a-z0-9-]+)?[a-z0-9]$)?/', $result[self::SELECTOR_DOMAIN_NAME])
-        ) {
-            return false;
-        }
-
-        if ($arrayDomainLength > 2) {
-            $result[self::SELECTOR_SUB_DOMAIN_NAME] = implode('.', $arrayDomain);
-        }
-        $result[self::SELECTOR_FULL_NAME] = $result[self::SELECTOR_SUB_DOMAIN_NAME]
-                                            . $result[self::SELECTOR_DOMAIN_NAME];
-        return $result;
-    }
 
     /* ------------------------------------------------------ +
      | EMAIL VALIDATOR                                        |
@@ -200,6 +149,8 @@ class Validator
         if ($checkMX) {
             return $this->isMXExists($domainName);
         }
+
+        // @todo completion logic
     }
 
     /**
