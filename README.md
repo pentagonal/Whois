@@ -1,7 +1,7 @@
 # Php WhoIs
 
-[![Build Status](https://travis-ci.org/pentagonal/Whois.svg?branch=master)](https://travis-ci.org/pentagonal/Whois)
-[![Coverage Status](https://coveralls.io/repos/github/pentagonal/Whois/badge.svg?branch=master)](https://coveralls.io/github/pentagonal/Whois?branch=master)
+[![Build Status](https://travis-ci.org/pentagonal/Whois.svg?branch=1.0)](https://travis-ci.org/pentagonal/Whois)
+[![Coverage Status](https://coveralls.io/repos/github/pentagonal/Whois/badge.svg?branch=1.0)](https://coveralls.io/github/pentagonal/Whois?branch=1.0)
 
 Php Domain / ASN / IP WhoIs Checker
 
