@@ -23,7 +23,6 @@ script:
 matrix:
   fast_finish: true
 
-# After Succeeded
-# Execute Coverall
+# After Succeeded Execute Coverall
 after_success:
   - travis_retry php vendor/bin/coveralls -v --exclude-no-stmt
