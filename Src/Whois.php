@@ -987,16 +987,35 @@ class WhoIs
     }
 
     /**
-     * @param string $data
+     * @param string $ipData
      * @param bool   $clean
+     *
      * @return Collection|Collection[]
      */
-    public function getIpData($data, $clean = false)
+    public function getIpData($ipData, $clean = false)
     {
-        $ipData = @gethostbyaddr(@gethostbyname($data));
-        if (!$ipData) {
+        if (!is_string($ipData)) {
+            throw new InvalidArgumentException(
+                sprintf(
+                    'Argument 1 must be as astring %s given',
+                    gettype($ipData)
+                ),
+                E_WARNING
+            );
+        }
+
+        if ($this->verifier->isIPv4($ipData)) {
+            $ipData = @gethostbyaddr(@gethostbyname($ipData));
+            if ( ! $ipData) {
+                throw new \InvalidArgumentException(
+                    'Invalid address.',
+                    E_USER_ERROR
+                );
+            }
+        }
+        if ($this->verifier->isLocalIPv4($ipData)) {
             throw new \InvalidArgumentException(
-                'Invalid address.',
+                'Can not get local IP Data.',
                 E_USER_ERROR
             );
         }
