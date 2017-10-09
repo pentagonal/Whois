@@ -113,4 +113,5 @@ composer require pentagonal/whois "^1.0"
 The whois server only support via socket only.
 
 Some domain does not know about server socket address.
- 
+
+The code is final Release, and will be update on next repository for support PSR7 compatible.
