@@ -1006,7 +1006,7 @@ class WhoIs
 
         if ($this->verifier->isIPv4($ipData)) {
             $ipData = @gethostbyaddr(@gethostbyname($ipData));
-            if ( ! $ipData) {
+            if (! $ipData) {
                 throw new \InvalidArgumentException(
                     'Invalid address.',
                     E_USER_ERROR
