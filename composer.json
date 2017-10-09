@@ -1,0 +1,38 @@
+{
+  "name": "pentagonal/whois",
+  "description": "Domain & Network Whois checker & info",
+  "type": "project",
+  "require": {
+    "php": ">= 7",
+    "guzzlehttp/guzzle": "^6",
+    "true/punycode": "^2.0"
+  },
+  "require-dev": {
+    "squizlabs/php_codesniffer": "3.*",
+    "phpunit/phpunit": "^5",
+    "satooshi/php-coveralls": "^1"
+  },
+  "license": "GPL-3.0",
+  "authors": [
+    {
+      "name": "pentagonal",
+      "email": "org@pentagonal.org"
+    }
+  ],
+  "autoload" : {
+    "psr-4" : {
+      "\\Pentagonal\\WhoIs\\App\\": "Src/App/",
+      "\\Pentagonal\\WhoIs\\Exceptions\\": "Src/Exceptions/",
+      "\\Pentagonal\\WhoIs\\Handler\\": "Src/Handler/",
+      "\\Pentagonal\\WhoIs\\Interfaces\\": "Src/Interfaces/",
+      "\\Pentagonal\\WhoIs\\Util\\": "Src/Util/"
+    },
+    "classmap": [
+      "Src/App",
+      "Src/Exceptions",
+      "Src/Handler",
+      "Src/Interfaces",
+      "Src/Util"
+    ]
+  }
+}
