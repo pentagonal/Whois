@@ -103,6 +103,18 @@ class ArrayCollector extends \ArrayObject implements \JsonSerializable
     }
 
     /**
+     * check if contains expected value
+     *
+     * @param string $value
+     *
+     * @return bool
+     */
+    public function contain($value) : bool
+    {
+        return in_array($value, (array) $this);
+    }
+
+    /**
      * @return array
      */
     public function jsonSerialize() : array

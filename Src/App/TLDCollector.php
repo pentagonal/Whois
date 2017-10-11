@@ -193,7 +193,7 @@ class TLDCollector
         }
 
         $extension = $this->encode(trim($extension));
-        return !empty($this->availableServers[$extension])
+        return isset($this->availableServers[$extension])
             ? new ArrayCollector($this->availableServers[$extension])
             : null;
     }
@@ -239,7 +239,7 @@ class TLDCollector
         }
 
         $extension = $this->encode(trim($extension));
-        return !empty($this->availableExtensions[$extension])
+        return isset($this->availableExtensions[$extension])
             ? new ArrayCollector($this->availableExtensions[$extension])
             : null;
     }

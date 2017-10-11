@@ -19,10 +19,10 @@ use Pentagonal\WhoIs\Exceptions\TimeOutException;
 use Pentagonal\WhoIs\Handler\TransportSocketClient;
 
 /**
- * Class Generator
+ * Class DataGenerator
  * @package Pentagonal\WhoIs\Util
  */
-final class Generator
+final class DataGenerator
 {
     const IANA_URI     = 'whois.iana.org';
     const IANA_IDN_URI = 'https://data.iana.org/TLD/tlds-alpha-by-domain.txt';
@@ -90,16 +90,16 @@ LICENSE;
         }
 
         // iana
-        $iAna = Cleaner::cleanIniComment((string) $ianaResponse->getBody());
-        $iAna = Cleaner::cleanMultipleWhiteSpaceTrim($iAna);
+        $iAna = DataParser::cleanIniComment((string) $ianaResponse->getBody());
+        $iAna = DataParser::cleanMultipleWhiteSpaceTrim($iAna);
         $iAna = str_replace("\r\n", "\n", strtolower($iAna));
         $iAna = explode("\n", $iAna);
         $iAna = array_filter($iAna);
 
         // sufix
-        $suffix = Cleaner::cleanIniComment((string) $suffixResponse->getBody());
-        $suffix = Cleaner::cleanSlashComment($suffix);
-        $suffix = Cleaner::cleanMultipleWhiteSpaceTrim($suffix);
+        $suffix = DataParser::cleanIniComment((string) $suffixResponse->getBody());
+        $suffix = DataParser::cleanSlashComment($suffix);
+        $suffix = DataParser::cleanMultipleWhiteSpaceTrim($suffix);
         $suffix = str_replace("\r\n", "\n", strtolower($suffix));
         $suffix = explode("\n", $suffix);
         $suffix = array_filter($suffix);
@@ -163,16 +163,34 @@ LICENSE;
     {
         $license = static::LICENSE;
         $newData = "<?php\n{$license}\nreturn [\n";
+        $baseSeparator = '    ';
+        $repeatedSeparator = str_repeat($baseSeparator, 2);
         foreach ($data as $extension => $server) {
             if (!is_array($server)) {
                 continue;
             }
             $serverArr = '[';
             if (!empty($server)) {
-                $serverArr .= "\n        '".implode("',\n        '", $server)."',\n    ";
+                $server = array_map(function ($data) {
+                    if (!is_string($data) || ($data = trim($data)) == ''
+                        || strpos($data, "'") !== false
+                    ) {
+                        return false;
+                    }
+
+                    return strtolower($data);
+                }, $server);
+
+                $server = array_filter($server);
+                if (!empty($server)) {
+                    $serverArr .= "\n{$repeatedSeparator}'"
+                          . implode("', \n{$repeatedSeparator}'", $server)
+                          . "',\n{$baseSeparator}";
+                }
             }
+
             $serverArr .= ']';
-            $newData .= "    '{$extension}' => {$serverArr},\n";
+            $newData .= "{$baseSeparator}'{$extension}' => {$serverArr},\n";
         }
         $newData .= "];\n";
         return $newData;
