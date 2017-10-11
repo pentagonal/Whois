@@ -18,6 +18,8 @@ namespace Pentagonal\WhoIs\Util;
  */
 class DataParser
 {
+    const REGISTERED    = true;
+    const UNREGISTERED  = false;
     const UNKNOWN = 'UNKNOWN';
     const LIMIT   = 'LIMIT';
 
@@ -123,15 +125,15 @@ class DataParser
         if ($cleanData === '') {
             // if cleanData is empty & data is not empty check entries
             if ($data && preg_match('/No\s+entries(?:\s+found)?|Not(?:hing)?\s+found/i', $data)) {
-                return false;
+                return static::UNREGISTERED;
             }
 
-            return self::UNKNOWN;
+            return static::UNKNOWN;
         }
 
         // if invalid domain
         if (stripos($cleanData, 'Failure to locate a record in ') !== false) {
-            return self::UNKNOWN;
+            return static::UNKNOWN;
         }
 
         // array check for detailed content only that below is not registered
@@ -151,7 +153,7 @@ class DataParser
             // for za domain eg: co.za
             || stripos($cleanData, 'Available') === 0 && strpos($cleanData, 'Domain:')
         ) {
-            return false;
+            return static::UNREGISTERED;
         }
 
         // regex not match or not found on start tag
@@ -178,7 +180,7 @@ class DataParser
                 $cleanData
             )
         ) {
-            return false;
+            return static::UNREGISTERED;
         }
         // match domain with name and with status available extension for eg: .be
         if (preg_match('/Domain\s*(?:\_name)?\:(?:[^\n]+)/i', $cleanData)) {
@@ -189,21 +191,21 @@ class DataParser
                 /ix',
                 $cleanData
             )) {
-                return false;
+                return static::UNREGISTERED;
             }
 
             if (preg_match(
                 '/(?:Domain\s+)?Status\s*\:\s*NOT\s*AVAILABLE/i',
                 $cleanData
             )) {
-                return true;
+                return static::REGISTERED;
             }
         }
 
         if (stripos($cleanData, 'Status: Not Registered') !== false
             && preg_match('/[\n]+Query\s*\:[^\n]+/', $cleanData)
         ) {
-            return false;
+            return static::UNREGISTERED;
         }
 
         // Reserved Domain
@@ -237,15 +239,15 @@ class DataParser
                ) && !empty($matchDataResult[1])
            )
         ) {
-            return true;
+            return static::REGISTERED;
         }
 
         // check if on limit whois check
         if (self::hasContainLimitedResultData($data)) {
-            return self::LIMIT;
+            return static::LIMIT;
         }
 
-        return false;
+        return static::UNREGISTERED;
     }
 
     /**
