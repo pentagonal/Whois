@@ -100,9 +100,9 @@ class BaseMailAddressProviderValidator
                 // email address only allowed a-zA-Z0-9\_\.\-
                 || preg_match('/[^a-zA-Z0-9\_\.\-]/i', $baseMail)
                 // could not start with @, period (.) , -
-                || in_array(substr_count($baseMail, 0, 1), ['.', '-'])
+                || in_array(substr($baseMail, 0, 1), ['.', '-'])
                 // could not end with @ and period (.)
-                || in_array(substr_count($baseMail, -1), ['.'])
+                || in_array(substr($baseMail, -1), ['.'])
                 // could not (.-), (..), (._), (-.)
                 || preg_match('/[\.][\.\-_]|[\-]|\@\./', $baseMail)
                 # could not contain invalid characters

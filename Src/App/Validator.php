@@ -34,6 +34,9 @@ class Validator
      */
     const MAX_LENGTH_BASE_DOMAIN_NAME = 63;
     const MAX_LENGTH_DOMAIN_NAME      = 255;
+    const NAME_HOST             = 'HOST';
+    const NAME_EMAIL            = 'EMAIL';
+    const NAME_IS_IP            = 'IS_IP_ADDRESS';
 
     const NAME_IS_TOP_DOMAIN    = 'IS_TOP_DOMAIN';
     const NAME_IS_GTLD_DOMAIN   = 'IS_GLTD_DOMAIN';
@@ -161,9 +164,6 @@ class Validator
      | DOMAIN VALIDATOR                                       |
      + ------------------------------------------------------ */
 
-    /**
-     * @todo add Domain Validator
-     */
     /**
      * @param string $domainName
      *
@@ -433,42 +433,46 @@ class Validator
             $domainName
         );
     }
+
     /**
      * Re-validate domain name
+     * override this method to make more advance domain validation
      *
      * @param DomainRecord $collector
-     * @param string $baseDomain
+     * @param string $domainName
      *
      * @return DomainRecord
      */
-    private function reValidateDomainName(DomainRecord $collector, string $baseDomain) : DomainRecord
+    protected function reValidateDomainName(DomainRecord $collector, string $domainName) : DomainRecord
     {
         $extension = $collector[self::NAME_BASE_EXTENSION];
+        // remove dot and validate all domain name string
+        $domainNameNoPeriods = str_replace('.', '', $collector[self::NAME_BASE_DOMAIN_NAME]);
         switch ($extension) {
             case 'id':
-                $domainName = str_replace('.', '', $collector[self::NAME_BASE_DOMAIN_NAME]);
-                if (preg_match('/[^a-zA-Z0-9\-\_]/', $domainName)) {
-                    $this->throwDomainNameHasInvalidCharacters($baseDomain);
+                if (preg_match('/[^a-zA-Z0-9\-\_]/', $domainNameNoPeriods)) {
+                    $this->throwDomainNameHasInvalidCharacters($domainName);
                 }
                 break;
             default:
-                $domainName = str_replace('.', '', $collector[self::NAME_BASE_DOMAIN_NAME]);
                 if (preg_match(
                     '/
                         [^a-z0-9\-\P{Latin}\P{Hebrew}\P{Greek}\P{Cyrillic}
                         \P{Han}\P{Arabic}\P{Gujarati}\P{Armenian}\P{Hiragana}\P{Thai}]
                     /x',
-                    $domainName
+                    $domainNameNoPeriods
                 )) {
-                    $this->throwDomainNameHasInvalidCharacters($baseDomain);
+                    $this->throwDomainNameHasInvalidCharacters($domainName);
                 }
                 break;
         }
-
+        // fallback result DomainRecord
         return $collector;
     }
 
     /**
+     * Check if is valid Domain Name
+     *
      * @param string $domainName
      *
      * @return bool
@@ -478,6 +482,23 @@ class Validator
         try {
             $this->splitDomainName($domainName);
             return true;
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Check if is Valid Top Level Domain
+     *
+     * @param string $domainName
+     *
+     * @return bool
+     */
+    public function isValidTopLevelDomain(string $domainName) : bool
+    {
+        try {
+            $domain = $this->splitDomainName($domainName);
+            return $domain->isTopLevelDomain();
         } catch (\Exception $e) {
             return false;
         }
@@ -497,6 +518,60 @@ class Validator
      * @return bool
      */
     public function isValidEmail(string $email, $allowIP = false, $checkMX = true) : bool
+    {
+        $domain = $this->reValidateEmailAddress($email, $allowIP, $checkMX);
+        if (is_bool($domain)) {
+            return $domain;
+        }
+
+        return $this->isValidDomain($domain);
+    }
+
+    /**
+     * Split Email into array collector if valid email
+     *
+     * @param string $email
+     * @param bool $checkMX
+     *
+     * @return ArrayCollector
+     */
+    public function splitEmailDomain(string $email, $checkMX = true) : ArrayCollector
+    {
+        $domain = $this->reValidateEmailAddress($email, true, $checkMX);
+        if (!$domain) {
+            throw new \InvalidArgumentException(
+                sprintf(
+                    '%s is not a valid email',
+                    $email
+                ),
+                E_WARNING
+            );
+        }
+
+        $email   = strtolower($email);
+        $explode = explode('@', $email);
+        $host    = end($explode);
+        if (is_string($domain)) {
+            $host = $this->tldCollector->decode($host);
+        }
+
+        return new ArrayCollector([
+            self::NAME_IS_IP => ! is_string($domain),
+            self::NAME_EMAIL => reset($explode),
+            self::NAME_HOST  => $host
+        ]);
+    }
+
+    /**
+     * Revalidate Email with returning domain Name
+     *
+     * @param string $email
+     * @param bool $allowIP
+     * @param bool $checkMX
+     *
+     * @return bool|string
+     */
+    protected function reValidateEmailAddress(string $email, $allowIP = false, $checkMX = true)
     {
         // minimum email length is 6 for minimum eg a@a.aa
         if (strlen(trim($email)) < 6
@@ -519,9 +594,6 @@ class Validator
         $emailAddress = strtolower(array_shift($emailArray));
         // get domain
         $domain       = implode('.', $emailArray);
-        // get extension
-        $extEnd       = end($emailArray);
-
         // it was must be invalid stop here
         if ($this->getBaseMailProviderValidator($emailAddress)->isMustBeInvalid()) {
             return false;
@@ -538,7 +610,7 @@ class Validator
                 )
             )/ix',
             $domain
-        ) || in_array($extEnd, ['local', 'dev'])) {
+        )) {
             return false;
         }
 
@@ -546,6 +618,8 @@ class Validator
         $domainName = strtolower(array_shift($emailArray));
         // split into array
         $domainNameArray = explode('.', $domainName);
+        // get extension
+        $extEnd       = array_pop($domainNameArray);
         // base sub domain
         $baseOrSub = array_pop($domainNameArray);
 
@@ -576,6 +650,7 @@ class Validator
             if (in_array($baseOrSub, $this->commonEmailProvider)) {
                 return false;
             }
+
             $commonProvider = ['hotmail', 'outlook', 'live', 'yahoo', 'rocketmail', 'ymail'];
             $baseDomain = array_pop($domainNameArray);
             if ($baseOrSub == 'co') {
@@ -605,10 +680,10 @@ class Validator
 
         // if use Check MX just ignore domain check
         if ($checkMX) {
-            return $this->isMXExists($domainName);
+            return $this->isMXExists($domainName) ? $domain : false;
         }
 
-        return $this->isValidDomain($domain);
+        return $domain;
     }
 
     /**
