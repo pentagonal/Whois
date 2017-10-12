@@ -34,6 +34,7 @@ class Validator
      */
     const MAX_LENGTH_BASE_DOMAIN_NAME = 63;
     const MAX_LENGTH_DOMAIN_NAME      = 255;
+
     const NAME_HOST             = 'HOST';
     const NAME_EMAIL            = 'EMAIL';
     const NAME_IS_IP            = 'IS_IP_ADDRESS';

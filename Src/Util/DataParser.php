@@ -270,6 +270,13 @@ class DataParser
      */
     public static function hasContainLimitedResultData(string $data) : bool
     {
+        if (preg_match(
+            '/passed\s+(?:the)?\s+daily\s+limit|temporarily\s+denied/i',
+            $data
+        )) {
+            return true;
+        }
+
         $data = self::cleanWhoIsSocketResult($data);
         // check if on limit whois check
         if ($data && preg_match(

@@ -14,6 +14,7 @@ declare(strict_types=1);
 
 namespace Pentagonal\WhoIs\App;
 
+use Pentagonal\WhoIs\Util\DataGenerator;
 use Pentagonal\WhoIs\Util\Puny;
 
 /**
@@ -56,8 +57,8 @@ class TLDCollector
     final public function __construct(array $serverList = null)
     {
         $this->punyCodeInstance        = new Puny();
-        $this->availableServersFile    = dirname(__DIR__) . '/Data/AvailableServers.php';
-        $this->availableExtensionsFile = dirname(__DIR__) . '/Data/AvailableExtensions.php';
+        $this->availableServersFile    = DataGenerator::PATH_WHOIS_SERVERS;
+        $this->availableExtensionsFile = DataGenerator::PATH_EXTENSIONS_AVAILABLE;
 
         /** @noinspection PhpIncludeInspection */
         $this->availableServers = $this->checkTLDList($serverList ?: require $this->availableServersFile);

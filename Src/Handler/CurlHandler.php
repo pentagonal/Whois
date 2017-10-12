@@ -12,8 +12,10 @@
 
 namespace Pentagonal\WhoIs\Handler;
 
+use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Handler\CurlFactory;
 use GuzzleHttp\Handler\CurlFactoryInterface;
+use Pentagonal\WhoIs\Exceptions\ConnectionException;
 use Psr\Http\Message\RequestInterface;
 
 /**
@@ -25,7 +27,9 @@ use Psr\Http\Message\RequestInterface;
  */
 class CurlHandler
 {
-    /** @var CurlFactoryInterface */
+    /**
+     * @var CurlFactoryInterface
+     */
     protected $factory;
 
     /**
@@ -47,6 +51,7 @@ class CurlHandler
      * @param array $options
      *
      * @return \GuzzleHttp\Promise\PromiseInterface
+     * @throws \Throwable
      */
     public function __invoke(RequestInterface $request, array $options)
     {
@@ -66,6 +71,9 @@ class CurlHandler
         }
 
         $easy = $this->factory->create($request, $options);
+
+        // if use port 43 headers is not important anymore because it was use telnet
+        // maybe?
         $options['curl'][CURLOPT_WRITEFUNCTION] = function ($ch, $h) use (&$easy) {
             return $easy->sink->write($h);
         };
@@ -75,6 +83,8 @@ class CurlHandler
         curl_exec($easy->handle);
         $easy->errno = curl_errno($easy->handle);
         $info = curl_getinfo($easy->handle);
+
+        // socket 43 does not require headers so make it headers 200
         if ($easy->errno === 0 || ($easy->sink->getSize() > 0 || empty($info['htp_code']))) {
             if (empty($easy->headers)) {
                 $easy->headers[] = 'HTTP/1.1 200 OK';
@@ -82,7 +92,21 @@ class CurlHandler
 
             $easy->createResponse();
         }
+        try {
+            return CurlFactory::finish($this, $easy, $this->factory);
+        } catch (ConnectException $e) {
+            if (!$easy->request instanceof RequestInterface) {
+                throw $e;
+            }
 
-        return CurlFactory::finish($this, $easy, $this->factory);
+            $code = $e->getCode();
+            if (!$code && $easy->errno) {
+                $code = (int) $easy->errno;
+            }
+            $e = new ConnectionException($e->getMessage(), $code);
+            $e->setLine($e->getLine());
+            $e->setFile($e->getFile());
+            throw TransportClient::thrownExceptionResource($easy->request, $e, false);
+        }
     }
 }

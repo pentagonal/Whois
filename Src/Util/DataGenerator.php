@@ -14,9 +14,10 @@ declare(strict_types=1);
 
 namespace Pentagonal\WhoIs\Util;
 
+use GuzzleHttp\Psr7\Stream;
 use Pentagonal\WhoIs\App\TLDCollector;
 use Pentagonal\WhoIs\Exceptions\TimeOutException;
-use Pentagonal\WhoIs\Handler\TransportSocketClient;
+use Pentagonal\WhoIs\Handler\TransportClient as Transport;
 
 /**
  * Class DataGenerator
@@ -24,9 +25,39 @@ use Pentagonal\WhoIs\Handler\TransportSocketClient;
  */
 final class DataGenerator
 {
-    const IANA_URI     = 'whois.iana.org';
-    const IANA_IDN_URI = 'https://data.iana.org/TLD/tlds-alpha-by-domain.txt';
-    const PUBLIC_SUFFIX_URI = 'https://publicsuffix.org/list/effective_tld_names.dat';
+    const ERRR_DENIED = -1;
+    const PORT_WHOIS  = 43;
+
+    // Uri
+    const
+        URI_IANA_WHOIS = 'whois.iana.org',
+        URI_IANA_IDN   = 'https://data.iana.org/TLD/tlds-alpha-by-domain.txt',
+        URI_PUBLIC_SUFFIX = 'https://publicsuffix.org/list/effective_tld_names.dat',
+        URI_CACERT     = 'https://curl.haxx.se/ca/cacert.pem';
+
+    // Path
+    const
+        PATH_WHOIS_SERVERS = __DIR__ . '/../Data/Servers/AvailableServers.php',
+        PATH_EXTENSIONS_AVAILABLE = __DIR__ . '/../Data/Servers/AvailableServers.php',
+        PATH_CACERT     = __DIR__ . '/../Data/Certs/cacert.pem';
+
+    const
+        ARIN_NET_PREFIX_COMMAND    = 'n +',
+        RIPE_NET_PREFIX_COMMAND    = '-V Md5.2',
+        APNIC_NET_PREFIX_COMMAND   = '-V Md5.2',
+        AFRINIC_NET_PREFIX_COMMAND = '-V Md5.2',
+        LACNIC_NET_PREFIX_COMMAND  = '';
+
+    /**
+     * @var array
+     */
+    protected static $serverPrefixList = [
+        'whois.arin.net'    => self::ARIN_NET_PREFIX_COMMAND,
+        'whois.ripe.net'    => self::RIPE_NET_PREFIX_COMMAND,
+        'whois.apnic.net'   => self::APNIC_NET_PREFIX_COMMAND,
+        'whois.afrinic.net' => self::AFRINIC_NET_PREFIX_COMMAND,
+        'whois.lacnic.net'  => self::LACNIC_NET_PREFIX_COMMAND,
+    ];
 
     const LICENSE = <<<LICENSE
 /**
@@ -51,59 +82,73 @@ LICENSE;
         if (!file_exists($fileTLDExtensions) && !is_writeable($dirFileTLDExtensions)
             || !file_exists($fileServers) && !is_writeable($dirFileServers)
         ) {
-            return -1;
+            return self::ERRR_DENIED;
         }
 
         if (!file_exists($fileTLDExtensions)) {
             if (!touch($fileTLDExtensions)) {
-                return -1;
+                return self::ERRR_DENIED;
             }
         }
 
         if (!file_exists($fileServers)) {
             if (!touch($fileServers)) {
-                return -1;
+                return self::ERRR_DENIED;
             }
         }
 
         if (!is_writeable($fileTLDExtensions) || !is_writeable($fileServers)) {
-            return -1;
+            return self::ERRR_DENIED;
         }
 
-        $client = TransportSocketClient::createClient();
-        $ianaURI = TransportSocketClient::createUri(self::IANA_IDN_URI);
-        $suffixURI = TransportSocketClient::createUri(self::PUBLIC_SUFFIX_URI);
         try {
-            $ianaResponse = $client->request('GET', $ianaURI);
+            $iAnaResponse = Transport::get(self::URI_IANA_IDN);
         } catch (TimeOutException $e) {
-            $ianaResponse = $client->request('GET', $ianaURI);
+            $iAnaResponse = Transport::get(self::URI_IANA_IDN);
         } catch (\Exception $e) {
             throw $e;
         }
 
         try {
-            $suffixResponse = $client->request('GET', $suffixURI);
+            $suffixResponse = Transport::get(self::URI_PUBLIC_SUFFIX);
         } catch (TimeOutException $e) {
-            $suffixResponse = $client->request('GET', $suffixURI);
+            $suffixResponse = Transport::get(self::URI_PUBLIC_SUFFIX);
         } catch (\Exception $e) {
             throw $e;
         }
+
+        $dataResponse = '';
+        $body = $iAnaResponse->getBody();
+        while (!$body->eof()) {
+            $dataResponse .= $body->read(4096);
+        }
+        $body->close();
 
         // iana
-        $iAna = DataParser::cleanIniComment((string) $ianaResponse->getBody());
+        $iAna = DataParser::cleanIniComment($dataResponse);
         $iAna = DataParser::cleanMultipleWhiteSpaceTrim($iAna);
         $iAna = str_replace("\r\n", "\n", strtolower($iAna));
         $iAna = explode("\n", $iAna);
         $iAna = array_filter($iAna);
 
-        // sufix
-        $suffix = DataParser::cleanIniComment((string) $suffixResponse->getBody());
+        $dataResponse = '';
+        $body = $suffixResponse->getBody();
+        while (!$body->eof()) {
+            $dataResponse .= $body->read(4096);
+        }
+        $body->close();
+
+        // suffix
+        $suffix = DataParser::cleanIniComment($dataResponse);
         $suffix = DataParser::cleanSlashComment($suffix);
         $suffix = DataParser::cleanMultipleWhiteSpaceTrim($suffix);
         $suffix = str_replace("\r\n", "\n", strtolower($suffix));
         $suffix = explode("\n", $suffix);
         $suffix = array_filter($suffix);
         $arrayData = [];
+        // clear
+        unset($body, $dataResponse);
+
         foreach ($iAna as $extension) {
             $extension = trim($extension);
             $extension = $collector->encode($extension);
@@ -136,7 +181,17 @@ LICENSE;
 
         unset($iAna, $suffix);
         if ($collector->getAvailableExtensions() !== $arrayData) {
-            @file_put_contents($fileTLDExtensions, self::generateArrayToStringDefaultServer($arrayData));
+            $stream = new Stream(fopen($fileTLDExtensions, 'w+'));
+            $data = self::generateArrayToStringDefaultServer($arrayData);
+            $written = 0;
+            while (true) {
+                $dataToWrite = substr($data, $written, 4096);
+                if (strlen($dataToWrite) < 1 || !($write = $stream->write($dataToWrite))) {
+                    break;
+                }
+                $written += $write;
+            }
+            $stream->close();
         }
 
         $serverList = $collector->getAvailableServers();
@@ -147,11 +202,66 @@ LICENSE;
             foreach ($diff as $val) {
                 $serverList[$val] = [];
             }
-
-            @file_put_contents($fileServers, self::generateArrayToStringDefaultServer($serverList));
+            $stream = new Stream(fopen($fileServers, 'w+'));
+            $data = self::generateArrayToStringDefaultServer($serverList);
+            $written = 0;
+            while (true) {
+                $dataToWrite = substr($data, $written, 4096);
+                if (strlen($dataToWrite) < 1 || !($write = $stream->write($dataToWrite))) {
+                    break;
+                }
+                $written += $write;
+            }
+            $stream->close();
         }
-        unset($serverList);
+
+        unset($serverList, $stream);
         return $arrayData;
+    }
+
+    /**
+     * Generate CACERT
+     *
+     * @return int|string
+     * @throws \Exception
+     */
+    public static function generateCaCertificate()
+    {
+        $fileExists = file_exists(self::PATH_CACERT);
+        if ($fileExists) {
+            if (!is_writeable(self::PATH_CACERT)) {
+                return self::ERRR_DENIED;
+            }
+        }
+        if (!$fileExists && !is_writeable(dirname(self::PATH_CACERT))) {
+            return self::ERRR_DENIED;
+        }
+        try {
+            $response = Transport::get(self::URI_CACERT);
+        } catch (TimeOutException $e) {
+            $response = Transport::get(self::URI_CACERT);
+        } catch (\Exception $e) {
+            throw $e;
+        }
+        $body = $response->getBody();
+        $data = '';
+        while (!$body->eof()) {
+            $data .= $body->read(4096);
+        }
+        $body->close();
+
+        $stream = new Stream(fopen(self::PATH_CACERT, 'w+'));
+        $written = 0;
+        while (true) {
+            $dataToWrite = substr($data, $written, 4096);
+            if (strlen($dataToWrite) < 1 || !($write = $stream->write($dataToWrite))) {
+                break;
+            }
+            $written += $write;
+        }
+        $stream->close();
+
+        return $data;
     }
 
     /**
@@ -192,7 +302,60 @@ LICENSE;
             $serverArr .= ']';
             $newData .= "{$baseSeparator}'{$extension}' => {$serverArr},\n";
         }
+
         $newData .= "];\n";
         return $newData;
+    }
+
+    /**
+     * @param string $ip
+     * @param string $server
+     *
+     * @return string
+     */
+    public static function buildNetworkAddressCommandServer(string $ip, string $server) : string
+    {
+        // if contain white space on IP ignore it
+        if (! preg_match('/\s+/', trim($ip))
+            && ($server = strtolower(trim($server))) !== ''
+            && isset(static::$serverPrefixList[$server])
+            && static::$serverPrefixList[$server]
+        ) {
+            $prefix = static::$serverPrefixList[$server];
+            if (strpos($ip, "{$prefix} ") !== 0) {
+                $ip = "{$prefix} {$ip}";
+            }
+        }
+
+        return $ip;
+    }
+
+    /**
+     * @param string $ip
+     * @param string $server
+     *
+     * @return string
+     */
+    public static function buildASNCommandServer(string $ip, string $server) : string
+    {
+        // if contain white space on IP ignore it
+        if (! preg_match('/\s+/', trim($ip))
+            && ($server = strtolower(trim($server))) !== ''
+            && isset(static::$serverPrefixList[$server])
+            && static::$serverPrefixList[$server]
+        ) {
+            $ip     = ltrim($ip);
+            if ($server === 'whois.arin.net') {
+                return "a + {$ip}";
+            }
+
+            $ip     = ltrim($ip);
+            $prefix = static::$serverPrefixList[$server];
+            if (strpos($ip, "{$prefix} ") !== 0) {
+                $ip = "{$prefix} $ip";
+            }
+        }
+
+        return $ip;
     }
 }
