@@ -204,6 +204,10 @@ class WhoIs
             throw $exception;
         }
 
+        if ($server === 'whois.arin.net:43') {
+            $domain = "n + {$domain}";
+        }
+
         if (!$stream->write("{$domain}\r\n")) {
             $stream->close();
             throw new \UnexpectedValueException(
@@ -242,7 +246,7 @@ class WhoIs
                 E_WARNING
             );
         }
-
+        $data = str_replace(["\r\n", "\r"], ["\n", ""], $data);
         $data = preg_replace(
             [
                 '/^(\s)+/sm', # clean each line start with whitespace
@@ -1005,7 +1009,7 @@ class WhoIs
         }
 
         if ($this->verifier->isIPv4($ipData)) {
-            $ipData = @gethostbyaddr(@gethostbyname($ipData));
+            $ipData = @gethostbyname($ipData);
             if (! $ipData) {
                 throw new \InvalidArgumentException(
                     'Invalid address.',
