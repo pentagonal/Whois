@@ -12,6 +12,7 @@
 
 namespace Pentagonal\Tests\PhpUnit\WhoIs;
 
+use Pentagonal\WhoIs\Util\DataGenerator;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -26,11 +27,11 @@ class DataServerExtensionsTest extends TestCase
     public function testServerList()
     {
         $this->assertNotEmpty(
-            require __DIR__ .'/../../../Src/Data/AvailableServers.php'
+            require DataGenerator::PATH_EXTENSIONS_AVAILABLE
         );
 
         $this->assertNotEmpty(
-            require __DIR__ .'/../../../Src/Data/AvailableExtensions.php'
+            require DataGenerator::PATH_WHOIS_SERVERS
         );
     }
 }
