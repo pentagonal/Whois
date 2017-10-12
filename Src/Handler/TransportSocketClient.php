@@ -16,8 +16,21 @@ namespace Pentagonal\WhoIs\Handler;
 
 use GuzzleHttp\Client;
 use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Psr7\Request;
+use GuzzleHttp\Psr7\Response;
+use GuzzleHttp\Psr7\Stream;
 use GuzzleHttp\Psr7\Uri;
+use Pentagonal\WhoIs\Exceptions\ConnectionException;
+use Pentagonal\WhoIs\Exceptions\ConnectionFailException;
+use Pentagonal\WhoIs\Exceptions\ConnectionRefuseException;
+use Pentagonal\WhoIs\Exceptions\HttpBadAddressException;
+use Pentagonal\WhoIs\Exceptions\HttpExpiredException;
+use Pentagonal\WhoIs\Exceptions\HttpPermissionException;
+use Pentagonal\WhoIs\Exceptions\ResourceException;
+use Pentagonal\WhoIs\Exceptions\TimeOutException;
+use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\UriInterface;
 
 /**
  * Client Creator To fix Guzzle Client Socket Enable
@@ -65,7 +78,43 @@ class TransportSocketClient
      */
     public function request(string $method = 'GET', $uri = '', array $options = [])
     {
+        if (!$uri instanceof UriInterface) {
+            $uri = $this->createUri($uri);
+        }
+        if ($uri->getPort() === self::DEFAULT_PORT && $uri->getScheme() == '') {
+            $options['stream'] = false;
+            $options['curl'][CURLOPT_CUSTOMREQUEST] = $method;
+        }
+
         return $this->getClient()->request($method, $uri, $options);
+    }
+
+    /**
+     * @param $domainName
+     * @param string $server
+     *
+     * @return ResponseInterface
+     */
+    public static function requestSocketConnection($domainName, string $server) : ResponseInterface
+    {
+        /**
+         * Make Domain Name To Custom Request
+         */
+        $domainName = trim($domainName) ."\r\n";
+        // create uri
+        $args = func_get_args();
+        array_shift($args);
+        $uri = self::createUri($server);
+        $request = new Request($domainName, $uri);
+        $stream = @fsockopen($uri->getHost(), self::DEFAULT_PORT, $errCode, $errMessage);
+        if (!$stream) {
+            self::thrownExceptionResource($request, new ResourceException($errMessage, $errCode));
+        }
+
+        $stream = new Stream($stream);
+        $stream->write($domainName);
+
+        return new Response(200, [], $stream);
     }
 
     /**
@@ -77,25 +126,29 @@ class TransportSocketClient
      *
      * @return mixed|ResponseInterface
      */
-    public function requestSocket(string $domainName, string $server, int $port = null)
+    public static function requestStreamConnection(string $domainName, string $server, int $port = null)
     {
         /**
          * Make Domain Name To Custom Request
          */
-        $domainName = trim(strtolower($domainName)) ."\r\n";
+        $domainName = trim($domainName) ."\r\n";
         // create uri
         $args = func_get_args();
         array_shift($args);
-        $uri = call_user_func_array([$this, 'createUri'], $args);
-        return $this->request($domainName, $uri);
+        $clone = self::createForStreamSocket();
+        return $clone
+            ->request(
+                $domainName,
+                call_user_func_array([$clone, 'createUri'], $args)
+            );
     }
 
     /**
      * @return HandlerStack
      */
-    public static function createSocketHandler() : HandlerStack
+    public static function createStackHandler() : HandlerStack
     {
-        return HandlerStack::create(new StreamHandler());
+        return HandlerStack::create(new CurlHandler());
     }
 
     /**
@@ -105,36 +158,10 @@ class TransportSocketClient
      *
      * @return TransportSocketClient
      */
-    public static function createForSocket(array $options = []) : TransportSocketClient
+    public static function createForStreamSocket(array $options = []) : TransportSocketClient
     {
         $defaultOptions = [
-            'handler' => static::createSocketHandler(),
-            'on_headers' => function (ResponseInterface $response) {
-                $headers = $response->getHeaders();
-                if (!empty($headers)) {
-                    $header = '';
-                    foreach ($headers as $name => $value) {
-                        // remove header
-                        $response->withoutHeader($name);
-                        foreach ($value as $val) {
-                            if ($val) {
-                                $sep = '';
-                                if (strpos($val, '/') !== 0) {
-                                    $sep = ' ';
-                                }
-                                $val = ":{$sep}{$val}";
-                            }
-                            $header .= "{$name}{$val}\r\n";
-                        }
-                    }
-
-                    $body = $response->getBody();
-                    $body->write($header);
-                    $response = $response->withBody($body);
-                }
-
-                return $response;
-            }
+            'handler' => static::createStackHandler(),
         ];
 
         $options =  array_merge($defaultOptions, $options);
@@ -150,12 +177,9 @@ class TransportSocketClient
     public static function createClient(array $options = []) : TransportSocketClient
     {
         // with no headers
-        $defaultOptions = [
-            'on_headers' => null
-        ];
-
+        $defaultOptions = ['handler' => static::createStackHandler()];
         $options =  array_merge($defaultOptions, $options);
-        return static::createForSocket($options);
+        return static::createForStreamSocket($options);
     }
 
     /**
@@ -231,5 +255,44 @@ class TransportSocketClient
         }
 
         return $uri;
+    }
+
+    /**
+     * Determine & Throws
+     *
+     * @param RequestInterface $request
+     * @param \Throwable $e
+     * @throws \Throwable
+     */
+    public static function thrownExceptionResource(RequestInterface $request, \Throwable $e)
+    {
+        switch ($e->getCode()) {
+            case AF_INET:
+                $e = new ConnectionFailException($e->getMessage(), $request, $e);
+                break;
+            case SOCKET_ETIMEDOUT:
+                $e = new TimeOutException($e->getMessage(), $request, $e);
+                break;
+            case SOCKET_ETIME:
+                $e = new HttpExpiredException($e->getMessage(), $request, $e);
+                break;
+            case SOCKET_ECONNREFUSED:
+                $e = new ConnectionRefuseException($e->getMessage(), $request, $e);
+                break;
+            case SOCKET_EACCES:
+                $e = new HttpPermissionException($e->getMessage(), $request, $e);
+                break;
+            case SOCKET_EFAULT:
+                $e = new HttpBadAddressException($e->getMessage(), $request, $e);
+                break;
+            case SOCKET_EPROTONOSUPPORT:
+            case SOCKET_EPROTO:
+            case SOCKET_EPROTOTYPE:
+                $e = new ConnectionException($e->getMessage(), $request, $e);
+                break;
+            // case SOCKET_EINVAL:
+            // case SOCKET_EINTR:
+        }
+        throw $e;
     }
 }

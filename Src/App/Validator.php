@@ -146,6 +146,15 @@ class Validator
         }
     }
 
+    /**
+     * Get TLD Collector
+     *
+     * @return TLDCollector
+     */
+    public function getTldCollector() : TLDCollector
+    {
+        return $this->tldCollector;
+    }
 
     /**
      * Get @class BaseMailAddressProviderValidator object instance

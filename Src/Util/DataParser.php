@@ -72,7 +72,17 @@ class DataParser
      */
     public static function cleanMultipleWhiteSpaceTrim(string $data) : string
     {
-        return trim(preg_replace('/(\s)+/sm', '$1', $data));
+        $data = str_replace("\r\n", "\n", $data);
+        return trim(
+            preg_replace(
+                [
+                    '/^(\s)+/sm',
+                    '/(\s)+/sm'
+                ],
+                ['', '$1'],
+                $data
+            )
+        );
     }
 
     /**
@@ -101,6 +111,7 @@ class DataParser
             '',
             $data
         );
+
         return preg_replace(
             '/([\n])+/s',
             '$1',
@@ -274,5 +285,24 @@ class DataParser
         }
 
         return false;
+    }
+
+    /**
+     * Parse Whois Server from whois result data
+     *
+     * @param string $data
+     *
+     * @return bool|string
+     */
+    public static function getWhoIsServerFromResultData(string $data)
+    {
+        if (trim($data) === '') {
+            return false;
+        }
+
+        preg_match('/Whois\s*Server\s*:([^\n]+)/i', $data, $match);
+        return !empty($match[1])
+            ? trim($match[1])
+            : false;
     }
 }
