@@ -355,6 +355,6 @@ class DataParser
 
         $stream->close();
 
-        return $stream;
+        return $data;
     }
 }
