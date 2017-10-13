@@ -10,11 +10,14 @@
  * @author pentagonal <org@pentagonal.org>
  */
 
+declare(strict_types=1);
+
 namespace Pentagonal\WhoIs\App;
 
 use Pentagonal\WhoIs\Exceptions\TimeOutException;
 use Pentagonal\WhoIs\Handler\TransportClient;
 use Pentagonal\WhoIs\Util\DataGenerator;
+use Pentagonal\WhoIs\Util\DataParser;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\UriInterface;
 
@@ -373,11 +376,7 @@ final class WhoIsRequest
             $this->send();
             $this->bodyString = '';
             if (!$this->isError()) {
-                $body = clone $this->getResponse()->getBody();
-                while (!$body->eof()) {
-                    $this->bodyString .= $body->read(4096);
-                }
-                $body->close();
+                $this->bodyString = DataParser::convertResponseBodyToString($this->getResponse());
             }
         }
 

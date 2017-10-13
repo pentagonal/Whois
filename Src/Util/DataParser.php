@@ -12,6 +12,10 @@
 
 namespace Pentagonal\WhoIs\Util;
 
+use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\StreamInterface;
+
 /**
  * Class DataParser
  * @package Pentagonal\WhoIs\Util
@@ -311,5 +315,46 @@ class DataParser
         return !empty($match[1])
             ? trim($match[1])
             : false;
+    }
+
+    /**
+     * @param RequestInterface $request
+     * @param bool $useClone
+     *
+     * @return string
+     */
+    public static function convertRequestBodyToString(RequestInterface $request, $useClone = true) : string
+    {
+        return self::convertStreamToString($request->getBody(), $useClone);
+    }
+
+    /**
+     * @param ResponseInterface $response
+     * @param bool $useClone
+     *
+     * @return string
+     */
+    public static function convertResponseBodyToString(ResponseInterface $response, $useClone = true) : string
+    {
+        return self::convertStreamToString($response->getBody(), $useClone);
+    }
+
+    /**
+     * @param StreamInterface $stream
+     * @param bool $useClone            true if resource clone
+     *
+     * @return string
+     */
+    public static function convertStreamToString(StreamInterface $stream, $useClone = true) : string
+    {
+        $data = '';
+        $stream = $useClone ? clone $stream : $stream;
+        while (!$stream->eof()) {
+            $data .= $stream->read(4096);
+        }
+
+        $stream->close();
+
+        return $stream;
     }
 }

@@ -10,15 +10,18 @@
  * @author pentagonal <org@pentagonal.org>
  */
 
+declare(strict_types=1);
+
 namespace Pentagonal\WhoIs\Util;
 
+use Pentagonal\WhoIs\Interfaces\TransCodeInterface;
 use TrueBV\Punycode;
 
 /**
  * Class Puny
  * @package Pentagonal\WhoIs\Util
  */
-class Puny
+class Puny implements TransCodeInterface
 {
     /**
      * @var Punycode
@@ -49,8 +52,12 @@ class Puny
      */
     public function encode(string $string) : string
     {
+        if (trim($string) === '') {
+            return $string;
+        }
+
         return $this->isIntlEnabled
-            ? idn_to_ascii($string)
+            ? (idn_to_ascii($string)?: $string)
             : $this->puny->encode($string);
     }
 
@@ -63,8 +70,12 @@ class Puny
      */
     public function decode(string $string) : string
     {
+        if (trim($string) === '') {
+            return $string;
+        }
+
         return $this->isIntlEnabled
-            ? idn_to_utf8($string)
+            ? (idn_to_utf8($string)?: $string)
             : $this->puny->encode($string);
     }
 }

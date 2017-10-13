@@ -14,8 +14,11 @@ declare(strict_types=1);
 
 namespace Pentagonal\WhoIs\Handler;
 
+use Guzzle\Http\Exception\RequestException;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\ConnectException;
+use GuzzleHttp\Handler\Proxy;
+use GuzzleHttp\Handler\StreamHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
@@ -72,9 +75,9 @@ class TransportClient
     {
         $this->client = $client;
         $this->defaultOptions = [
-            'handler' => static::createStackHandler(),
-            'curl'    => [
-                CURLOPT_CAINFO => DataGenerator::PATH_CACERT,
+            'handler' => $this->createStackHandler(),
+            'ssl'    => [
+                'certificate_authority' => DataGenerator::PATH_CACERT,
             ]
         ];
     }
@@ -128,35 +131,160 @@ class TransportClient
     }
 
     /**
-     * Request Socket for domain
+     * @param string $userAgent
      *
-     * @param string $domainName
-     * @param string|UriInterface $server
+     * @return TransportClient
+     */
+    public function withUserAgent(string $userAgent) : TransportClient
+    {
+        $object = clone $this;
+        $configs = $object->client->getConfig();
+        if (!isset($configs['headers']) || !is_array($configs['headers'])) {
+            $configs['headers'] = [];
+        }
+
+        foreach ($configs['headers'] as $key => $v) {
+            if (is_string($key) && strtolower($key) === 'user-agent') {
+                unset($configs['headers'][$key]);
+            }
+        }
+
+        $configs['headers']['User-Agent'] = $userAgent;
+        $object->client = new Client($configs);
+        return $object;
+    }
+
+
+    public function withoutUserAgent() : TransportClient
+    {
+        $object = clone $this;
+        $configs = $object->client->getConfig();
+        if (!isset($configs['headers']) || !is_array($configs['headers'])) {
+            $configs['headers'] = [];
+        }
+        foreach ($configs['headers'] as $key => $v) {
+            if (is_string($key) && strtolower($key) === 'user-agent') {
+                unset($configs['headers'][$key]);
+            }
+        }
+
+        $configs['headers']['User-Agent'] = null;
+        $object->client = new Client($configs);
+        return $object;
+    }
+
+    /**
+     * @return TransportClient
+     */
+    public function withNoSSLVerify() : TransportClient
+    {
+        $object = clone $this;
+        $config = $object->getClient()->getConfig();
+        $config['verify'] = false;
+        if (isset($config['curl'])) {
+            if (!is_array($config['curl'])) {
+                unset($config['curl']);
+            }
+            if (isset($config['curl'])) {
+                $config['curl'][CURLOPT_SSL_VERIFYHOST] = false;
+                $config['curl'][CURLOPT_SSL_VERIFYPEER] = false;
+            }
+        }
+        $object->client = new Client($config);
+        return $object;
+    }
+
+    /**
+     * @return TransportClient
+     */
+    public function withSSLVerify() : TransportClient
+    {
+        $object = clone $this;
+        $config = $object->getClient()->getConfig();
+        $config['verify'] = true;
+        if (isset($config['curl'])) {
+            if (!is_array($config['curl'])) {
+                unset($config['curl']);
+            }
+            if (isset($config['curl'])) {
+                $config['curl'][CURLOPT_SSL_VERIFYHOST] = true;
+                $config['curl'][CURLOPT_SSL_VERIFYPEER] = true;
+            }
+        }
+
+        $object->client = new Client($config);
+        return $object;
+    }
+
+    /**
+     * Magic Method to instance stream
+     *
+     * @param string $name
+     * @param array $arguments
      *
      * @return ResponseInterface
      */
-    public static function requestSocketDomainConnection($domainName, $server) : ResponseInterface
+    public static function __callStatic(string $name, array $arguments) : ResponseInterface
+    {
+        array_unshift($arguments, $name);
+        return call_user_func_array(
+            [
+                static::class,
+                'requestConnection'
+            ],
+            $arguments
+        );
+    }
+
+    /**
+     * @param string $name
+     * @param array $arguments
+     *
+     * @return mixed
+     */
+    public function __call(string $name, array $arguments)
+    {
+        array_unshift($arguments, $name);
+        return call_user_func_array([$this, 'request'], $arguments);
+    }
+
+    /**
+     * Request Socket for domain
+     *
+     * @param string $dataToWrite
+     * @param string|UriInterface $server
+     *
+     * @return ResponseInterface
+     * @throws \Throwable
+     */
+    public static function requestSocketConnectionWrite(string $dataToWrite, $server) : ResponseInterface
     {
         /**
          * Make Domain Name To Custom Request
          */
-        $domainName = trim($domainName) ."\r\n";
         // create uri
-        $args = func_get_args();
+        $uri         = self::createUri($server);
+        $dataToWrite = $uri->getPort() === 43 ? trim($dataToWrite) . "\r\n" : $dataToWrite;
+        $args        = func_get_args();
         array_shift($args);
-        $request = new Request($domainName, self::createUri($server));
+        $request = new Request($dataToWrite, $uri);
         $stream = @fsockopen(
             $request->getUri()->getHost(),
             $request->getUri()->getPort(),
             $errCode,
             $errMessage
         );
+
         if (!$stream) {
-            self::thrownExceptionResource($request, new ResourceException($errMessage, $errCode));
+            throw self::thrownExceptionResource(
+                $request,
+                new ResourceException($errMessage, $errCode),
+                false
+            );
         }
 
         $stream = new Stream($stream);
-        $stream->write($domainName);
+        $stream->write($dataToWrite);
 
         return new Response(200, [], $stream);
     }
@@ -164,16 +292,16 @@ class TransportClient
     /**
      * Aliases
      *
-     * @uses requestSocketDomainConnection()
+     * @uses requestSocketConnectionWrite()
      *
      * @param string $domainName
      * @param string|UriInterface $server
      *
      * @return ResponseInterface
      */
-    public static function whoIsRequest(string $domainName, $server)
+    public static function whoIsRequest(string $domainName, $server) : ResponseInterface
     {
-        return static::requestSocketDomainConnection($domainName, $server);
+        return static::requestSocketConnectionWrite($domainName, $server);
     }
 
     /**
@@ -242,7 +370,34 @@ class TransportClient
      */
     public static function createStackHandler() : HandlerStack
     {
-        return HandlerStack::create(new CurlHandler());
+        return HandlerStack::create(static::chooseHandler());
+    }
+
+    /**
+     * @return callable
+     */
+    public static function chooseHandler()
+    {
+        $handler = null;
+        if (function_exists('curl_multi_exec') && function_exists('curl_exec')) {
+            $handler = Proxy::wrapSync(new CurlMultiHandler(), new CurlHandler());
+        } elseif (function_exists('curl_exec')) {
+            $handler = new CurlHandler();
+        } elseif (function_exists('curl_multi_exec')) {
+            $handler = new CurlMultiHandler();
+        }
+
+        if (ini_get('allow_url_fopen')) {
+            $handler = $handler
+                ? Proxy::wrapStreaming($handler, new StreamHandler())
+                : new StreamHandler();
+        } elseif (!$handler) {
+            throw new \RuntimeException(
+                'GuzzleHttp requires cURL, the allow_url_fopen ini setting, or a custom HTTP handler.'
+            );
+        }
+
+        return $handler;
     }
 
     /**
@@ -274,61 +429,6 @@ class TransportClient
         $defaultOptions = ['handler' => static::createStackHandler()];
         $options =  array_merge($defaultOptions, $options);
         return static::createForStreamSocket($options);
-    }
-
-    /**
-     * @param string $userAgent
-     *
-     * @return TransportClient
-     */
-    public function withUserAgent(string $userAgent) : TransportClient
-    {
-        $object = clone $this;
-        $configs = $object->client->getConfig();
-        if (!isset($configs['headers']) || !is_array($configs['headers'])) {
-            $configs['headers'] = [];
-        }
-
-        foreach ($configs['headers'] as $key => $v) {
-            if (is_string($key) && strtolower($key) === 'user-agent') {
-                unset($configs['headers'][$key]);
-            }
-        }
-
-        $configs['headers']['User-Agent'] = $userAgent;
-        $object->client = new Client($configs);
-        return $object;
-    }
-
-
-    public function withoutUserAgent() : TransportClient
-    {
-        $object = clone $this;
-        $configs = $object->client->getConfig();
-        if (!isset($configs['headers']) || !is_array($configs['headers'])) {
-            $configs['headers'] = [];
-        }
-        foreach ($configs['headers'] as $key => $v) {
-            if (is_string($key) && strtolower($key) === 'user-agent') {
-                unset($configs['headers'][$key]);
-            }
-        }
-
-        $configs['headers']['User-Agent'] = null;
-        $object->client = new Client($configs);
-        return $object;
-    }
-
-    /**
-     * @return TransportClient
-     */
-    public function withNoSSLVerify() : TransportClient
-    {
-        $object = clone $this;
-        $config = $object->getClient()->getConfig();
-        $config['verify'] = false;
-        $object->client = new Client($config);
-        return $object;
     }
 
     /**
@@ -384,39 +484,50 @@ class TransportClient
         $response = true,
         $throw = true
     ) {
-        $throw = $response instanceof ResponseInterface
-            ? $throw
-            : $response;
+        $responseCopy = $response;
+        $response = $response instanceof ResponseInterface
+            ? $response
+            : ($throw instanceof ResponseInterface ? $throw : null);
+        $throw = $responseCopy instanceof ResponseInterface
+            ? (bool) $throw
+            : (bool) $responseCopy;
 
-        switch ($e->getCode()) {
-            case AF_INET:
-            case CURLE_COULDNT_CONNECT:
-                $e = new ConnectionFailException($e->getMessage(), $request, $e);
-                break;
-            case SOCKET_ETIMEDOUT:
-            case CURLE_OPERATION_TIMEDOUT:
-            case CURLE_OPERATION_TIMEOUTED:
-                $e = new TimeOutException($e->getMessage(), $request, $e);
-                break;
-            case SOCKET_ETIME:
-                $e = new HttpExpiredException($e->getMessage(), $request, $e);
-                break;
-            case SOCKET_ECONNREFUSED:
-                $e = new ConnectionRefuseException($e->getMessage(), $request, $e);
-                break;
-            case SOCKET_EACCES:
-                $e = new HttpPermissionException($e->getMessage(), $request, $e);
-                break;
-            case SOCKET_EFAULT:
-                $e = new HttpBadAddressException($e->getMessage(), $request, $e);
-                break;
-            case SOCKET_EPROTONOSUPPORT:
-            case SOCKET_EPROTO:
-            case SOCKET_EPROTOTYPE:
-            case CURLE_COULDNT_RESOLVE_HOST:
-            case CURLE_COULDNT_RESOLVE_PROXY:
-                $e = new ConnectionException($e->getMessage(), $request, $e);
-                break;
+        if ($e->getCode() !== 0 && (
+                $e instanceof ResourceException
+                || $e instanceof RequestException
+                || $e instanceof \GuzzleHttp\Exception\RequestException
+            )
+        ) {
+            switch ($e->getCode()) {
+                case AF_INET:
+                case CURLE_COULDNT_CONNECT:
+                    $e = new ConnectionFailException($e->getMessage(), $request, $e);
+                    break;
+                case SOCKET_ETIMEDOUT:
+                case CURLE_OPERATION_TIMEDOUT:
+                case CURLE_OPERATION_TIMEOUTED:
+                    $e = new TimeOutException($e->getMessage(), $request, $e);
+                    break;
+                case SOCKET_ETIME:
+                    $e = new HttpExpiredException($e->getMessage(), $request, $e);
+                    break;
+                case SOCKET_ECONNREFUSED:
+                    $e = new ConnectionRefuseException($e->getMessage(), $request, $e);
+                    break;
+                case SOCKET_EACCES:
+                    $e = new HttpPermissionException($e->getMessage(), $request, $e);
+                    break;
+                case SOCKET_EFAULT:
+                    $e = new HttpBadAddressException($e->getMessage(), $request, $e);
+                    break;
+                case SOCKET_EPROTONOSUPPORT:
+                case SOCKET_EPROTO:
+                case SOCKET_EPROTOTYPE:
+                case CURLE_COULDNT_RESOLVE_HOST:
+                case CURLE_COULDNT_RESOLVE_PROXY:
+                    $e = new ConnectionException($e->getMessage(), $request, $e);
+                    break;
+            }
         }
 
         if ($response instanceof ResponseInterface && method_exists($e, 'setResponse')) {
@@ -428,37 +539,5 @@ class TransportClient
         }
 
         return $e;
-    }
-
-    /**
-     * Magic Method to instance stream
-     *
-     * @param string $name
-     * @param array $arguments
-     *
-     * @return ResponseInterface
-     */
-    public static function __callStatic(string $name, array $arguments) : ResponseInterface
-    {
-        array_unshift($arguments, $name);
-        return call_user_func_array(
-            [
-                static::class,
-                'requestConnection'
-            ],
-            $arguments
-        );
-    }
-
-    /**
-     * @param string $name
-     * @param array $arguments
-     *
-     * @return mixed
-     */
-    public function __call(string $name, array $arguments)
-    {
-        array_unshift($arguments, $name);
-        return call_user_func_array([$this, 'request'], $arguments);
     }
 }

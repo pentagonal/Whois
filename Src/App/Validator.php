@@ -754,7 +754,7 @@ class Validator
             case 'gmx':
                 return $baseMailValidator->isValidMailComMail();
             case 'yandex':
-                return $baseMailValidator->isValidYandexMail();
+                return $baseMailValidator->isValidYanDexMail();
         }
 
         return null;

@@ -12,6 +12,7 @@
 
 namespace Pentagonal\Tests\PhpUnit\WhoIs;
 
+use Pentagonal\WhoIs\Interfaces\TransCodeInterface;
 use Pentagonal\WhoIs\Util\Puny;
 use PHPUnit\Framework\TestCase;
 
@@ -24,6 +25,10 @@ class PunyTest extends TestCase
     public function testDecodePunyCode()
     {
         $puny = new Puny();
+        $this->assertInstanceOf(
+            TransCodeInterface::class,
+            $puny
+        );
         $this->assertNotEquals(
             $puny->decode('xn--11b4c3d'),
             'xn--11b4c3d'

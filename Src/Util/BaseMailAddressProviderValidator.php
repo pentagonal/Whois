@@ -84,6 +84,30 @@ class BaseMailAddressProviderValidator
     }
 
     /**
+     * Validator helper for mail check min max & matches
+     *
+     * @param int $min      minimum email address length
+     * @param int $max      maximum email address length
+     * @param string $regex Matches Regex
+     *
+     * @return bool
+     */
+    protected function checkValidateLogic(int $min, int $max, string $regex) : bool
+    {
+        if ($this->isMustBeInvalid()) {
+            return false;
+        }
+
+        $length = strlen($this->getBaseMailAddress());
+        return $length >= $min
+            && $length <= $max
+            && preg_match(
+                $regex,
+                $this->getBaseMailAddress()
+            );
+    }
+
+    /**
      * Is this must be invalid
      *
      * @return bool
@@ -122,17 +146,13 @@ class BaseMailAddressProviderValidator
      */
     public function isValidGMail() : bool
     {
-        if (!$this->isMustBeInvalid()) {
-            return false;
-        }
-
-        $length = strlen($this->getBaseMailAddress());
-        return
-            $length >= static::MIN_GMAIL_LENGTH
-            && $length <= static::MAX_GMAIL_LENGTH
+        return $this->checkValidateLogic(
+            static::MIN_GMAIL_LENGTH,
+            static::MAX_GMAIL_LENGTH,
             // only allow alpha numeric and periods
             // and start with letter or number
-            && preg_match('/^[a-z0-9](?:[a-z0-9\.]+?[a-z0-9])$/i', $this->getBaseMailAddress());
+            '/^[a-z0-9](?:[a-z0-9\.]+?[a-z0-9])$/i'
+        );
     }
 
     /**
@@ -142,17 +162,13 @@ class BaseMailAddressProviderValidator
      */
     public function isValidMicrosoftMail() : bool
     {
-        if ($this->isMustBeInvalid()) {
-            return false;
-        }
-
-        $length = strlen($this->getBaseMailAddress());
-        return
-            $length >= static::MIN_MICROSOFT_LENGTH
-            && $length <= static::MAX_MICROSOFT_LENGTH
-            // must be start with letter and only allow contains alpha numeric periods underscore
-            // and hyphen and end with alpha numeric underscore and hyphen
-            && preg_match('/^[a-z]([a-z0-9\.\_\-]+?[a-z0-9\_\-])?$/i', $this->getBaseMailAddress());
+        // must be start with letter and only allow contains alpha numeric periods underscore
+        // and hyphen and end with alpha numeric underscore and hyphen
+        return $this->checkValidateLogic(
+            static::MIN_MICROSOFT_LENGTH,
+            static::MAX_MICROSOFT_LENGTH,
+            '/^[a-z]([a-z0-9\.\_\-]+?[a-z0-9\_\-])?$/i'
+        );
     }
 
     /**
@@ -162,17 +178,13 @@ class BaseMailAddressProviderValidator
      */
     public function isValidYahooMail() : bool
     {
-        if ($this->isMustBeInvalid()) {
-            return false;
-        }
-
-        $length = strlen($this->getBaseMailAddress());
-        return
-            $length >= static::MIN_YAHOO_LENGTH
-            && $length <= static::MAX_YAHOO_LENGTH
-            // only allow alpha numeric period & underscore, must be start with letter
-            // and end with alpha numeric
-            && preg_match('/^[a-z]([a-z0-9\.\_]+?[a-z0-9])?$/i', $this->getBaseMailAddress());
+        // only allow alpha numeric period & underscore, must be start with letter
+        // and end with alpha numeric
+        return $this->checkValidateLogic(
+            static::MIN_YAHOO_LENGTH,
+            static::MAX_YAHOO_LENGTH,
+            '/^[a-z]([a-z0-9\.\_]+?[a-z0-9])?$/i'
+        );
     }
 
     /**
@@ -182,37 +194,28 @@ class BaseMailAddressProviderValidator
      */
     public function isValidMailComMail() : bool
     {
-        if ($this->isMustBeInvalid()) {
-            return false;
-        }
-
-        $length = strlen($this->getBaseMailAddress());
-        return
-            $length >= static::MIN_MAIL_COM_LENGTH
-            && $length <= static::MAX_MAIL_COM_LENGTH
-            // must be start with alpha numeric and only allow contains alpha numeric periods underscore
-            // and hyphen and end with alpha numeric underscore and hyphen
-            && preg_match('/^[a-z0-9]([a-z0-9\.\_\-]+?[a-z0-9\_\-]$)?/i', $this->getBaseMailAddress());
+        // must be start with alpha numeric and only allow contains alpha numeric periods underscore
+        // and hyphen and end with alpha numeric underscore and hyphen
+        return $this->checkValidateLogic(
+            static::MIN_MAIL_COM_LENGTH,
+            static::MAX_MAIL_COM_LENGTH,
+            '/^[a-z0-9]([a-z0-9\.\_\-]+?[a-z0-9\_\-]$)?/i'
+        );
     }
 
     /**
-     * Check if Valid yandex Mail
+     * Check if Valid YanDex Mail
      *
      * @return bool
      */
-    public function isValidYandexMail() : bool
+    public function isValidYanDexMail() : bool
     {
-        if ($this->isMustBeInvalid()) {
-            return false;
-        }
-
-        $emailAddress =  $this->getBaseMailAddress();
-        $length = strlen($this->getBaseMailAddress());
-        return
-            $length >= static::MIN_YANDEX_LENGTH
-            && $length <= static::MAX_YANDEX_LENGTH
-            // only allow alpha numeric must be start with letter
-            // and must be end with alpha or numeric characters
-            && preg_match('/^[a-z](?:\.[a-z0-9]{2,}|[a-z0-9]+)?$/i', $emailAddress);
+        // only allow alpha numeric must be start with letter
+        // and must be end with alpha or numeric characters
+        return $this->checkValidateLogic(
+            static::MIN_YANDEX_LENGTH,
+            static::MAX_YANDEX_LENGTH,
+            '/^[a-z](?:\.[a-z0-9]{2,}|[a-z0-9]+)?$/i'
+        );
     }
 }

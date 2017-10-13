@@ -10,6 +10,8 @@
  * @author pentagonal <org@pentagonal.org>
  */
 
+declare(strict_types=1);
+
 namespace Pentagonal\WhoIs\Handler;
 
 use GuzzleHttp\Exception\ConnectException;
@@ -72,26 +74,17 @@ class CurlHandler
 
         $easy = $this->factory->create($request, $options);
 
-        // if use port 43 headers is not important anymore because it was use telnet
-        // maybe?
-        $options['curl'][CURLOPT_WRITEFUNCTION] = function ($ch, $h) use (&$easy) {
-            return $easy->sink->write($h);
-        };
+        // invoke
+        CurlHandlerInvoker::invokeRequest($easy);
+        // exec
 
-        // set option curl
-        curl_setopt_array($easy->handle, $options['curl']);
         curl_exec($easy->handle);
         $easy->errno = curl_errno($easy->handle);
-        $info = curl_getinfo($easy->handle);
 
-        // socket 43 does not require headers so make it headers 200
-        if ($easy->errno === 0 || ($easy->sink->getSize() > 0 || empty($info['htp_code']))) {
-            if (empty($easy->headers)) {
-                $easy->headers[] = 'HTTP/1.1 200 OK';
-            }
-
+        if (CurlHandlerInvoker::invokeProcess($easy) === true) {
             $easy->createResponse();
         }
+
         try {
             return CurlFactory::finish($this, $easy, $this->factory);
         } catch (ConnectException $e) {
@@ -103,8 +96,9 @@ class CurlHandler
             if (!$code && $easy->errno) {
                 $code = (int) $easy->errno;
             }
+
             $e = new ConnectionException($e->getMessage(), $code);
-            $e->setLine($e->getLine());
+            $e->setLine((int) $e->getLine());
             $e->setFile($e->getFile());
             throw TransportClient::thrownExceptionResource($easy->request, $e, false);
         }

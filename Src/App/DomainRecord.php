@@ -199,6 +199,7 @@ class DomainRecord extends ArrayCollector
     {
         return $this[Validator::NAME_BASE_DOMAIN_NAME_ASCII];
     }
+
     /**
      * Get sub domain name without extension and main domain name
      *

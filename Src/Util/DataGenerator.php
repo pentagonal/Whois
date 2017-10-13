@@ -22,11 +22,13 @@ use Pentagonal\WhoIs\Handler\TransportClient as Transport;
 /**
  * Class DataGenerator
  * @package Pentagonal\WhoIs\Util
+ * @final
+ * @internal
  */
 final class DataGenerator
 {
-    const ERRR_DENIED = -1;
-    const PORT_WHOIS  = 43;
+    const ERR_DENIED = -1;
+    const PORT_WHOIS = 43;
 
     // Uri
     const
@@ -64,7 +66,7 @@ final class DataGenerator
  * This package contains some code that reused by other repository(es) for private uses.
  * But on some certain conditions, it will also allowed to used as commercials project.
  * Some code & coding standard also used from other repositories as inspiration ideas.
- * And also uses 3rd-Party as to be used as result value without their permission but permit to be used. 
+ * And also uses 3rd-Party as to be used as result value without their permission but permit to be used.
  *
  * @license GPL-3.0  {@link https://www.gnu.org/licenses/gpl-3.0.en.html}
  * @copyright (c) 2017. Pentagonal Development
@@ -82,23 +84,23 @@ LICENSE;
         if (!file_exists($fileTLDExtensions) && !is_writeable($dirFileTLDExtensions)
             || !file_exists($fileServers) && !is_writeable($dirFileServers)
         ) {
-            return self::ERRR_DENIED;
+            return self::ERR_DENIED;
         }
 
         if (!file_exists($fileTLDExtensions)) {
             if (!touch($fileTLDExtensions)) {
-                return self::ERRR_DENIED;
+                return self::ERR_DENIED;
             }
         }
 
         if (!file_exists($fileServers)) {
             if (!touch($fileServers)) {
-                return self::ERRR_DENIED;
+                return self::ERR_DENIED;
             }
         }
 
         if (!is_writeable($fileTLDExtensions) || !is_writeable($fileServers)) {
-            return self::ERRR_DENIED;
+            return self::ERR_DENIED;
         }
 
         try {
@@ -116,30 +118,16 @@ LICENSE;
         } catch (\Exception $e) {
             throw $e;
         }
-
-        $dataResponse = '';
-        $body = $iAnaResponse->getBody();
-        while (!$body->eof()) {
-            $dataResponse .= $body->read(4096);
-        }
-        $body->close();
 
         // iana
-        $iAna = DataParser::cleanIniComment($dataResponse);
+        $iAna = DataParser::cleanIniComment(DataParser::convertResponseBodyToString($iAnaResponse, false));
         $iAna = DataParser::cleanMultipleWhiteSpaceTrim($iAna);
         $iAna = str_replace("\r\n", "\n", strtolower($iAna));
         $iAna = explode("\n", $iAna);
         $iAna = array_filter($iAna);
 
-        $dataResponse = '';
-        $body = $suffixResponse->getBody();
-        while (!$body->eof()) {
-            $dataResponse .= $body->read(4096);
-        }
-        $body->close();
-
         // suffix
-        $suffix = DataParser::cleanIniComment($dataResponse);
+        $suffix = DataParser::cleanIniComment(DataParser::convertResponseBodyToString($suffixResponse, false));
         $suffix = DataParser::cleanSlashComment($suffix);
         $suffix = DataParser::cleanMultipleWhiteSpaceTrim($suffix);
         $suffix = str_replace("\r\n", "\n", strtolower($suffix));
@@ -230,11 +218,11 @@ LICENSE;
         $fileExists = file_exists(self::PATH_CACERT);
         if ($fileExists) {
             if (!is_writeable(self::PATH_CACERT)) {
-                return self::ERRR_DENIED;
+                return self::ERR_DENIED;
             }
         }
         if (!$fileExists && !is_writeable(dirname(self::PATH_CACERT))) {
-            return self::ERRR_DENIED;
+            return self::ERR_DENIED;
         }
         try {
             $response = Transport::get(self::URI_CACERT);
@@ -243,12 +231,9 @@ LICENSE;
         } catch (\Exception $e) {
             throw $e;
         }
-        $body = $response->getBody();
-        $data = '';
-        while (!$body->eof()) {
-            $data .= $body->read(4096);
-        }
-        $body->close();
+
+        $data = DataParser::convertResponseBodyToString($response, false);
+        unset($response);
 
         $stream = new Stream(fopen(self::PATH_CACERT, 'w+'));
         $written = 0;
@@ -259,6 +244,7 @@ LICENSE;
             }
             $written += $write;
         }
+
         $stream->close();
 
         return $data;
