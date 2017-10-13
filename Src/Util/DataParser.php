@@ -40,7 +40,7 @@ class DataParser
         }
 
         return preg_replace(
-            '/^(?:\;|\#)[^\n]+\n?/sm',
+            '/^(?:\;|\#)[^\n]+\n?/m',
             '',
             $data
         );
@@ -71,39 +71,109 @@ class DataParser
      * Clean Multiple whitespace
      *
      * @param string $data
+     * @param bool $allowEmptyNewLine allow one new line
      *
      * @return string
      */
-    public static function cleanMultipleWhiteSpaceTrim(string $data) : string
+    public static function cleanMultipleWhiteSpaceTrim(string $data, $allowEmptyNewLine = false) : string
     {
-        $data = str_replace("\r\n", "\n", $data);
-        return trim(
-            preg_replace(
-                [
-                    '/^(\s)+/sm',
-                    '/(\s)+/sm'
-                ],
-                ['', '$1'],
-                $data
-            )
+        $data = str_replace(
+            ["\r\n", "\t",],
+            ["\n", " "],
+            $data
         );
+
+        if (!$allowEmptyNewLine) {
+            return trim(preg_replace(['/^[\s]+/m', '/(\n)[ ]+/'], ['', '$1'], $data));
+        }
+
+        $data = preg_replace(
+            ['/(?!\n)([\s])+/m', '/(\n)[ ]+/', '/([\n][\n])[\n]+/m'],
+            '$1',
+            $data
+        );
+
+        return trim($data);
     }
 
     /**
-     * Clean Whois result
+     * @param string $data
+     *
+     * @return mixed|string
+     */
+    public static function cleanWhoIsResultComment(string $data)
+    {
+        $data = str_replace("\r", "", $data);
+        $data = preg_replace('/^(\#|\%)[^\n]+\n?/m', '', $data);
+        return trim($data);
+    }
+
+    /**
+     * Get Whois Date Update
      *
      * @param string $data
      *
-     * @return string
+     * @return string|null
      */
-    public static function cleanWhoIsSocketResult(string $data) : string
+    public static function getWhoIsLastUpdateDatabase(string $data)
     {
-        $data = static::cleanMultipleWhiteSpaceTrim($data);
-        $data = preg_replace(
-            '/^\s?(\%|#)/sm',
-            '',
-            $data
+        $data = str_replace(["\r", "\t"], ["", " "], trim($data));
+        preg_match(
+            '/
+                (?:\>\>\>?)?\s*
+                (?P<information>Last\s*Update\s*(?:[a-z0-9\s]+)?
+                  (?:\s+Whois\s*)?
+                  (?:\s+Database)?
+                )\s*
+                \:\s*(?P<date_update>(?:[0-9]+[0-9TZ\-\:\s]+)?)
+            /ix',
+            $data,
+            $match
         );
+
+        if (empty($match['date_update'])) {
+            return null;
+        }
+        $data =  "{$match['information']}: {$match['date_update']}";
+        $data = preg_replace('/(\s)+/', '$1', trim($data));
+        return trim($data);
+    }
+
+    /**
+     * Get Whois Date Update
+     *
+     * @param string $data
+     *
+     * @return string|null
+     */
+    public static function getICANNReportUrl(string $data)
+    {
+        $data = str_replace(["\r", "\t"], ["", " "], trim($data));
+        preg_match(
+            '/
+                URL\s+of(?:\s+the)?\s+ICANN[^\:]+\:\s*
+                (?P<url_uri>(?:http\:\\/\/)[^\n]+)
+            /ix',
+            $data,
+            $match
+        );
+
+        if (empty($match['date_update'])) {
+            return null;
+        }
+
+        $data =  "{$match['information']}: {$match['date_update']}";
+        $data = preg_replace('/(\s)+/', '$1', trim($data));
+        return trim($data);
+    }
+
+    /**
+     * @param string $data
+     *
+     * @return mixed|string
+     */
+    public static function cleanWhoIsResultInformationalData(string $data)
+    {
         $data = preg_replace(
             '~
             (?:
@@ -116,11 +186,29 @@ class DataParser
             $data
         );
 
-        return preg_replace(
-            '/([\n])+/s',
-            '$1',
-            $data
-        );
+        return $data;
+    }
+
+    /**
+     * @param string $data
+     *
+     * @return mixed|string
+     */
+    public static function cleanUnwantedWhoIsResult(string $data)
+    {
+        if (!trim($data) === '') {
+            return '';
+        }
+
+        // clean the data
+        $cleanData = static::cleanWhoIsResultComment($data);
+        $cleanData = static::cleanWhoIsResultInformationalData($cleanData);
+        $cleanData = static::cleanMultipleWhiteSpaceTrim($cleanData);
+        if ($cleanData && ($dateUpdated = static::getWhoIsLastUpdateDatabase($data))) {
+            $cleanData .= "\n{$dateUpdated}";
+        }
+
+        return $cleanData;
     }
 
     /**
@@ -134,10 +222,8 @@ class DataParser
      */
     public static function hasRegisteredDomain(string $data)
     {
-        // clean the data
-        $cleanData = self::cleanWhoIsSocketResult($data);
         // check if empty result
-        if ($cleanData === '') {
+        if (($cleanData = static::cleanUnwantedWhoIsResult($data)) === '') {
             // if cleanData is empty & data is not empty check entries
             if ($data && preg_match('/No\s+entries(?:\s+found)?|Not(?:hing)?\s+found/i', $data)) {
                 return static::UNREGISTERED;
@@ -258,7 +344,7 @@ class DataParser
         }
 
         // check if on limit whois check
-        if (self::hasContainLimitedResultData($data)) {
+        if (static::hasContainLimitedResultData($data)) {
             return static::LIMIT;
         }
 
@@ -281,17 +367,17 @@ class DataParser
             return true;
         }
 
-        $data = self::cleanWhoIsSocketResult($data);
         // check if on limit whois check
-        if ($data && preg_match(
-            '/
+        if (($data = static::cleanUnwantedWhoIsResult($data)) !== ''
+            && preg_match(
+                '/
                 (?:Resource|Whois)\s+Limit
                 | exceeded\s(.+)?limit
-                |limit\s+exceed
-                |allowed\s+queries\s+exceeded
+                | limit\s+exceed
+                |allow(?:ed|ing)?\s+quer(?:ies|y)\s+exceeded
             /ix',
-            $data
-        )) {
+                $data
+            )) {
             return true;
         }
 
@@ -329,6 +415,8 @@ class DataParser
     }
 
     /**
+     * Convert ResponseInterface body to string
+     *
      * @param ResponseInterface $response
      * @param bool $useClone
      *

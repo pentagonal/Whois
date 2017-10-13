@@ -14,11 +14,13 @@ declare(strict_types=1);
 
 namespace Pentagonal\WhoIs\App;
 
+use Pentagonal\WhoIs\Interfaces\ArrayCollectorInterface;
+
 /**
  * Class ArrayCollector
  * @package Pentagonal\WhoIs\App
  */
-class ArrayCollector extends \ArrayObject implements \JsonSerializable
+class ArrayCollector extends \ArrayObject implements ArrayCollectorInterface
 {
     /**
      * Collection constructor.
@@ -115,10 +117,19 @@ class ArrayCollector extends \ArrayObject implements \JsonSerializable
     }
 
     /**
+     * {@inheritdoc}
+     * @return array
+     */
+    public function toArray(): array
+    {
+        return (array) $this;
+    }
+
+    /**
      * @return array
      */
     public function jsonSerialize() : array
     {
-        return (array) $this;
+        return $this->toArray();
     }
 }

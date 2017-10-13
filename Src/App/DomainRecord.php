@@ -14,11 +14,13 @@ declare(strict_types=1);
 
 namespace Pentagonal\WhoIs\App;
 
+use Pentagonal\WhoIs\Interfaces\DomainRecordInterface;
+
 /**
  * Class DomainRecord
  * @package Pentagonal\WhoIs\App
  */
-class DomainRecord extends ArrayCollector
+class DomainRecord extends ArrayCollector implements DomainRecordInterface
 {
     /**
      * Check if domain is top level Domain
