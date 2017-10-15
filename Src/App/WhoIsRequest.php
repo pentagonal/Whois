@@ -216,6 +216,24 @@ final class WhoIsRequest
     }
 
     /**
+     * Get response body to string
+     *
+     * @return string
+     */
+    public function getBodyString() : string
+    {
+        if (!isset($this->bodyString)) {
+            $this->send();
+            $this->bodyString = '';
+            if (!$this->isError()) {
+                $this->bodyString = DataParser::convertResponseBodyToString($this->getResponse());
+            }
+        }
+
+        return $this->bodyString;
+    }
+
+    /**
      * @return bool
      */
     public function isUseSocket() : bool
@@ -245,7 +263,7 @@ final class WhoIsRequest
                     $this->uri->getHost()
                 );
             } // resolve asn
-            elseif (preg_match('/^(ASN?)?([0-9]{1,20})$/i', trim($this->domainName), $match)
+            elseif (preg_match(DataParser::ASN_REGEX, trim($this->domainName), $match)
                     && ! empty($match[2])
             ) {
                 $domainName = "{$match[1]}{$match[2]}";
@@ -327,6 +345,11 @@ final class WhoIsRequest
         return $this;
     }
 
+    /* --------------------------------------------------------------------------------*
+     |                                   STATUS                                        |
+     |---------------------------------------------------------------------------------|
+     */
+
     /**
      * @return bool
      */
@@ -367,21 +390,10 @@ final class WhoIsRequest
         return $this->getResponse() instanceof TimeOutException;
     }
 
-    /**
-     * @return string
+    /* --------------------------------------------------------------------------------*
+     |                                MAGIC METHOD                                     |
+     |---------------------------------------------------------------------------------|
      */
-    public function getBodyString() : string
-    {
-        if (!isset($this->bodyString)) {
-            $this->send();
-            $this->bodyString = '';
-            if (!$this->isError()) {
-                $this->bodyString = DataParser::convertResponseBodyToString($this->getResponse());
-            }
-        }
-
-        return $this->bodyString;
-    }
 
     /**
      * @return string

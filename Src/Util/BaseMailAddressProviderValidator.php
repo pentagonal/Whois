@@ -83,6 +83,11 @@ class BaseMailAddressProviderValidator
         return $this->baseMail;
     }
 
+    /* --------------------------------------------------------------------------------*
+     |                                   UTILITY                                       |
+     |---------------------------------------------------------------------------------|
+     */
+
     /**
      * Validator helper for mail check min max & matches
      *
@@ -106,6 +111,11 @@ class BaseMailAddressProviderValidator
                 $this->getBaseMailAddress()
             );
     }
+
+    /* --------------------------------------------------------------------------------*
+     |                               LOGIC VALIDATOR                                   |
+     |---------------------------------------------------------------------------------|
+     */
 
     /**
      * Is this must be invalid

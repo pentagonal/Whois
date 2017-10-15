@@ -5,6 +5,13 @@
 
 **VERSION 2.0.0**
 
+## DESCRIPTION
+
+This Package contains email validator, domain & network checker that `API READY`
+Whois Result is returning Object base and Detail Result as array collection
+also convert it into string is become `json pretty print` result.
+
+
 ## LICENSE
 
 `GPL-3.0` see [LICENSE](LICENSE)

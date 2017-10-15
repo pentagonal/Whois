@@ -40,7 +40,7 @@ final class DataGenerator
     // Path
     const
         PATH_WHOIS_SERVERS = __DIR__ . '/../Data/Servers/AvailableServers.php',
-        PATH_EXTENSIONS_AVAILABLE = __DIR__ . '/../Data/Servers/AvailableServers.php',
+        PATH_EXTENSIONS_AVAILABLE = __DIR__ . '/../Data/Servers/AvailableExtensions.php',
         PATH_CACERT     = __DIR__ . '/../Data/Certs/cacert.pem';
 
     const

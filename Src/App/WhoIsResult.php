@@ -20,8 +20,9 @@ use Pentagonal\WhoIs\Util\DataParser;
 /**
  * Class WhoIsResult
  * @package Pentagonal\WhoIs\App
+ * By default on string result is parse on JSON
  */
-class WhoIsResult
+class WhoIsResult implements \JsonSerializable, \ArrayAccess
 {
     const TYPE_UNKNOWN = 'UNKNOWN';
     const TYPE_IP      = 'IP';
@@ -31,29 +32,44 @@ class WhoIsResult
     const IP_IPV4    = 'IPV4';
     const IP_IPV6    = 'IPV6';
 
+    // icann compliance
+    const ICANN_COMPLIANCE_URI = 'https://www.icann.org/wicf/';
+    const ICANN_EPP_URI        = 'https://www.icann.org/epp';
+
     /**
      * Constant Key for Collection detail
      */
     // domain
-    const KEY_DOMAIN     = 'domain';
-    const KEY_REGISTRAR  = 'registrar';
-    const KEY_REGISTRANT = 'registrant';
-    const KEY_ABUSE      = 'abuse';
-    const KEY_RESULT     = 'result';
+    const KEY_DOMAIN    = 'domain',
+        KEY_NAME_SERVER = 'name_server',
+        KEY_DNSSEC      = 'dnssec';
+
+    const KEY_REGISTRAR  = 'registrar',
+        KEY_ABUSE        = 'abuse';
+
     const KEY_URL        = 'url';
-    const KEY_NAME_SERVER = 'name_server';
+
+    const KEY_REGISTRANT = 'registrant',
+        KEY_TECH     = 'tech',
+        KEY_ADMIN    = 'admin',
+        KEY_BILLING  = 'billing';
+
+    const KEY_DATE    = 'date',
+        KEY_CREATE    = 'create',
+        KEY_UPDATE    = 'update',
+        KEY_EXPIRE    = 'expire',
+        # last update database
+        KEY_UPDATE_DB = 'update_db';
 
     const KEY_ID       = 'id';
     const KEY_NAME     = 'name';
+
+    // address
     const KEY_ORGANIZATION = 'organization';
     const KEY_STATUS   = 'status';
-    const KEY_CREATE   = 'create';
-    const KEY_UPDATE   = 'update';
-    const KEY_EXPIRE   = 'expire';
     const KEY_EMAIL    = 'email';
     const KEY_PHONE    = 'phone';
     const KEY_FAX      = 'fax';
-    // address
     const KEY_COUNTRY  = 'country';
     const KEY_CITY     = 'city';
     const KEY_STREET   = 'street';
@@ -63,16 +79,17 @@ class WhoIsResult
 
     // uri
     const KEY_WHOIS           = 'whois';
-    const KEY_REFERRAL        = 'referral';
-    const KEY_ICANN_REPORT_URI = 'report';
+    const KEY_ICANN_COMPLIANCE = 'icann_compliance';
+    const KEY_ICANN_EPP        = 'icann_epp';
+    const KEY_REPORT           = 'report';
 
-    // informational
-    const KEY_UPDATE_DB      = 'last_update_database';
-    const KEY_RESELLER       = 'reseller';
-    const KEY_DNSSEC         = 'dnssec';
-    const KEY_ORIGINAL       = 'original';
-    const KEY_CLEAN          = 'clean';
-    const KEY_SERVER         = 'server';
+    const KEY_DATA   = 'data',
+        KEY_REFERRAL = 'referral',
+        KEY_RESELLER = 'reseller',
+        // result
+        KEY_RESULT = 'result',
+        KEY_ORIGINAL  = 'original',
+        KEY_CLEAN     = 'clean';
 
     /**
      * @var string|DataParser
@@ -87,7 +104,7 @@ class WhoIsResult
     /**
      * @var string
      */
-    protected $type;
+    protected $type = self::TYPE_UNKNOWN;
 
     /**
      * @var string
@@ -115,6 +132,11 @@ class WhoIsResult
         $this->hasParsed = false;
     }
 
+    /* --------------------------------------------------------------------------------*
+     |                                   UTILITY                                       |
+     |---------------------------------------------------------------------------------|
+     */
+
     /**
      * Parsing data
      *
@@ -130,6 +152,7 @@ class WhoIsResult
             return $this;
         }
 
+        // set has parsed
         $this->hasParsed = true;
         // normalize data parser
         $this->normalizeDataParser();
@@ -148,7 +171,10 @@ class WhoIsResult
 
             throw $response;
         }
-
+        // determine type first
+        $this->determineType();
+        // create default array collector
+        $this->createArrayCollector();
         $this->cleanData = $this
             ->dataParser
             ->cleanUnwantedWhoIsResult(
@@ -156,6 +182,31 @@ class WhoIsResult
             );
 
         return $this;
+    }
+
+    /**
+     * Determine Type
+     */
+    final protected function determineType()
+    {
+        $domainName = $this->getWhoIsRequest()->getDomainName();
+        $domainName = preg_replace('/^https?\:\/\//i', '', $domainName);
+        if (preg_match_all(DataParser::ASN_REGEX, $domainName)) {
+            $this->type = static::TYPE_ASN;
+            return;
+        }
+
+        $validator = new Validator();
+        if ($validator->isValidIP($domainName)) {
+            $this->type = $validator->isIPv6($domainName)
+                ? static::IP_IPV6
+                : static::IP_IPV4;
+            return;
+        }
+
+        $this->type = $validator->isValidDomain($domainName)
+            ? static::TYPE_DOMAIN
+            : static::TYPE_UNKNOWN;
     }
 
     /**
@@ -185,13 +236,92 @@ class WhoIsResult
     }
 
     /**
-     * @final for callback parser
-     * @return string
+     * Create Array Collector
+     * For Detail Result
+     * @todo completion for array collector
      */
-    final public function getCleanData(): string
+    protected function createArrayCollector()
     {
-        $this->parseData();
-        return $this->cleanData;
+        if ($this->dataDetail instanceof ArrayCollector && count($this->dataDetail) > 0) {
+            return;
+        }
+
+        // Redetermine
+        if ($this->getType() === 'UNKNOWN') {
+            $this->determineType();
+        }
+
+        // registrant data default
+        $registrantDefault = [
+            static::KEY_ID => null,
+            static::KEY_NAME => null,
+            static::KEY_ORGANIZATION => null,
+            static::KEY_EMAIL    => null,
+            static::KEY_COUNTRY => null,
+            static::KEY_CITY => null,
+            static::KEY_STREET => null,
+            static::KEY_POSTAL_CODE => null,
+            static::KEY_POSTAL_PROVINCE => null,
+            static::KEY_POSTAL_STATE => null,
+            static::KEY_PHONE => [],
+            static::KEY_FAX => [],
+        ];
+
+        $collection = [
+            static::KEY_DATA => [
+                static::KEY_REFERRAL => null,
+                static::KEY_RESELLER => null,
+                static::KEY_RESULT => [
+                    static::KEY_CLEAN => [],
+                    static::KEY_ORIGINAL => [],
+                ]
+            ],
+        ];
+
+        switch ($this->getType()) {
+            case static::TYPE_DOMAIN:
+                $collection = [
+                    static::KEY_DOMAIN     => [
+                        static::KEY_ID          => null,
+                        static::KEY_NAME        => null,
+                        static::KEY_STATUS      => [],
+                        static::KEY_NAME_SERVER => [],
+                        static::KEY_DNSSEC      => null,
+                    ],
+                    static::KEY_DATE       => [
+                        static::KEY_CREATE    => null,
+                        static::KEY_UPDATE    => null,
+                        static::KEY_EXPIRE    => null,
+                        static::KEY_UPDATE_DB => null,
+                    ],
+                    static::KEY_REGISTRAR  => [
+                        static::KEY_ID    => null,
+                        static::KEY_NAME  => null,
+                        static::KEY_ABUSE => [
+                            static::KEY_EMAIL => [],
+                            static::KEY_URL   => [],
+                            static::KEY_PHONE => [],
+                        ]
+                    ],
+                    static::KEY_REGISTRANT => [
+                        static::KEY_DATA    => $registrantDefault,
+                        static::KEY_BILLING => $registrantDefault,
+                        static::KEY_TECH    => $registrantDefault,
+                        static::KEY_ADMIN   => $registrantDefault,
+                    ],
+                    static::KEY_URL        => [
+                        static::KEY_WHOIS            => [],
+                        static::KEY_REPORT           => static::ICANN_COMPLIANCE_URI,
+                        static::KEY_ICANN_COMPLIANCE => static::ICANN_COMPLIANCE_URI,
+                        static::KEY_ICANN_EPP        => static::ICANN_EPP_URI,
+                    ],
+                    // fallback
+                    static::KEY_DATA => $collection[static::KEY_DATA]
+                ];
+                break;
+        }
+
+        $this->dataDetail = new ArrayCollector($collection);
     }
 
     /**
@@ -199,8 +329,9 @@ class WhoIsResult
      */
     protected function parseDetail() : ArrayCollector
     {
-        $collector = new ArrayCollector();
-        return $collector;
+        $this->createArrayCollector();
+
+        return $this->dataDetail;
     }
 
     /**
@@ -211,6 +342,21 @@ class WhoIsResult
     public static function create(WhoIsRequest $request) : WhoIsResult
     {
         return new static($request);
+    }
+
+    /* --------------------------------------------------------------------------------*
+     |                                   GETTERS                                       |
+     |---------------------------------------------------------------------------------|
+     */
+
+    /**
+     * @final for callback parser
+     * @return string
+     */
+    final public function getCleanData(): string
+    {
+        $this->parseData();
+        return $this->cleanData;
     }
 
     /**
@@ -237,5 +383,76 @@ class WhoIsResult
     {
         $this->parseData();
         return $this->dataDetail;
+    }
+
+    /* --------------------------------------------------------------------------------*
+     |                              JSON SERIALIZABLE                                  |
+     |---------------------------------------------------------------------------------|
+     */
+
+    /**
+     * @return array
+     */
+    public function jsonSerialize() : array
+    {
+        return (array) $this->dataDetail;
+    }
+
+    /* --------------------------------------------------------------------------------*
+     |                                ARRAY ACCESS                                     |
+     |---------------------------------------------------------------------------------|
+     */
+
+    /**
+     * @param string $offset
+     *
+     * @return bool
+     */
+    public function offsetExists($offset) : bool
+    {
+         return $this->getDetail()->offsetExists($offset);
+    }
+
+    /**
+     * @param string $offset
+     *
+     * @return mixed
+     */
+    public function offsetGet($offset)
+    {
+        return $this->getDetail()->offsetGet($offset);
+    }
+
+    /**
+     * @param string $offset
+     * @param mixed $value
+     */
+    public function offsetSet($offset, $value)
+    {
+         $this->getDetail()->offsetSet($offset, $value);
+    }
+
+    /**
+     * @param string $offset
+     */
+    public function offsetUnset($offset)
+    {
+        $this->getDetail()->offsetUnset($offset);
+    }
+
+    /* --------------------------------------------------------------------------------*
+     |                                MAGIC METHOD                                     |
+     |---------------------------------------------------------------------------------|
+     */
+
+    /**
+     * Magic Method to string
+     * @return string
+     */
+    public function __toString() : string
+    {
+        // call parse data
+        $this->parseData();
+        return json_encode($this, JSON_PRETTY_PRINT);
     }
 }

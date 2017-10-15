@@ -40,10 +40,9 @@ class Sanitizer
      */
     public static function entityMultiByteString(string $string, $entity = false)
     {
-        if (!isset(self::$iconvEnabled)) {
-            // safe resource check
+        // safe resource check
+        !isset(self::$iconvEnabled) &&
             self::$iconvEnabled = function_exists('iconv');
-        }
 
         if (! self::$iconvEnabled && ! $entity) {
             return $string;
@@ -51,11 +50,18 @@ class Sanitizer
 
         if (!isset(self::$regexLimit)) {
             self::$regexLimit = @ini_get('pcre.backtrack_limit');
-            self::$regexLimit = ! is_numeric(self::$regexLimit) ? 4096 : abs(self::$regexLimit);
-            // minimum regex is 512 byte
-            self::$regexLimit = self::$regexLimit < 512 ? 512 : self::$regexLimit;
-            // limit into 40 KB
-            self::$regexLimit = self::$regexLimit > 40960 ? 40960 : self::$regexLimit;
+            self::$regexLimit = ! is_numeric(self::$regexLimit)
+                ? 4096
+                // minimum regex is 512 byte
+                : (abs(self::$regexLimit) <= 512
+                    ? 512
+                    : (
+                        // limit into 40 KB
+                        abs(self::$regexLimit) >= 40960
+                        ? 40960
+                        : abs(self::$regexLimit)
+                    )
+                );
         }
 
         /**
@@ -86,7 +92,7 @@ class Sanitizer
                         }
                         $utf = iconv('UTF-8', 'UCS-4//IGNORE', $char);
                         $utf = $utf ? bin2hex($utf) : null;
-                        if (!is_string($utf) || ($utf == trim($utf)) == '') {
+                        if (! is_string($utf) || ($utf == trim($utf)) == '') {
                             return "&#x0;";
                         }
                         $utf = strtolower($utf);

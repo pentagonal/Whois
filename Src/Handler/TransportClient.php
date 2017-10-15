@@ -217,38 +217,6 @@ class TransportClient
     }
 
     /**
-     * Magic Method to instance stream
-     *
-     * @param string $name
-     * @param array $arguments
-     *
-     * @return ResponseInterface
-     */
-    public static function __callStatic(string $name, array $arguments) : ResponseInterface
-    {
-        array_unshift($arguments, $name);
-        return call_user_func_array(
-            [
-                static::class,
-                'requestConnection'
-            ],
-            $arguments
-        );
-    }
-
-    /**
-     * @param string $name
-     * @param array $arguments
-     *
-     * @return mixed
-     */
-    public function __call(string $name, array $arguments)
-    {
-        array_unshift($arguments, $name);
-        return call_user_func_array([$this, 'request'], $arguments);
-    }
-
-    /**
      * Request Socket for domain
      *
      * @param string $dataToWrite
@@ -539,5 +507,42 @@ class TransportClient
         }
 
         return $e;
+    }
+
+    /* --------------------------------------------------------------------------------*
+     |                                MAGIC METHOD                                     |
+     |---------------------------------------------------------------------------------|
+     */
+
+    /**
+     * @param string $name
+     * @param array $arguments
+     *
+     * @return mixed
+     */
+    public function __call(string $name, array $arguments)
+    {
+        array_unshift($arguments, $name);
+        return call_user_func_array([$this, 'request'], $arguments);
+    }
+
+    /**
+     * Magic Method to instance stream
+     *
+     * @param string $name
+     * @param array $arguments
+     *
+     * @return ResponseInterface
+     */
+    public static function __callStatic(string $name, array $arguments) : ResponseInterface
+    {
+        array_unshift($arguments, $name);
+        return call_user_func_array(
+            [
+                static::class,
+                'requestConnection'
+            ],
+            $arguments
+        );
     }
 }

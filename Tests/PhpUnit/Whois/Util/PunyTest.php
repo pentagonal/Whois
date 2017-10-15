@@ -10,7 +10,9 @@
  * @author pentagonal <org@pentagonal.org>
  */
 
-namespace Pentagonal\Tests\PhpUnit\WhoIs;
+declare(strict_types=1);
+
+namespace Pentagonal\Tests\PhpUnit\WhoIs\Util;
 
 use Pentagonal\WhoIs\Interfaces\TransCodeInterface;
 use Pentagonal\WhoIs\Util\Puny;
@@ -18,11 +20,11 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Class PunyTest
- * @package Pentagonal\Tests\PhpUnit\WhoIs
+ * @package Pentagonal\Tests\PhpUnit\WhoIs\Util
  */
 class PunyTest extends TestCase
 {
-    public function testDecodePunyCode()
+    public function testPunyCodeDecodeTheStringContent()
     {
         $puny = new Puny();
         $this->assertInstanceOf(
@@ -37,9 +39,13 @@ class PunyTest extends TestCase
             $puny->decode('xn--11b4c3d'),
             'कॉम'
         );
+        $this->assertEquals(
+            $puny->decode('कॉम'),
+            'कॉम'
+        );
     }
 
-    public function testEncodePunyCode()
+    public function testPunyCodeEncodeTheStringContent()
     {
         $puny = new Puny();
         $this->assertNotEquals(
@@ -49,6 +55,26 @@ class PunyTest extends TestCase
         $this->assertEquals(
             $puny->encode('कॉम'),
             'xn--11b4c3d'
+        );
+        $this->assertEquals(
+            $puny->encode('xn--11b4c3d'),
+            'xn--11b4c3d'
+        );
+    }
+
+    public function testEncodeDecodeWithEmptyWhiteSpaceFallBackToOriginal()
+    {
+        $puny = new Puny();
+        $data = '     ';
+
+        $this->assertEquals(
+            $data,
+            $puny->encode($data)
+        );
+
+        $this->assertEquals(
+            $data,
+            $puny->decode($data)
         );
     }
 }

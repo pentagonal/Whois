@@ -26,6 +26,7 @@ class DataParser
     const UNREGISTERED  = false;
     const UNKNOWN = 'UNKNOWN';
     const LIMIT   = 'LIMIT';
+    const ASN_REGEX = '/^(ASN?)?([0-9]{1,20})$/i';
 
     /**
      * @param string $data
@@ -121,21 +122,23 @@ class DataParser
         preg_match(
             '/
                 (?:\>\>\>?)?\s*
-                (?P<information>Last\s*Update\s*(?:[a-z0-9\s]+)?
+                (Last\s*Update\s*(?:[a-z0-9\s]+)?
                   (?:\s+Whois\s*)?
                   (?:\s+Database)?
                 )\s*
-                \:\s*(?P<date_update>(?:[0-9]+[0-9TZ\-\:\s]+)?)
+                \:\s*((?:[0-9]+[0-9\-\:\s\+TZGMU]+)?)
             /ix',
             $data,
             $match
         );
 
-        if (empty($match['date_update'])) {
+        if (empty($match[2])) {
             return null;
         }
-        $data =  "{$match['information']}: {$match['date_update']}";
-        $data = preg_replace('/(\s)+/', '$1', trim($data));
+
+        $match[1] = trim($match[1]);
+        $match[2] = trim($match[2]);
+        $data = preg_replace('/(\s)+/', '$1', "{$match[1]}: {$match[2]}");
         return trim($data);
     }
 
@@ -152,18 +155,17 @@ class DataParser
         preg_match(
             '/
                 URL\s+of(?:\s+the)?\s+ICANN[^\:]+\:\s*
-                (?P<url_uri>(?:http\:\\/\/)[^\n]+)
+                (https?\:\/\/[^\n]+)
             /ix',
             $data,
             $match
         );
 
-        if (empty($match['date_update'])) {
+        if (empty($match[1])) {
             return null;
         }
 
-        $data =  "{$match['information']}: {$match['date_update']}";
-        $data = preg_replace('/(\s)+/', '$1', trim($data));
+        $data = preg_replace('/(\s)+/', '$1', trim($match[1]));
         return trim($data);
     }
 

@@ -10,27 +10,39 @@
  * @author pentagonal <org@pentagonal.org>
  */
 
-namespace Pentagonal\Tests\PhpUnit\WhoIs;
+declare(strict_types=1);
+
+namespace Pentagonal\Tests\PhpUnit\WhoIs\Data;
 
 use Pentagonal\WhoIs\Util\DataGenerator;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Class DataServerExtensionsTest
- * @package Pentagonal\Tests\PhpUnit\WhoIs
+ * Class ServerExtensionsTest
+ * @package Pentagonal\Tests\PhpUnit\WhoIs\Data
  */
-class DataServerExtensionsTest extends TestCase
+class ServerExtensionsTest extends TestCase
 {
     /**
-     * Server List
+     * Server List test for require files that returning array
      */
-    public function testServerList()
+    public function testIncludeServerExtensionsFilesReturningArray()
     {
         $this->assertNotEmpty(
             require DataGenerator::PATH_EXTENSIONS_AVAILABLE
         );
 
         $this->assertNotEmpty(
+            require DataGenerator::PATH_WHOIS_SERVERS
+        );
+
+        $this->assertArrayHasKey(
+            'com',
+            require DataGenerator::PATH_EXTENSIONS_AVAILABLE
+        );
+
+        $this->assertArrayHasKey(
+            'com',
             require DataGenerator::PATH_WHOIS_SERVERS
         );
     }

@@ -10,14 +10,14 @@
   -->
 
 <phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/5.7/phpunit.xsd"
+         xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/6.3/phpunit.xsd"
          bootstrap="./Tests/bootstrap.php"
          colors="true"
          coverageText="true"
          convertErrorsToExceptions="true"
          convertNoticesToExceptions="true"
          convertWarningsToExceptions="true"
-         stopOnFailure="false"
+         stopOnFailure="true"
          syntaxCheck="true">
     <testsuite name="Pentagonal WhoIs Test Case Suite">
         <directory>Tests/</directory>
