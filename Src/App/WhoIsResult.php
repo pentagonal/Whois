@@ -206,9 +206,10 @@ class WhoIsResult implements \JsonSerializable, \ArrayAccess, \Serializable
                 : DataParser::class;
         }
 
-        if (!is_string($dataParser)
+        if (! is_string($dataParser)
             || ! class_exists($dataParser)
             || ! is_subclass_of($dataParser, DataParser::class)
+            || strtolower(ltrim($dataParser, '\\')) !== strtolower(DataParser::class)
         ) {
             // fall back to default
             $dataParser = DataParser::class;
@@ -306,6 +307,9 @@ class WhoIsResult implements \JsonSerializable, \ArrayAccess, \Serializable
                         static::KEY_ICANN_EPP        => static::ICANN_EPP_URI,
                     ],
                 ]);
+                $data = $this->dataDetail[static::KEY_DATA];
+                unset($this->dataDetail[static::KEY_DATA]);
+                $this->dataDetail[static::KEY_DATA] = $data;
                 break;
         }
     }
@@ -362,7 +366,7 @@ class WhoIsResult implements \JsonSerializable, \ArrayAccess, \Serializable
                     | (?:Domain\s*)?(?:Flags|Status)\s*:(?P<domain_status>[^\n]+)
 
                     # dnssec
-                    | DNSSEC\s*\:[^\n]+(?P<domain_dnssec>[^\n]+)
+                    | DNSSEC\s*\:(?P<domain_dnssec>[^\n]+)
                     # other
                     | Referral(?:[^\:]+)?\s*\:(?P<referral>[^\n]+)
                     | Reseller(?:[^\:]+)?\s*\:(?P<reseller>[^\n]+)
@@ -582,7 +586,7 @@ class WhoIsResult implements \JsonSerializable, \ArrayAccess, \Serializable
 
             $dataUrl[static::KEY_WHOIS] = $whoIsServers;
             $dataUrl[static::KEY_REPORT] = $reportUrl != '' ? $reportUrl : $dataUrl[static::KEY_REPORT];
-            $this->dataDetail[static::KEY_WHOIS] = $dataUrl;
+            $this->dataDetail[static::KEY_URL] = $dataUrl;
             unset($dataUrl);
         }
 
@@ -749,7 +753,6 @@ class WhoIsResult implements \JsonSerializable, \ArrayAccess, \Serializable
             || ! is_string($unSerialized[static::KEY_DOMAIN])
             || ! is_string($unSerialized[static::KEY_RESULT])
             || ! class_exists($unSerialized[static::KEY_PARSER])
-            || ! is_subclass_of($unSerialized[static::KEY_PARSER], DataParser::class)
         ) {
             throw new \InvalidArgumentException(
                 'Invalid serialized value',
@@ -757,8 +760,22 @@ class WhoIsResult implements \JsonSerializable, \ArrayAccess, \Serializable
             );
         }
 
+        if (ltrim($unSerialized[static::KEY_PARSER], '\\') !== DataParser::class
+           && ! is_subclass_of($unSerialized[static::KEY_PARSER], DataParser::class)
+        ) {
+            $parser = strtolower(ltrim($unSerialized[static::KEY_PARSER], '\\'));
+            if ($parser !== strtolower(DataParser::class)) {
+                throw new \InvalidArgumentException(
+                    'Invalid serialized value',
+                    E_WARNING
+                );
+            }
+
+            $unSerialized[static::KEY_PARSER] = DataParser::class;
+        }
+
         $this->hasParsed    = false;
-        $this->dataParser   = static::KEY_PARSER;
+        $this->dataParser   = $unSerialized[static::KEY_PARSER];
         $this->dataDetail   = $this->createCollectorFromData(
             $unSerialized[static::KEY_DOMAIN],
             $unSerialized[static::KEY_RESULT]
