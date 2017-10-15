@@ -431,7 +431,11 @@ class WhoIsResult implements \JsonSerializable, \ArrayAccess, \Serializable
                     | (?:Tech(?:[^\:]+)?)\s*(?:Postal|Post)(?:[^\:]+)?\s*\:(?P<tech_postal>[^\n]+)
                     | (?:Tech(?:[^\:]+)?)\s*Phone(?:[\:]+)?\s*\:(?P<tech_phone>[^\n]+)
                     | (?:Tech(?:[^\:]+)?)\s*Fax(?:[\:]+)?\s*\:(?P<tech_fax>[^\n]+)
-
+                    # last update db
+                    | (?:\>\>\>?)?\s*(?:Last\s*Update\s*(?:[a-z0-9\s]+)?(?:\s+Whois\s*)?(?:\s+Database(?:Whois)?)?)\s*
+                          \:\s*(?P<last_update_db>(?:[0-9]+[0-9\-\:\s\+TZGMU]+)?)
+                    # icann report url
+                    | URL\s+of(?:\s+the)?\s+ICANN[^\:]+\:\s*(?P<icann_report>https?\:\/\/[^\n]+)
                 ~xisx',
                 $resultString,
                 $match
@@ -441,15 +445,15 @@ class WhoIsResult implements \JsonSerializable, \ArrayAccess, \Serializable
             }
 
             // filtering result
-            $match = array_filter($match, function($key) {
+            $match = array_filter($match, function ($key) {
                 return ! is_int($key);
             }, ARRAY_FILTER_USE_KEY);
-            $match = array_map(function($v) {
+            $match = array_map(function ($v) {
                 $v = array_filter($v);
                 return array_map('trim', array_values($v));
             }, $match);
 
-            $reportUrl = DataParser::getICANNReportUrl($resultString);
+            $reportUrl = reset($match['icann_report']);
 
             // domain
             $dataDomain = $this->dataDetail[static::KEY_DOMAIN];
@@ -473,7 +477,7 @@ class WhoIsResult implements \JsonSerializable, \ArrayAccess, \Serializable
             if ($expireDate && is_int($expireDateNew = @strtotime($expireDate))) {
                 $expireDate = gmdate('c', $expireDateNew);
             }
-            $updateDb = DataParser::getWhoIsLastUpdateDatabase($resultString);
+            $updateDb = reset($match['last_update_db']);
             $updateDb = $updateDb
                 ? preg_replace('/^[^\:]+\:\s*/', '', $updateDb)
                 : null;
@@ -490,7 +494,7 @@ class WhoIsResult implements \JsonSerializable, \ArrayAccess, \Serializable
             $registrar[static::KEY_ID] = reset($match['registrar_id']) ?: null;
             $registrar[static::KEY_NAME] = reset($match['registrar_name']) ?: null;
             if (!empty($match['registrar_url'])) {
-                $match['registrar_url'] = array_map(function($v) {
+                $match['registrar_url'] = array_map(function ($v) {
                     $v = trim($v);
                     if (!preg_match('/^(?:(?:http|ftp)s?)\:\/\//i', $v)) {
                         $v = "http://{$v}";
