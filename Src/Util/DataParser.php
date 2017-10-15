@@ -19,6 +19,9 @@ use Psr\Http\Message\StreamInterface;
 /**
  * Class DataParser
  * @package Pentagonal\WhoIs\Util
+ *
+ * Data parser or helper for some reason function to easier implement code
+ * and for code competent
  */
 class DataParser
 {
@@ -29,6 +32,9 @@ class DataParser
     const ASN_REGEX = '/^(ASN?)?([0-9]{1,20})$/i';
 
     /**
+     * Clean string ini comment
+     * dot ini comment is # and ;
+     *
      * @param string $data
      *
      * @return string
@@ -98,6 +104,9 @@ class DataParser
     }
 
     /**
+     * Clean whois comment result
+     * the comment string started with # and %
+     *
      * @param string $data
      *
      * @return mixed|string
@@ -110,7 +119,7 @@ class DataParser
     }
 
     /**
-     * Get Whois Date Update
+     * Get Whois Date Update of database record
      *
      * @param string $data
      *
@@ -170,6 +179,9 @@ class DataParser
     }
 
     /**
+     * Clean Whosi result informational data like, ICANN URL or comment whois
+     * or ads or etc.
+     *
      * @param string $data
      *
      * @return mixed|string
@@ -192,6 +204,13 @@ class DataParser
     }
 
     /**
+     * Clean all unwanted result from whois result data
+     *
+     * @uses cleanWhoIsResultComment
+     * @uses cleanWhoIsResultInformationalData
+     * @uses cleanMultipleWhiteSpaceTrim
+     * @uses getWhoIsLastUpdateDatabase
+     *
      * @param string $data
      *
      * @return mixed|string
@@ -214,7 +233,7 @@ class DataParser
     }
 
     /**
-     * Domain Parser Registered or Not Callback
+     * Domain Parser Registered or Not - Callback method
      *
      * @param string $data
      *
@@ -430,8 +449,10 @@ class DataParser
     }
 
     /**
-     * @param StreamInterface $stream
-     * @param bool $useClone            true if resource clone
+     * Convert the given stream to string result
+     *
+     * @param StreamInterface $stream   the stream resource
+     * @param bool            $useClone true if resource clone
      *
      * @return string
      */
@@ -443,7 +464,8 @@ class DataParser
             $data .= $stream->read(4096);
         }
 
-        $stream->close();
+        // if use clone close the resource otherwise let it open
+        $useClone && $stream->close();
 
         return $data;
     }
