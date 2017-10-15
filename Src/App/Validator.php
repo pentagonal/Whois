@@ -289,8 +289,8 @@ class Validator
         if ($countDomainArray < 2) {
             $result[self::NAME_IS_TOP_DOMAIN]  = true;
             $result[self::NAME_IS_GTLD_DOMAIN] = true;
-            if ($countDomainArray == 1) {
-                $topDomain = $this->tldCollector->decode(reset($domainArray));
+            if ($countDomainArray === 1) {
+                $topDomain = $this->tldCollector->decode($subExtension);
                 // domain name too long
                 if (strlen($topDomain) > self::MAX_LENGTH_BASE_DOMAIN_NAME) {
                     throw new DomainNameTooLongException(
@@ -419,10 +419,16 @@ class Validator
         $result[self::NAME_EXTENSION_ASCII] = $fullExtensionASCII;
 
         $result[self::NAME_BASE_DOMAIN_NAME] = $result[self::NAME_SUB_DOMAIN_NAME];
-        $result[self::NAME_BASE_DOMAIN_NAME] .= ".{$result[self::NAME_MAIN_DOMAIN_NAME]}";
+        if (!empty($result[self::NAME_SUB_DOMAIN_NAME])) {
+            $result[self::NAME_BASE_DOMAIN_NAME] .= ".";
+        }
+        $result[self::NAME_BASE_DOMAIN_NAME] .=  $result[self::NAME_MAIN_DOMAIN_NAME];
 
         $result[self::NAME_BASE_DOMAIN_NAME_ASCII] = $result[self::NAME_SUB_DOMAIN_NAME_ASCII];
-        $result[self::NAME_BASE_DOMAIN_NAME_ASCII] .= ".{$result[self::NAME_MAIN_DOMAIN_NAME_ASCII]}";
+        if (!empty($result[self::NAME_SUB_DOMAIN_NAME_ASCII])) {
+            $result[self::NAME_BASE_DOMAIN_NAME_ASCII] .= ".";
+        }
+        $result[self::NAME_BASE_DOMAIN_NAME_ASCII] .= $result[self::NAME_MAIN_DOMAIN_NAME_ASCII];
 
         return $this->reValidateDomainName(new DomainRecord($result), $domainName);
     }

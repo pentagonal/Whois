@@ -133,7 +133,7 @@ class DataParser
                 (?:\>\>\>?)?\s*
                 (Last\s*Update\s*(?:[a-z0-9\s]+)?
                   (?:\s+Whois\s*)?
-                  (?:\s+Database)?
+                  (?:\s+Database(?:Whois)?)?
                 )\s*
                 \:\s*((?:[0-9]+[0-9\-\:\s\+TZGMU]+)?)
             /ix',
@@ -420,7 +420,7 @@ class DataParser
 
         preg_match('/Whois\s*Server\s*:([^\n]+)/i', $data, $match);
         return !empty($match[1])
-            ? trim($match[1])
+            ? strtolower(trim($match[1]))
             : false;
     }
 
