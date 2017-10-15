@@ -616,7 +616,7 @@ class WhoIsResult implements \JsonSerializable, \ArrayAccess, \Serializable
      */
     public function getDomainName() : string
     {
-        return $this->getDetail()[static::KEY_DOMAIN][static::KEY_NAME];
+        return $this->dataDetail[static::KEY_DOMAIN][static::KEY_NAME];
     }
 
     /**
@@ -633,7 +633,7 @@ class WhoIsResult implements \JsonSerializable, \ArrayAccess, \Serializable
      */
     public function getType() : string
     {
-        return $this->getDetail()[static::KEY_DATA][static::KEY_TYPE];
+        return $this->dataDetail[static::KEY_DATA][static::KEY_TYPE];
     }
 
     /**
@@ -642,7 +642,7 @@ class WhoIsResult implements \JsonSerializable, \ArrayAccess, \Serializable
      */
     final public function getCleanData() : string
     {
-        return $this->getDetail()[static::KEY_DATA][static::KEY_CLEAN];
+        return $this->dataDetail[static::KEY_DATA][static::KEY_RESULT][static::KEY_CLEAN];
     }
 
     /**
@@ -650,7 +650,7 @@ class WhoIsResult implements \JsonSerializable, \ArrayAccess, \Serializable
      */
     public function getResultString() : string
     {
-        return $this->getDetail()[static::KEY_DATA][static::KEY_RESULT][static::KEY_ORIGINAL];
+        return $this->dataDetail[static::KEY_DATA][static::KEY_RESULT][static::KEY_ORIGINAL];
     }
 
     /* --------------------------------------------------------------------------------*
@@ -727,7 +727,8 @@ class WhoIsResult implements \JsonSerializable, \ArrayAccess, \Serializable
     final public function serialize() : string
     {
         // parse data first
-        $this->parseData();
+        // $this->parseData(); # no need to parse
+        // will be parse after unserialize
         $detail = [
             static::KEY_PARSER   => $this->dataParser,
             static::KEY_DOMAIN   => $this->getDomainName(),
@@ -773,13 +774,14 @@ class WhoIsResult implements \JsonSerializable, \ArrayAccess, \Serializable
 
             $unSerialized[static::KEY_PARSER] = DataParser::class;
         }
-
+        // set parsed as false
         $this->hasParsed    = false;
         $this->dataParser   = $unSerialized[static::KEY_PARSER];
         $this->dataDetail   = $this->createCollectorFromData(
             $unSerialized[static::KEY_DOMAIN],
             $unSerialized[static::KEY_RESULT]
         );
+
         // and parse data
         $this->parseData();
     }
@@ -796,7 +798,6 @@ class WhoIsResult implements \JsonSerializable, \ArrayAccess, \Serializable
     public function __toString() : string
     {
         // call parse data
-        $this->parseData();
         return json_encode($this->getDetail(), JSON_PRETTY_PRINT);
     }
 }
