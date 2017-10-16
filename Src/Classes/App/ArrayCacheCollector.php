@@ -45,7 +45,7 @@ class ArrayCacheCollector implements CacheInterface
      */
     public function exist(string $identifier): bool
     {
-        return isset($this->arrayCollector[$identifier]);
+        return $this->arrayCollector->exist($identifier);
     }
 
     /**

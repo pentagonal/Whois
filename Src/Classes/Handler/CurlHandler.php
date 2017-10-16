@@ -18,6 +18,7 @@ use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Handler\CurlFactory;
 use GuzzleHttp\Handler\CurlFactoryInterface;
 use Pentagonal\WhoIs\Exceptions\ConnectionException;
+use Pentagonal\WhoIs\Util\TransportClient;
 use Psr\Http\Message\RequestInterface;
 
 /**

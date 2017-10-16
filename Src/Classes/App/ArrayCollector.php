@@ -33,6 +33,31 @@ class ArrayCollector extends \ArrayObject implements ArrayCollectorInterface
     }
 
     /**
+     * @param string $keyName
+     * @param null $default
+     *
+     * @return mixed
+     */
+    public function get($keyName, $default = null)
+    {
+        return $this->exist($keyName)
+            ? $this[$keyName]
+            : $default;
+    }
+
+    /**
+     * Check if exists
+     *
+     * @param string $keyName
+     *
+     * @return bool
+     */
+    public function exist($keyName) : bool
+    {
+        return array_key_exists($keyName, (array) $this);
+    }
+
+    /**
      * Get First Value
      *
      * @return mixed
@@ -80,6 +105,15 @@ class ArrayCollector extends \ArrayObject implements ArrayCollectorInterface
     public function prev()
     {
         return prev($this);
+    }
+
+
+    /**
+     * {@inheritdoc}
+     */
+    public function remove($keyName)
+    {
+        unset($this[$keyName]);
     }
 
     /**

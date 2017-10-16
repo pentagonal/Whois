@@ -72,6 +72,13 @@ interface ArrayCollectorInterface extends \IteratorAggregate, \ArrayAccess, \Ser
     public function clear();
 
     /**
+     * @param mixed $keyName
+     *
+     * @return bool
+     */
+    public function exist($keyName) : bool;
+
+    /**
      * check if contains expected value
      *
      * @param string $value
@@ -79,6 +86,13 @@ interface ArrayCollectorInterface extends \IteratorAggregate, \ArrayAccess, \Ser
      * @return bool
      */
     public function contain($value) : bool;
+
+    /**
+     * Remove offset
+     *
+     * @param string $keyName
+     */
+    public function remove($keyName);
 
     /**
      * Get as array

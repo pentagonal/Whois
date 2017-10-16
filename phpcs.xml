@@ -14,9 +14,6 @@
     <!-- array must be use short syntax array() == [] -->
     <rule ref="Generic.Arrays.DisallowLongArraySyntax"/>
     <!-- Path To Check -->
-    <file>Src/App</file>
-    <file>Src/Handler</file>
-    <file>Src/Interfaces</file>
-    <file>Src/Util</file>
+    <file>Src/Classes</file>
     <file>Tests</file>
 </ruleset>

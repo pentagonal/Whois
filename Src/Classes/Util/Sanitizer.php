@@ -172,6 +172,7 @@ class Sanitizer
             // or else fall through
             case 'a':
             case 'O':
+            case 'C':
                 return (bool) preg_match("/^{$token}:[0-9]+:/s", $data);
             case 'i':
             case 'd':

@@ -26,18 +26,10 @@
   ],
   "autoload" : {
     "psr-4" : {
-      "\\Pentagonal\\WhoIs\\App\\": "Src/App/",
-      "\\Pentagonal\\WhoIs\\Exceptions\\": "Src/Exceptions/",
-      "\\Pentagonal\\WhoIs\\Handler\\": "Src/Handler/",
-      "\\Pentagonal\\WhoIs\\Interfaces\\": "Src/Interfaces/",
-      "\\Pentagonal\\WhoIs\\Util\\": "Src/Util/"
+      "\\Pentagonal\\WhoIs\\": "Src/Classes/"
     },
     "classmap": [
-      "Src/App",
-      "Src/Exceptions",
-      "Src/Handler",
-      "Src/Interfaces",
-      "Src/Util"
+      "Src/Classes"
     ]
   }
 }

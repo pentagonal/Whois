@@ -15,12 +15,12 @@ declare(strict_types=1);
 namespace Pentagonal\WhoIs\App;
 
 use Pentagonal\WhoIs\Exceptions\EmptyDomainException;
+use Pentagonal\WhoIs\Exceptions\InvalidDomainException;
 use Pentagonal\WhoIs\Exceptions\RequestLimitException;
 use Pentagonal\WhoIs\Exceptions\ResultException;
 use Pentagonal\WhoIs\Exceptions\TimeOutException;
 use Pentagonal\WhoIs\Exceptions\WhoIsServerNotFoundException;
 use Pentagonal\WhoIs\Interfaces\CacheInterface;
-use Pentagonal\WhoIs\Util\DataGenerator;
 use Pentagonal\WhoIs\Util\DataParser;
 use Pentagonal\WhoIs\Util\Sanitizer;
 
@@ -41,6 +41,11 @@ class Checker
     const CACHE_PREFIX = 'pentagonal_wc_';
 
     /**
+     * whois result class to use a result
+     */
+    const WHOIS_RESULT_CLASS = WhoIsResult::class;
+
+    /**
      * max retry if timeout
      */
     const MAX_RETRY = 5;
@@ -58,6 +63,40 @@ class Checker
      * @var CacheInterface
      */
     protected $cacheInstance;
+
+    /**
+     * @var int minimum length when domain name always registered,
+     *          maximum set is on between 0 to 3 to use it
+     *          and set to non numeric , null or les than 0 or more than
+     *          3 (4 or more) to disable it
+     */
+    protected $minLength = 2;
+
+    /**
+     * Declare base on domain name
+     * that must be always registered
+     * maybe this is branded domain that use trademark use on TLD
+     * Domain. or has 1 stld
+     * This is fast check for domain availability checker
+     * That means no check from whois server
+     * but on less than 3 characters it means domain always registered!
+     *
+     * @var array
+     */
+    protected $reservedNameTLDDomain = [
+        // brand domain that easy to understand and always registered
+        'google', 'youtube', 'blogspot', 'android', 'blogger',
+        'example', 'icann', 'iana', 'pir', 'ripe', 'arin',
+        'amazon', 'ebay', 'adobe', 'hp',
+        'fb', 'facebook', 'twitter', 'instagram', 'path',
+        'wikipedia', 'wordpress', 'wp', 'time', 'php',
+        'office', 'microsoft', 'windows', 'apple', 'mac',
+        'disney', 'marvel', 'dc',
+
+        // common registered domain for network
+        'dot', 'nic', 'whois', 'web', 'dig', 'blog', 'ping',
+        'ip', 'linux', 'unix', 'com', 'net', 'co',
+    ];
 
     /**
      * Checker constructor.
@@ -122,8 +161,12 @@ class Checker
      */
     protected function getCache(string $cache)
     {
-        $cacheData = $this->cacheInstance->get($cache, null);
-        if (!is_string($cacheData)) {
+        $cacheData = $this->cacheInstance->get(
+            $this->normalizeCacheKey($cache),
+            null
+        );
+
+        if ($cacheData !== null && is_string($cacheData)) {
             $cacheData = Sanitizer::maybeUnSerialize($cacheData);
         }
 
@@ -163,16 +206,16 @@ class Checker
         $validator  = $this->getValidator();
         // if invalid thrown error
         $domainRecord = $validator->splitDomainName($domainName);
-        $extension  = $domainRecord->getExtension();
+        $extension  = $domainRecord->getBaseExtension();
         $servers = $validator->getTldCollector()->getServersFromExtension($extension);
         if (empty($servers)) {
             $domainKey = strtolower($domainName);
             $keyWhoIs = "{$domainKey}_whs";
             $whoIsServer = $this->getCache($keyWhoIs);
             if (empty($whoIsServer) || !is_array($whoIsServer)) {
-                $iAnaRequest = $this->getRequest($domainName, DataGenerator::URI_IANA_WHOIS);
+                $iAnaRequest = $this->getRequest($domainName, DataParser::URI_IANA_WHOIS);
                 if ($iAnaRequest->isTimeOut()) {
-                    $iAnaRequest = $this->getRequest($domainName, DataGenerator::URI_IANA_WHOIS);
+                    $iAnaRequest = $this->getRequest($domainName, DataParser::URI_IANA_WHOIS);
                 }
                 if ($iAnaRequest->isError()) {
                     throw $iAnaRequest->getResponse();
@@ -198,6 +241,8 @@ class Checker
     }
 
     /**
+     * Get From Domain With Server
+     *
      * @param string $domainName
      * @param string $server
      * @param int $retry
@@ -220,13 +265,29 @@ class Checker
                 'Domain name could not be empty or white space only'
             );
         }
+
         $keyCache = "{$domainName}_{$server}";
         $result = $this->getCache($keyCache);
         if ($result instanceof WhoIsResult) {
             return $result;
         }
 
-        $request = $this->getRequest($domainName, $server);
+        $record = $this->getValidator()->splitDomainName($domainName);
+        if (! $record->isTopLevelDomain()) {
+            throw new InvalidDomainException(
+                sprintf(
+                    'Domain name %s is not a valid top domain',
+                    $record->getFullDomainName()
+                ),
+                E_NOTICE
+            );
+        }
+
+        $request = $this->getRequest(
+            $record->getDomainName(),
+            $server
+        );
+
         while ($request->isTimeOut() && $retry > 0) {
             $retry -= 1;
             $request = $this->getRequest($domainName, $server);
@@ -236,7 +297,8 @@ class Checker
             throw $request->getResponse();
         }
 
-        $result = new WhoIsResult($domainName, $request->getBodyString());
+        $whoIsResultClass = static::WHOIS_RESULT_CLASS;
+        $result = new $whoIsResultClass($record, $request->getBodyString(), $request->getServer());
         $this->putCache($keyCache, $result);
         return $result;
     }
@@ -245,12 +307,12 @@ class Checker
      * Get From Domain
      *
      * @param string $domainName
-     * @param bool $followGivenServer
+     * @param bool $followServer follow server if whois server exists
      *
-     * @return ArrayCollector
+     * @return ArrayCollector|WhoIsResult[]
      * @throws \Throwable
      */
-    public function getFromDomain(string $domainName, bool $followGivenServer = false) : ArrayCollector
+    public function getFromDomain(string $domainName, bool $followServer = false) : ArrayCollector
     {
         $servers = $this->getWhoIsServerFor($domainName);
         $isLimit = false;
@@ -258,7 +320,7 @@ class Checker
         foreach ($servers as $server) {
             try {
                 $usedServer = $server;
-                $request = $this->getFromDomainWithServer($domainName, $server);
+                $whoIsResult = $this->getFromDomainWithServer($domainName, $server);
                 break;
             } catch (TimeOutException $e) {
                 continue;
@@ -267,10 +329,10 @@ class Checker
             } catch (\Throwable $e) {
                 throw $e;
             }
-            unset($request);
+            unset($whoIsResult);
         }
 
-        if (!isset($request)) {
+        if (!isset($whoIsResult)) {
             if ($isLimit) {
                 throw $isLimit;
             }
@@ -284,14 +346,19 @@ class Checker
         }
 
         // result
-        $result = new ArrayCollector([$usedServer => $request]);
-
-        if ($followGivenServer) {
-            $alternatedServer = DataParser::getWhoIsServerFromResultData($request->getResultString());
-            if ($alternatedServer && strtolower($alternatedServer) !== strtolower($usedServer)) {
+        $result = new ArrayCollector([$usedServer => $whoIsResult]);
+        if ($followServer) {
+            $alternatedServer = $whoIsResult->getWhoIsServerFromResult();
+            if ($alternatedServer
+                && ! in_array(
+                    strtolower($alternatedServer),
+                    // whois.iana.org is not allowed here
+                    [strtolower($usedServer), DataParser::URI_IANA_WHOIS]
+                )
+            ) {
                 try {
-                    $request = $this->getFromDomainWithServer($domainName, $alternatedServer);
-                    $result[$alternatedServer] = $request;
+                    $whoIsResult = $this->getFromDomainWithServer($domainName, $alternatedServer);
+                    $result[$alternatedServer] = $whoIsResult;
                 } catch (\Throwable $e) {
                     // pass
                 }
@@ -299,5 +366,54 @@ class Checker
         }
 
         return $result;
+    }
+
+    /**
+     * @param string $domainName the domain name to check
+     *
+     * @return bool|null  boolean true if registered otherwise false,
+     *                    or null if can not check domain
+     */
+    public function isDomainRegistered(string $domainName)
+    {
+        $record = $this->getValidator()->splitDomainName($domainName);
+        if (! $record->isTopLevelDomain()) {
+            throw new InvalidDomainException(
+                sprintf(
+                    'Domain name %s is not a valid top domain',
+                    $record->getFullDomainName()
+                ),
+                E_NOTICE
+            );
+        }
+
+        if (in_array($record->getMainDomainName(), $this->reservedNameTLDDomain)) {
+            return true;
+        }
+
+        // check length
+        if (is_numeric($this->minLength)
+            && $this->minLength > 0
+            && $this->minLength < 4
+            && strlen($record->getMainDomainName()) <= $this->minLength
+        ) {
+            return true;
+        }
+
+        $result = $this->getFromDomain($domainName);
+        /**
+         * @var WhoIsResult $result
+         */
+        $result = $result->last();
+        $parser = $result->getDataParser();
+        $status = $parser->hasRegisteredDomain($result->getOriginalResultString());
+        return $status === $parser::REGISTERED
+            || $status === $parser::RESERVED
+            ? true
+            : (
+                $status === $parser::UNREGISTERED
+                    ? false
+                    : null
+            );
     }
 }

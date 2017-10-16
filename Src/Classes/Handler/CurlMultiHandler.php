@@ -10,6 +10,8 @@
  * @author pentagonal <org@pentagonal.org>
  */
 
+declare(strict_types=1);
+
 namespace Pentagonal\WhoIs\Handler;
 
 use GuzzleHttp\Handler\CurlFactory;

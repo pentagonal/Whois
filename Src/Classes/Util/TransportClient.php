@@ -12,7 +12,7 @@
 
 declare(strict_types=1);
 
-namespace Pentagonal\WhoIs\Handler;
+namespace Pentagonal\WhoIs\Util;
 
 use Guzzle\Http\Exception\RequestException;
 use GuzzleHttp\Client;
@@ -32,7 +32,8 @@ use Pentagonal\WhoIs\Exceptions\HttpExpiredException;
 use Pentagonal\WhoIs\Exceptions\HttpPermissionException;
 use Pentagonal\WhoIs\Exceptions\ResourceException;
 use Pentagonal\WhoIs\Exceptions\TimeOutException;
-use Pentagonal\WhoIs\Util\DataGenerator;
+use Pentagonal\WhoIs\Handler\CurlHandler;
+use Pentagonal\WhoIs\Handler\CurlMultiHandler;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\UriInterface;
@@ -41,7 +42,7 @@ use Psr\Http\Message\UriInterface;
  * Client Creator To fix Guzzle Client Socket Enable
  *
  * Class TransportClient
- * @package Pentagonal\WhoIs\Handler
+ * @package Pentagonal\WhoIs\Util
  *
  * @method static ResponseInterface get($uri, array $options = [])
  * @method static ResponseInterface post($uri, array $options = [])
@@ -54,7 +55,7 @@ use Psr\Http\Message\UriInterface;
  */
 class TransportClient
 {
-    const DEFAULT_PORT = DataGenerator::PORT_WHOIS;
+    const DEFAULT_PORT = DataParser::PORT_WHOIS;
 
     /**
      * @var Client
@@ -77,7 +78,7 @@ class TransportClient
         $this->defaultOptions = [
             'handler' => $this->createStackHandler(),
             'ssl'    => [
-                'certificate_authority' => DataGenerator::PATH_CACERT,
+                'certificate_authority' => DataParser::PATH_CACERT,
             ]
         ];
     }

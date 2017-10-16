@@ -15,15 +15,16 @@ declare(strict_types=1);
 namespace Pentagonal\WhoIs\App;
 
 use Pentagonal\WhoIs\Exceptions\TimeOutException;
-use Pentagonal\WhoIs\Handler\TransportClient;
-use Pentagonal\WhoIs\Util\DataGenerator;
 use Pentagonal\WhoIs\Util\DataParser;
+use Pentagonal\WhoIs\Util\TransportClient;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\UriInterface;
 
 /**
  * Class WhoIsRequest
  * @package Pentagonal\WhoIs\App
+ * @final
+ * @access protected
  */
 final class WhoIsRequest
 {
@@ -258,7 +259,7 @@ final class WhoIsRequest
             $validator = new Validator();
             $this->socketMethod = rtrim($this->domainName) ."\r\n";
             if ($validator->isValidIP(trim($this->domainName))) {
-                $this->socketMethod = DataGenerator::buildNetworkAddressCommandServer(
+                $this->socketMethod = DataParser::buildNetworkAddressCommandServer(
                     trim($this->domainName) . "\r\n",
                     $this->uri->getHost()
                 );
@@ -267,7 +268,7 @@ final class WhoIsRequest
                     && ! empty($match[2])
             ) {
                 $domainName = "{$match[1]}{$match[2]}";
-                $this->socketMethod = DataGenerator::buildASNCommandServer(
+                $this->socketMethod = DataParser::buildASNCommandServer(
                     $domainName . "\r\n",
                     $this->uri->getHost()
                 );

@@ -17,7 +17,7 @@ namespace Pentagonal\WhoIs\Util;
 use GuzzleHttp\Psr7\Stream;
 use Pentagonal\WhoIs\App\TLDCollector;
 use Pentagonal\WhoIs\Exceptions\TimeOutException;
-use Pentagonal\WhoIs\Handler\TransportClient as Transport;
+use Pentagonal\WhoIs\Util\TransportClient as Transport;
 
 /**
  * Class DataGenerator
@@ -28,38 +28,6 @@ use Pentagonal\WhoIs\Handler\TransportClient as Transport;
 final class DataGenerator
 {
     const ERR_DENIED = -1;
-    const PORT_WHOIS = 43;
-
-    // Uri
-    const
-        URI_IANA_WHOIS = 'whois.iana.org',
-        URI_IANA_IDN   = 'https://data.iana.org/TLD/tlds-alpha-by-domain.txt',
-        URI_PUBLIC_SUFFIX = 'https://publicsuffix.org/list/effective_tld_names.dat',
-        URI_CACERT     = 'https://curl.haxx.se/ca/cacert.pem';
-
-    // Path
-    const
-        PATH_WHOIS_SERVERS = __DIR__ . '/../Data/Servers/AvailableServers.php',
-        PATH_EXTENSIONS_AVAILABLE = __DIR__ . '/../Data/Servers/AvailableExtensions.php',
-        PATH_CACERT     = __DIR__ . '/../Data/Certs/cacert.pem';
-
-    const
-        ARIN_NET_PREFIX_COMMAND    = 'n +',
-        RIPE_NET_PREFIX_COMMAND    = '-V Md5.2',
-        APNIC_NET_PREFIX_COMMAND   = '-V Md5.2',
-        AFRINIC_NET_PREFIX_COMMAND = '-V Md5.2',
-        LACNIC_NET_PREFIX_COMMAND  = '';
-
-    /**
-     * @var array
-     */
-    protected static $serverPrefixList = [
-        'whois.arin.net'    => self::ARIN_NET_PREFIX_COMMAND,
-        'whois.ripe.net'    => self::RIPE_NET_PREFIX_COMMAND,
-        'whois.apnic.net'   => self::APNIC_NET_PREFIX_COMMAND,
-        'whois.afrinic.net' => self::AFRINIC_NET_PREFIX_COMMAND,
-        'whois.lacnic.net'  => self::LACNIC_NET_PREFIX_COMMAND,
-    ];
 
     const LICENSE = <<<LICENSE
 /**
@@ -104,17 +72,17 @@ LICENSE;
         }
 
         try {
-            $iAnaResponse = Transport::get(self::URI_IANA_IDN);
+            $iAnaResponse = Transport::get(DataParser::URI_IANA_IDN);
         } catch (TimeOutException $e) {
-            $iAnaResponse = Transport::get(self::URI_IANA_IDN);
+            $iAnaResponse = Transport::get(DataParser::URI_IANA_IDN);
         } catch (\Exception $e) {
             throw $e;
         }
 
         try {
-            $suffixResponse = Transport::get(self::URI_PUBLIC_SUFFIX);
+            $suffixResponse = Transport::get(DataParser::URI_PUBLIC_SUFFIX);
         } catch (TimeOutException $e) {
-            $suffixResponse = Transport::get(self::URI_PUBLIC_SUFFIX);
+            $suffixResponse = Transport::get(DataParser::URI_PUBLIC_SUFFIX);
         } catch (\Exception $e) {
             throw $e;
         }
@@ -215,19 +183,19 @@ LICENSE;
      */
     public static function generateCaCertificate()
     {
-        $fileExists = file_exists(self::PATH_CACERT);
+        $fileExists = file_exists(DataParser::PATH_CACERT);
         if ($fileExists) {
-            if (!is_writeable(self::PATH_CACERT)) {
+            if (!is_writeable(DataParser::PATH_CACERT)) {
                 return self::ERR_DENIED;
             }
         }
-        if (!$fileExists && !is_writeable(dirname(self::PATH_CACERT))) {
+        if (!$fileExists && !is_writeable(dirname(DataParser::PATH_CACERT))) {
             return self::ERR_DENIED;
         }
         try {
-            $response = Transport::get(self::URI_CACERT);
+            $response = Transport::get(DataParser::URI_CACERT);
         } catch (TimeOutException $e) {
-            $response = Transport::get(self::URI_CACERT);
+            $response = Transport::get(DataParser::URI_CACERT);
         } catch (\Exception $e) {
             throw $e;
         }
@@ -235,7 +203,7 @@ LICENSE;
         $data = DataParser::convertResponseBodyToString($response, false);
         unset($response);
 
-        $stream = new Stream(fopen(self::PATH_CACERT, 'w+'));
+        $stream = new Stream(fopen(DataParser::PATH_CACERT, 'w+'));
         $written = 0;
         while (true) {
             $dataToWrite = substr($data, $written, 4096);
@@ -291,57 +259,5 @@ LICENSE;
 
         $newData .= "];\n";
         return $newData;
-    }
-
-    /**
-     * @param string $ip
-     * @param string $server
-     *
-     * @return string
-     */
-    public static function buildNetworkAddressCommandServer(string $ip, string $server) : string
-    {
-        // if contain white space on IP ignore it
-        if (! preg_match('/\s+/', trim($ip))
-            && ($server = strtolower(trim($server))) !== ''
-            && isset(static::$serverPrefixList[$server])
-            && static::$serverPrefixList[$server]
-        ) {
-            $prefix = static::$serverPrefixList[$server];
-            if (strpos($ip, "{$prefix} ") !== 0) {
-                $ip = "{$prefix} {$ip}";
-            }
-        }
-
-        return $ip;
-    }
-
-    /**
-     * @param string $ip
-     * @param string $server
-     *
-     * @return string
-     */
-    public static function buildASNCommandServer(string $ip, string $server) : string
-    {
-        // if contain white space on IP ignore it
-        if (! preg_match('/\s+/', trim($ip))
-            && ($server = strtolower(trim($server))) !== ''
-            && isset(static::$serverPrefixList[$server])
-            && static::$serverPrefixList[$server]
-        ) {
-            $ip     = ltrim($ip);
-            if ($server === 'whois.arin.net') {
-                return "a + {$ip}";
-            }
-
-            $ip     = ltrim($ip);
-            $prefix = static::$serverPrefixList[$server];
-            if (strpos($ip, "{$prefix} ") !== 0) {
-                $ip = "{$prefix} $ip";
-            }
-        }
-
-        return $ip;
     }
 }

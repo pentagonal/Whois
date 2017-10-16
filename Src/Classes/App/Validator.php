@@ -19,6 +19,8 @@ use Pentagonal\WhoIs\Exceptions\DomainSTLDException;
 use Pentagonal\WhoIs\Exceptions\EmptyDomainException;
 use Pentagonal\WhoIs\Exceptions\InvalidDomainException;
 use Pentagonal\WhoIs\Exceptions\InvalidExtensionException;
+use Pentagonal\WhoIs\Interfaces\RecordDomainNetworkInterface as DRI;
+use Pentagonal\WhoIs\Record\DomainRecord;
 use Pentagonal\WhoIs\Util\BaseMailAddressProviderValidator;
 
 /**
@@ -38,33 +40,6 @@ class Validator
     const NAME_HOST             = 'HOST';
     const NAME_EMAIL            = 'EMAIL';
     const NAME_IS_IP            = 'IS_IP_ADDRESS';
-
-    const NAME_IS_TOP_DOMAIN    = 'IS_TOP_DOMAIN';
-    const NAME_IS_GTLD_DOMAIN   = 'IS_GLTD_DOMAIN';
-    const NAME_IS_STLD_DOMAIN   = 'IS_STLD_DOMAIN';
-
-    const NAME_IS_SUB_DOMAIN    = 'IS_SUB_DOMAIN';
-
-    const NAME_BASE_EXTENSION        = 'BASE_EXTENSION';
-    const NAME_BASE_EXTENSION_ASCII  = 'BASE_EXTENSION_ASCII';
-
-    const NAME_EXTENSION        = 'EXTENSION';
-    const NAME_EXTENSION_ASCII  = 'EXTENSION_ASCII';
-
-    const NAME_SUB_EXTENSION          = 'SUB_EXTENSION';
-    const NAME_SUB_EXTENSION_ASCII    = 'SUB_EXTENSION_ASCII';
-
-    const NAME_FULL_DOMAIN_NAME       = 'FULL_DOMAIN_NAME';
-    const NAME_FULL_DOMAIN_NAME_ASCII = 'FULL_DOMAIN_NAME_ASCII';
-
-    const NAME_MAIN_DOMAIN_NAME       = 'MAIN_DOMAIN_NAME';
-    const NAME_MAIN_DOMAIN_NAME_ASCII = 'MAIN_DOMAIN_NAME_ASCII';
-
-    const NAME_SUB_DOMAIN_NAME        = 'SUB_DOMAIN_NAME';
-    const NAME_SUB_DOMAIN_NAME_ASCII  = 'SUB_DOMAIN_NAME_ASCII';
-
-    const NAME_BASE_DOMAIN_NAME        = 'BASE_DOMAIN_NAME';
-    const NAME_BASE_DOMAIN_NAME_ASCII  = 'BASE_DOMAIN_NAME_ASCII';
 
     /**
      * Special characters is not allowed on domain for common keyboard US Layout
@@ -250,24 +225,24 @@ class Validator
         $domainNameAscii = $this->tldCollector->encode($utf8Domain);
 
         $result = [
-            self::NAME_IS_TOP_DOMAIN          => false,
-            self::NAME_IS_GTLD_DOMAIN         => false,
-            self::NAME_IS_STLD_DOMAIN         => false,
-            self::NAME_IS_SUB_DOMAIN          => false,
-            self::NAME_FULL_DOMAIN_NAME       => $utf8Domain,
-            self::NAME_FULL_DOMAIN_NAME_ASCII => $domainNameAscii,
-            self::NAME_BASE_EXTENSION         => $extension,
-            self::NAME_BASE_EXTENSION_ASCII   => $extension,
-            self::NAME_EXTENSION              => $extension,
-            self::NAME_EXTENSION_ASCII        => $extension,
-            self::NAME_SUB_EXTENSION          => '',
-            self::NAME_SUB_EXTENSION_ASCII    => '',
-            self::NAME_MAIN_DOMAIN_NAME       => '',
-            self::NAME_MAIN_DOMAIN_NAME_ASCII => '',
-            self::NAME_SUB_DOMAIN_NAME        => '',
-            self::NAME_SUB_DOMAIN_NAME_ASCII  => '',
-            self::NAME_BASE_DOMAIN_NAME       => '',
-            self::NAME_BASE_DOMAIN_NAME_ASCII => '',
+            DRI::NAME_IS_TOP_DOMAIN          => false,
+            DRI::NAME_IS_GTLD_DOMAIN         => false,
+            DRI::NAME_IS_STLD_DOMAIN         => false,
+            DRI::NAME_IS_SUB_DOMAIN          => false,
+            DRI::NAME_FULL_DOMAIN_NAME       => $utf8Domain,
+            DRI::NAME_FULL_DOMAIN_NAME_ASCII => $domainNameAscii,
+            DRI::NAME_BASE_EXTENSION         => $extension,
+            DRI::NAME_BASE_EXTENSION_ASCII   => $extension,
+            DRI::NAME_EXTENSION              => $extension,
+            DRI::NAME_EXTENSION_ASCII        => $extension,
+            DRI::NAME_SUB_EXTENSION          => '',
+            DRI::NAME_SUB_EXTENSION_ASCII    => '',
+            DRI::NAME_MAIN_DOMAIN_NAME       => '',
+            DRI::NAME_MAIN_DOMAIN_NAME_ASCII => '',
+            DRI::NAME_SUB_DOMAIN_NAME        => '',
+            DRI::NAME_SUB_DOMAIN_NAME_ASCII  => '',
+            DRI::NAME_BASE_DOMAIN_NAME       => '',
+            DRI::NAME_BASE_DOMAIN_NAME_ASCII => '',
         ];
 
         $subNestedDomain = [];
@@ -279,7 +254,7 @@ class Validator
 
         $count = count($subDomainList);
         if ($count === 0) {
-            $result[self::NAME_IS_GTLD_DOMAIN] = true;
+            $result[DRI::NAME_IS_GTLD_DOMAIN] = true;
         }
 
         $domainNameSub   = implode('.', $domainArray);
@@ -287,12 +262,12 @@ class Validator
         $subExtension    = array_pop($domainArray);
         $mainDomain      = $subExtension;
         if ($countDomainArray < 2) {
-            $result[self::NAME_IS_TOP_DOMAIN]  = true;
-            $result[self::NAME_IS_GTLD_DOMAIN] = true;
+            $result[DRI::NAME_IS_TOP_DOMAIN]  = true;
+            $result[DRI::NAME_IS_GTLD_DOMAIN] = true;
             if ($countDomainArray === 1) {
                 $topDomain = $this->tldCollector->decode($subExtension);
                 // domain name too long
-                if (strlen($topDomain) > self::MAX_LENGTH_BASE_DOMAIN_NAME) {
+                if (strlen($topDomain) > static::MAX_LENGTH_BASE_DOMAIN_NAME) {
                     throw new DomainNameTooLongException(
                         sprintf(
                             'Domain name %s is too long',
@@ -302,8 +277,8 @@ class Validator
                         $domainName
                     );
                 }
-                $result[self::NAME_MAIN_DOMAIN_NAME] = $topDomain;
-                $result[self::NAME_MAIN_DOMAIN_NAME_ASCII] = $this->tldCollector->encode($topDomain);
+                $result[DRI::NAME_MAIN_DOMAIN_NAME] = $topDomain;
+                $result[DRI::NAME_MAIN_DOMAIN_NAME_ASCII] = $this->tldCollector->encode($topDomain);
             }
         }
 
@@ -311,13 +286,13 @@ class Validator
         $extensionAscii = $this->tldCollector->encode($extension);
 
         $extension                                 = $this->tldCollector->decode($extensionAscii);
-        $result[self::NAME_FULL_DOMAIN_NAME_ASCII] = $domainNameAscii;
-        $result[self::NAME_BASE_EXTENSION]         = $extension;
-        $result[self::NAME_BASE_EXTENSION_ASCII]   = $extensionAscii;
+        $result[DRI::NAME_FULL_DOMAIN_NAME_ASCII] = $domainNameAscii;
+        $result[DRI::NAME_BASE_EXTENSION]         = $extension;
+        $result[DRI::NAME_BASE_EXTENSION_ASCII]   = $extensionAscii;
         if ($countDomainArray >= 2) {
             $domainNameSub = $this->tldCollector->decode($domainNameSub);
-            $result[self::NAME_SUB_DOMAIN_NAME]       = $domainNameSub;
-            $result[self::NAME_SUB_DOMAIN_NAME_ASCII] = $this->tldCollector->encode($domainNameSub);
+            $result[DRI::NAME_SUB_DOMAIN_NAME]       = $domainNameSub;
+            $result[DRI::NAME_SUB_DOMAIN_NAME_ASCII] = $this->tldCollector->encode($domainNameSub);
         }
 
         if ($subDomainList->contain($subExtensionAscii)) {
@@ -332,10 +307,10 @@ class Validator
                 );
             }
 
-            $result[self::NAME_IS_STLD_DOMAIN]      = !($result[self::NAME_IS_TOP_DOMAIN]);
-            $result[self::NAME_IS_TOP_DOMAIN]       = count($domainArray) === 1;
-            $result[self::NAME_SUB_EXTENSION_ASCII] = $subExtensionAscii;
-            $result[self::NAME_SUB_EXTENSION]       = $subExtension;
+            $result[DRI::NAME_IS_STLD_DOMAIN]      = !($result[DRI::NAME_IS_TOP_DOMAIN]);
+            $result[DRI::NAME_IS_TOP_DOMAIN]       = count($domainArray) === 1;
+            $result[DRI::NAME_SUB_EXTENSION_ASCII] = $subExtensionAscii;
+            $result[DRI::NAME_SUB_EXTENSION]       = $subExtension;
         }
 
         if (!empty($subNestedDomain)) {
@@ -356,12 +331,12 @@ class Validator
                         array_unshift($subExtensionArray, array_pop($domainArray));
                     }
                     $subExtension                           = implode('.', $subExtensionArray);
-                    $result[self::NAME_IS_STLD_DOMAIN]      = true;
-                    $result[self::NAME_SUB_EXTENSION_ASCII] = $subExtension;
-                    $result[self::NAME_SUB_EXTENSION]       = $subExtension;
+                    $result[DRI::NAME_IS_STLD_DOMAIN]      = true;
+                    $result[DRI::NAME_SUB_EXTENSION_ASCII] = $subExtension;
+                    $result[DRI::NAME_SUB_EXTENSION]       = $subExtension;
                     if (count($domainArray) == 1) {
-                        $result[self::NAME_SUB_DOMAIN_NAME_ASCII] = '';
-                        $result[self::NAME_SUB_DOMAIN_NAME]       = '';
+                        $result[DRI::NAME_SUB_DOMAIN_NAME_ASCII] = '';
+                        $result[DRI::NAME_SUB_DOMAIN_NAME]       = '';
                     }
                     if (empty($domainArray)) {
                         throw new DomainSTLDException(
@@ -379,16 +354,16 @@ class Validator
         }
 
         $isTopDomain = isset($topDomain) || count($domainArray) < 2;
-        $result[self::NAME_IS_TOP_DOMAIN]  = $isTopDomain;
-        $result[self::NAME_IS_SUB_DOMAIN]  = ! $isTopDomain;
-        $result[self::NAME_IS_GTLD_DOMAIN] = ! $result[self::NAME_IS_STLD_DOMAIN];
+        $result[DRI::NAME_IS_TOP_DOMAIN]  = $isTopDomain;
+        $result[DRI::NAME_IS_SUB_DOMAIN]  = ! $isTopDomain;
+        $result[DRI::NAME_IS_GTLD_DOMAIN] = ! $result[DRI::NAME_IS_STLD_DOMAIN];
         $topDomain = isset($topDomain)
             ? $topDomain
             : ($isTopDomain ? array_pop($domainArray) : $mainDomain);
-        $result[self::NAME_MAIN_DOMAIN_NAME]       = $topDomain;
+        $result[DRI::NAME_MAIN_DOMAIN_NAME]       = $topDomain;
 
         // check if domain name is too long
-        if (strlen($topDomain) > self::MAX_LENGTH_BASE_DOMAIN_NAME) {
+        if (strlen($topDomain) > static::MAX_LENGTH_BASE_DOMAIN_NAME) {
             throw new DomainNameTooLongException(
                 sprintf(
                     'Domain name %s is too long',
@@ -399,36 +374,41 @@ class Validator
             );
         }
 
-        $result[self::NAME_MAIN_DOMAIN_NAME_ASCII] = $result[self::NAME_MAIN_DOMAIN_NAME_ASCII]
-            ? $result[self::NAME_MAIN_DOMAIN_NAME_ASCII]
+        $result[DRI::NAME_MAIN_DOMAIN_NAME_ASCII] = $result[DRI::NAME_MAIN_DOMAIN_NAME_ASCII]
+            ? $result[DRI::NAME_MAIN_DOMAIN_NAME_ASCII]
             : $this->tldCollector->encode($topDomain);
 
         if (!$isTopDomain) {
             $subDomain = implode('.', $domainArray);
-            $result[self::NAME_SUB_DOMAIN_NAME_ASCII] = $this->tldCollector->encode($subDomain);
-            $result[self::NAME_SUB_DOMAIN_NAME]       = $this->tldCollector->decode($subDomain);
+            $result[DRI::NAME_SUB_DOMAIN_NAME_ASCII] = $this->tldCollector->encode($subDomain);
+            $result[DRI::NAME_SUB_DOMAIN_NAME]       = $this->tldCollector->decode($subDomain);
         }
 
-        $fullExtension = $result[self::NAME_SUB_EXTENSION];
-        $fullExtension .= ($fullExtension ? '.' : '') . $result[self::NAME_BASE_EXTENSION];
+        $fullExtension = $result[DRI::NAME_SUB_EXTENSION];
+        $fullExtension .= ($fullExtension ? '.' : '') . $result[DRI::NAME_BASE_EXTENSION];
 
-        $fullExtensionASCII = $result[self::NAME_SUB_EXTENSION_ASCII];
-        $fullExtensionASCII .= ($fullExtensionASCII ? '.' : '') . $result[self::NAME_BASE_EXTENSION_ASCII];
+        $fullExtensionASCII = $result[DRI::NAME_SUB_EXTENSION_ASCII];
+        $fullExtensionASCII .= ($fullExtensionASCII ? '.' : '') . $result[DRI::NAME_BASE_EXTENSION_ASCII];
 
-        $result[self::NAME_EXTENSION]       = $fullExtension;
-        $result[self::NAME_EXTENSION_ASCII] = $fullExtensionASCII;
+        $result[DRI::NAME_EXTENSION]       = $fullExtension;
+        $result[DRI::NAME_EXTENSION_ASCII] = $fullExtensionASCII;
 
-        $result[self::NAME_BASE_DOMAIN_NAME] = $result[self::NAME_SUB_DOMAIN_NAME];
-        if (!empty($result[self::NAME_SUB_DOMAIN_NAME])) {
-            $result[self::NAME_BASE_DOMAIN_NAME] .= ".";
+        $result[DRI::NAME_BASE_DOMAIN_NAME] = $result[DRI::NAME_SUB_DOMAIN_NAME];
+        if (!empty($result[DRI::NAME_SUB_DOMAIN_NAME])) {
+            $result[DRI::NAME_BASE_DOMAIN_NAME] .= ".";
         }
-        $result[self::NAME_BASE_DOMAIN_NAME] .=  $result[self::NAME_MAIN_DOMAIN_NAME];
+        $result[DRI::NAME_BASE_DOMAIN_NAME] .=  $result[DRI::NAME_MAIN_DOMAIN_NAME];
 
-        $result[self::NAME_BASE_DOMAIN_NAME_ASCII] = $result[self::NAME_SUB_DOMAIN_NAME_ASCII];
-        if (!empty($result[self::NAME_SUB_DOMAIN_NAME_ASCII])) {
-            $result[self::NAME_BASE_DOMAIN_NAME_ASCII] .= ".";
+        $result[DRI::NAME_BASE_DOMAIN_NAME_ASCII] = $result[DRI::NAME_SUB_DOMAIN_NAME_ASCII];
+        if (!empty($result[DRI::NAME_SUB_DOMAIN_NAME_ASCII])) {
+            $result[DRI::NAME_BASE_DOMAIN_NAME_ASCII] .= ".";
         }
-        $result[self::NAME_BASE_DOMAIN_NAME_ASCII] .= $result[self::NAME_MAIN_DOMAIN_NAME_ASCII];
+        $result[DRI::NAME_BASE_DOMAIN_NAME_ASCII] .= $result[DRI::NAME_MAIN_DOMAIN_NAME_ASCII];
+        $result[DRI::WHOIS_SERVER] = (array) $this
+            ->getTldCollector()
+            ->getServersFromExtension(
+                $result[DRI::NAME_EXTENSION]
+            );
 
         return $this->reValidateDomainName(new DomainRecord($result), $domainName);
     }
@@ -462,9 +442,9 @@ class Validator
      */
     protected function reValidateDomainName(DomainRecord $collector, string $domainName) : DomainRecord
     {
-        $extension = $collector[self::NAME_BASE_EXTENSION];
+        $extension = $collector[DRI::NAME_BASE_EXTENSION];
         // remove dot and validate all domain name string
-        $domainNameNoPeriods = str_replace('.', '', $collector[self::NAME_BASE_DOMAIN_NAME]);
+        $domainNameNoPeriods = str_replace('.', '', $collector[DRI::NAME_BASE_DOMAIN_NAME]);
         switch ($extension) {
             case 'id':
                 if (preg_match('/[^a-zA-Z0-9\-\_]/', $domainNameNoPeriods)) {

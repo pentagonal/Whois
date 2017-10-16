@@ -15,14 +15,17 @@ declare(strict_types=1);
 namespace Pentagonal\WhoIs\Interfaces;
 
 /**
- * Interface DomainRecordInterface
+ * Interface RecordASNNetworkInterface
+ * @package Pentagonal\WhoIs\Interfaces
  */
-interface DomainRecordInterface extends ArrayCollectorInterface
+interface RecordASNNetworkInterface extends RecordNetworkInterface
 {
+    const NAME_ASN_ADDRESS = 'ASN_ADDRESS';
+
     /**
-     * Get Domain Name
+     * Get ASN Number
      *
      * @return string
      */
-    public function getDomainName();
+    public function getASNumber() : string;
 }

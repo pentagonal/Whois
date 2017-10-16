@@ -26,10 +26,53 @@ use Psr\Http\Message\StreamInterface;
 class DataParser
 {
     const REGISTERED    = true;
+    const RESERVED      = 1;
     const UNREGISTERED  = false;
+
     const UNKNOWN = 'UNKNOWN';
     const LIMIT   = 'LIMIT';
+
     const ASN_REGEX = '/^(ASN?)?([0-9]{1,20})$/i';
+
+    const PORT_WHOIS = 43;
+
+    // Uri
+    const
+        URI_IANA_WHOIS = 'whois.iana.org',
+        URI_IANA_IDN   = 'https://data.iana.org/TLD/tlds-alpha-by-domain.txt',
+        URI_PUBLIC_SUFFIX = 'https://publicsuffix.org/list/effective_tld_names.dat',
+        URI_CACERT     = 'https://curl.haxx.se/ca/cacert.pem';
+
+    // Path
+    const
+        PATH_WHOIS_SERVERS = __DIR__ . '/../../Data/Servers/AvailableServers.php',
+        PATH_EXTENSIONS_AVAILABLE = __DIR__ . '/../../Data/Servers/AvailableExtensions.php',
+        PATH_CACERT     = __DIR__ . '/../../Data/Certs/cacert.pem';
+
+    const
+        ARIN_NET_PREFIX_COMMAND    = 'n +',
+        RIPE_NET_PREFIX_COMMAND    = '-V Md5.2',
+        APNIC_NET_PREFIX_COMMAND   = '-V Md5.2',
+        AFRINIC_NET_PREFIX_COMMAND = '-V Md5.2',
+        LACNIC_NET_PREFIX_COMMAND  = '';
+
+    /**
+     * @var array
+     */
+    protected static $serverPrefixList = [
+        'whois.arin.net'    => self::ARIN_NET_PREFIX_COMMAND,
+        'whois.ripe.net'    => self::RIPE_NET_PREFIX_COMMAND,
+        'whois.apnic.net'   => self::APNIC_NET_PREFIX_COMMAND,
+        'whois.afrinic.net' => self::AFRINIC_NET_PREFIX_COMMAND,
+        'whois.lacnic.net'  => self::LACNIC_NET_PREFIX_COMMAND,
+    ];
+
+    /**
+     * DataParser constructor.
+     */
+    final public function __construct()
+    {
+    }
 
     /**
      * Clean string ini comment
@@ -101,6 +144,48 @@ class DataParser
         );
 
         return trim($data);
+    }
+
+    /**
+     * Normalize Whois Result
+     *
+     * @param string $data
+     *
+     * @return string
+     */
+    public static function normalizeWhoIsResultData(string $data) : string
+    {
+        $data = str_replace("\r", "", $data);
+        if (strpos($data, ":\n\t")) {
+            $arr = explode("\n", $data);
+            $currentKey = null;
+            foreach ($arr as $key => $value) {
+                $arr[$key] = trim($value);
+                if (trim($value) == '' || substr(trim($value), 0, 1) == '%') {
+                    continue;
+                }
+
+                if (substr(rtrim($arr[$key]), -1) === ':'
+                    && isset($arr[$key+1])
+                    && substr($arr[$key+1], 0, 1) === "\t"
+                ) {
+                    unset($arr[$key]);
+                    $currentKey = trim($value);
+                    if (preg_match('/\t[a-z0-9\s]+\s*\:/i', $arr[$key+1])) {
+                        $currentKey = rtrim($currentKey, ':');
+                    }
+                    continue;
+                }
+
+                if (substr($value, 0, 1) === "\t") {
+                    $arr[$key] = "{$currentKey} {$arr[$key]}";
+                }
+            }
+            $data = implode("\n", $arr);
+            unset($arr);
+        }
+
+        return $data;
     }
 
     /**
@@ -222,7 +307,8 @@ class DataParser
         }
 
         // clean the data
-        $cleanData = static::cleanWhoIsResultComment($data);
+        $cleanData = static::normalizeWhoIsResultData($data);
+        $cleanData = static::cleanWhoIsResultComment($cleanData);
         $cleanData = static::cleanWhoIsResultInformationalData($cleanData);
         $cleanData = static::cleanMultipleWhiteSpaceTrim($cleanData);
         if ($cleanData && ($dateUpdated = static::getWhoIsLastUpdateDatabase($data))) {
@@ -304,8 +390,9 @@ class DataParser
         ) {
             return static::UNREGISTERED;
         }
+
         // match domain with name and with status available extension for eg: .be
-        if (preg_match('/Domain\s*(?:\_name)?\:(?:[^\n]+)/i', $cleanData)) {
+        if (preg_match('/Domain\s*(?:\_?Name\s*)?\:(?:[^\n]+)/i', $cleanData)) {
             if (preg_match(
                 '/
                     (?:Domain\s+)?Status\s*\:\s*(?:AVAILABLE|(?:No\s+Object|Not)\s+Found)
@@ -317,9 +404,16 @@ class DataParser
             }
 
             if (preg_match(
-                '/(?:Domain\s+)?Status\s*\:\s*NOT\s*AVAILABLE/i',
-                $cleanData
+                '/(?:Domain\s+)?Status\s*\:\s*
+                    (NOT\s*AVAILABLE|RESERVED?|BANNED)
+                /ix',
+                $cleanData,
+                $match
             )) {
+                if (!empty($match[1]) && stripos($match[1], 'Reserv') !== false) {
+                    return static::RESERVED;
+                }
+
                 return static::REGISTERED;
             }
         }
@@ -331,19 +425,28 @@ class DataParser
         }
 
         // Reserved Domain
-        if (preg_match('/^\s*Reserved\s*By/i', $cleanData)
-            // else check contact or status billing, tech or contact
-            || preg_match(
-                '/
+        if (preg_match(
+            '/
+                (^\s*Reserved\s*By)
+                | (?:Th(?:is|e))?\s*domain\s*(?:(?:can|could)(?:not|n\'t))\s*be\s*register(?:ed)?
+                /ix',
+            $cleanData
+        )) {
+            return static::RESERVED;
+        }
+
+        // else check contact or status billing, tech or contact
+        if (preg_match(
+            '/
                 (
                     Registr(?:ar|y|nt)\s[^\:]+
                     | Whois\s+Server
                     | (?:Phone|Registrar|Contact|(?:admin|tech)-c|Organisations?)
                 )\s*\:\s*([^\n]+)
                 /ix',
-                $cleanData,
-                $matchData
-            )
+            $cleanData,
+            $matchData
+        )
             && !empty($matchData[1])
             && (
                // match for name server
@@ -468,5 +571,56 @@ class DataParser
         $useClone && $stream->close();
 
         return $data;
+    }
+    /**
+     * @param string $ip
+     * @param string $server
+     *
+     * @return string
+     */
+    public static function buildNetworkAddressCommandServer(string $ip, string $server) : string
+    {
+        // if contain white space on IP ignore it
+        if (! preg_match('/\s+/', trim($ip))
+            && ($server = strtolower(trim($server))) !== ''
+            && isset(static::$serverPrefixList[$server])
+            && static::$serverPrefixList[$server]
+        ) {
+            $prefix = static::$serverPrefixList[$server];
+            if (strpos($ip, "{$prefix} ") !== 0) {
+                $ip = "{$prefix} {$ip}";
+            }
+        }
+
+        return $ip;
+    }
+
+    /**
+     * @param string $ip
+     * @param string $server
+     *
+     * @return string
+     */
+    public static function buildASNCommandServer(string $ip, string $server) : string
+    {
+        // if contain white space on IP ignore it
+        if (! preg_match('/\s+/', trim($ip))
+            && ($server = strtolower(trim($server))) !== ''
+            && isset(static::$serverPrefixList[$server])
+            && static::$serverPrefixList[$server]
+        ) {
+            $ip     = ltrim($ip);
+            if ($server === 'whois.arin.net') {
+                return "a + {$ip}";
+            }
+
+            $ip     = ltrim($ip);
+            $prefix = static::$serverPrefixList[$server];
+            if (strpos($ip, "{$prefix} ") !== 0) {
+                $ip = "{$prefix} $ip";
+            }
+        }
+
+        return $ip;
     }
 }

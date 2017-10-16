@@ -14,7 +14,7 @@ declare(strict_types=1);
 
 namespace Pentagonal\Tests\PhpUnit\WhoIs\Data;
 
-use Pentagonal\WhoIs\Util\DataGenerator;
+use Pentagonal\WhoIs\Util\DataParser;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -29,21 +29,21 @@ class ServerExtensionsTest extends TestCase
     public function testIncludeServerExtensionsFilesReturningArray()
     {
         $this->assertNotEmpty(
-            require DataGenerator::PATH_EXTENSIONS_AVAILABLE
+            require DataParser::PATH_EXTENSIONS_AVAILABLE
         );
 
         $this->assertNotEmpty(
-            require DataGenerator::PATH_WHOIS_SERVERS
+            require DataParser::PATH_WHOIS_SERVERS
         );
 
         $this->assertArrayHasKey(
             'com',
-            require DataGenerator::PATH_EXTENSIONS_AVAILABLE
+            require DataParser::PATH_EXTENSIONS_AVAILABLE
         );
 
         $this->assertArrayHasKey(
             'com',
-            require DataGenerator::PATH_WHOIS_SERVERS
+            require DataParser::PATH_WHOIS_SERVERS
         );
     }
 }
