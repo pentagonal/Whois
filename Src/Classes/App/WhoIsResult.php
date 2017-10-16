@@ -112,8 +112,18 @@ class WhoIsResult extends WhoIsResultAbstract
             $this->dataDetail[static::KEY_DATE] = $dataDate;
             // registrar
             $registrar = $this->dataDetail[static::KEY_REGISTRAR];
+            $registrar[static::KEY_IANA_ID] = $this->getFirstOr($match, 'registrar_iana_id');
             $registrar[static::KEY_ID] = $this->getFirstOr($match, 'registrar_id');
             $registrar[static::KEY_NAME] = $this->getFirstOr($match, 'registrar_name');
+            $registrar[static::KEY_ORGANIZATION] = $this->getFirstOr($match, 'registrar_org');
+            $registrar[static::KEY_EMAIL] = $this->getFirstOr($match, 'registrar_email');
+            $registrar[static::KEY_COUNTRY] = $this->getFirstOr($match, 'registrar_country');
+            $registrar[static::KEY_CITY] = $this->getFirstOr($match, 'registrar_city');
+            $registrar[static::KEY_POSTAL_CODE] = $this->getFirstOr($match, 'registrar_postal');
+            $registrar[static::KEY_STATE] = $this->getFirstOr($match, 'registrar_state');
+            $registrar[static::KEY_PHONE] = (array) $match['registrar_phone'];
+            $registrar[static::KEY_FAX] = (array) $match['registrar_fax'];
+
             $match['registrar_url'] = (array) $match->get('registrar_url');
             if (!empty($match['registrar_url'])) {
                 $match['registrar_url'] = array_map(function ($v) {
@@ -125,12 +135,20 @@ class WhoIsResult extends WhoIsResultAbstract
                 }, $match['registrar_url']);
             }
 
-            $registrar[static::KEY_ABUSE] = [
-                static::KEY_URL   => (array) $match['registrar_url'],
-                static::KEY_EMAIL => (array) $match['registrar_abuse_mail'],
-                static::KEY_PHONE => (array) $match['registrar_abuse_phone'],
-            ];
+            $registrar[static::KEY_ABUSE][static::KEY_URL] = (array) $match['registrar_url'];
+            $registrarAbuseEmail = (array) $match['registrar_abuse_mail'];
+            if (empty($registrarAbuseEmail) && !empty($registrar[static::KEY_EMAIL])) {
+                $registrarAbuseEmail = [$registrar[static::KEY_EMAIL]];
+            }
+            $registrarAbusePhone = (array) $match['registrar_abuse_phone'];
+            if (empty($registrarAbusePhone) && !empty($registrar[static::KEY_PHONE])) {
+                $registrarAbusePhone = $registrar[static::KEY_PHONE];
+            }
+            $registrar[static::KEY_ABUSE][static::KEY_EMAIL] = $registrarAbuseEmail;
+            $registrar[static::KEY_ABUSE][static::KEY_PHONE] = $registrarAbusePhone;
+
             $this->dataDetail[static::KEY_REGISTRAR] = $registrar;
+
             // ----------------- REGISTRANT
             $registrant = $this->dataDetail[static::KEY_REGISTRANT];
             $registrant[static::KEY_DATA] = [

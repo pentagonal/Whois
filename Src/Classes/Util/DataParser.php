@@ -184,7 +184,33 @@ class DataParser
             $data = implode("\n", $arr);
             unset($arr);
         }
+        if (stripos($data, 'Algorithm') === false || stripos($data, 'Digest') === false) {
+            return $data;
+        }
 
+        // fix for DNSSSEC
+        $placeHolder = "[__".microtime(true)."__]";
+        $data = preg_replace_callback(
+            '/
+                (?P<name>
+                  (?:
+                    DS\s*Key(?:\s*Tag)?
+                    | Algorithm
+                    | Digest\s*Type
+                    | Digest\s*
+                  )
+                )\s*(?P<selector>[0-9]+)(?:[^\:]+)?\:(?P<values>[0-9a-f]+)[^\n]*
+            /mxi',
+            function ($match) use ($placeHolder) {
+                if (strpos($match['name'], 'DS') !== false) {
+                    return "DNSSEC DS Data: {$match['values']}";
+                }
+                return $placeHolder.$match['values'];
+            },
+            $data
+        );
+
+        $data = str_replace(["\n{$placeHolder}", $placeHolder,], " ", $data);
         return $data;
     }
 
@@ -216,10 +242,7 @@ class DataParser
         preg_match(
             '/
                 (?:\>\>\>?)?\s*
-                (Last\s*Update\s*(?:[a-z0-9\s]+)?
-                  (?:\s+Whois\s*)?
-                  (?:\s+Database(?:Whois)?)?
-                )\s*
+                (Last\s*Update\s*(?:[a-z0-9\s]+)?Whois\s*Database)\s*
                 \:\s*((?:[0-9]+[0-9\-\:\s\+TZGMU]+)?)
             /ix',
             $data,

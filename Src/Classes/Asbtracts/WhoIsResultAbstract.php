@@ -31,6 +31,7 @@ abstract class WhoIsResultAbstract implements WhoIsNetworkResultInterface
 {
     // GLOBAL
     const KEY_ID       = 'id';
+    const KEY_IANA_ID  = 'iana_id';
     const KEY_NAME     = 'name';
     // data
     const KEY_DATA     = 'data';
@@ -466,7 +467,7 @@ abstract class WhoIsResultAbstract implements WhoIsNetworkResultInterface
 
         if ($this->networkRecord instanceof RecordDomainNetworkInterface) {
             // registrant data default
-            $registrantDefault = [
+            $registrationDefault = [
                 static::KEY_ID           => null,
                 static::KEY_NAME         => null,
                 static::KEY_ORGANIZATION => null,
@@ -497,20 +498,26 @@ abstract class WhoIsResultAbstract implements WhoIsNetworkResultInterface
                     static::KEY_EXPIRE    => null,
                     static::KEY_UPDATE_DB => null,
                 ],
-                static::KEY_REGISTRAR  => [
-                    static::KEY_ID    => null,
-                    static::KEY_NAME  => null,
-                    static::KEY_ABUSE => [
-                        static::KEY_URL   => [],
-                        static::KEY_EMAIL => [],
-                        static::KEY_PHONE => [],
+                static::KEY_REGISTRAR  => array_merge(
+                    array_merge(
+                        [
+                            static::KEY_IANA_ID => null
+                        ],
+                        $registrationDefault
+                    ),
+                    [
+                        static::KEY_ABUSE => [
+                            static::KEY_URL   => [],
+                            static::KEY_EMAIL => [],
+                            static::KEY_PHONE => [],
+                        ],
                     ]
-                ],
+                ),
                 static::KEY_REGISTRANT => [
-                    static::KEY_DATA    => $registrantDefault,
-                    static::KEY_BILLING => $registrantDefault,
-                    static::KEY_TECH    => $registrantDefault,
-                    static::KEY_ADMIN   => $registrantDefault,
+                    static::KEY_DATA    => $registrationDefault,
+                    static::KEY_BILLING => $registrationDefault,
+                    static::KEY_TECH    => $registrationDefault,
+                    static::KEY_ADMIN   => $registrationDefault,
                 ],
                 static::KEY_URL        => [
                     static::KEY_SERVER           => $collection[static::KEY_URL][static::KEY_SERVER],
