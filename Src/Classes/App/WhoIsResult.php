@@ -18,11 +18,11 @@ use Pentagonal\WhoIs\Abstracts\WhoIsResultAbstract;
 use Pentagonal\WhoIs\Interfaces\RecordDomainNetworkInterface;
 use Pentagonal\WhoIs\Interfaces\RecordNetworkInterface;
 
-// @todo completion
 /**
  * Class WhoIsResult
  * @package Pentagonal\WhoIs\App
  * By default on string result is parse on JSON
+ * @todo completion Detail & Method
  */
 class WhoIsResult extends WhoIsResultAbstract
 {

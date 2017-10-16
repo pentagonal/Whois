@@ -27,7 +27,7 @@ use Pentagonal\WhoIs\Util\BaseMailAddressProviderValidator;
  * Class Validator
  * @package Pentagonal\WhoIs\App
  *
- * @todo completion for method
+ * @todo Completion for method
  */
 class Validator
 {
