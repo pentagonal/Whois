@@ -153,7 +153,7 @@ class DataParser
      *
      * @return string
      */
-    public static function normalizeWhoIsResultData(string $data) : string
+    public static function normalizeWhoIsDomainResultData(string $data) : string
     {
         $data = str_replace("\r", "", $data);
         if (strpos($data, ":\n\t")) {
@@ -211,6 +211,7 @@ class DataParser
         );
 
         $data = str_replace(["\n{$placeHolder}", $placeHolder,], " ", $data);
+        $data = static::cleanMultipleWhiteSpaceTrim($data);
         return $data;
     }
 
@@ -330,7 +331,7 @@ class DataParser
         }
 
         // clean the data
-        $cleanData = static::normalizeWhoIsResultData($data);
+        $cleanData = static::normalizeWhoIsDomainResultData($data);
         $cleanData = static::cleanWhoIsResultComment($cleanData);
         $cleanData = static::cleanWhoIsResultInformationalData($cleanData);
         $cleanData = static::cleanMultipleWhiteSpaceTrim($cleanData);

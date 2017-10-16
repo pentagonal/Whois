@@ -31,7 +31,7 @@ trait ResultParser
     protected function parseDomainDetail(string $data) : ArrayCollector
     {
         // just check for first use especially for be domain
-        $data = DataParser::normalizeWhoIsResultData($data);
+        $data = DataParser::normalizeWhoIsDomainResultData($data);
 
         preg_match_all(
             '~
