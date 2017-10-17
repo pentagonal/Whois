@@ -110,6 +110,11 @@ composer require pentagonal/whois "^1.0"
 
 ## NOTE
 
+```
+Deprecated untill next release
+The script work but not fully work properly on result check
+```
+
 The whois server only support via socket only.
 
 Some domain does not know about server socket address.
