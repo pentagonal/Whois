@@ -15,6 +15,7 @@ declare(strict_types=1);
 namespace Pentagonal\WhoIs\App;
 
 use Pentagonal\WhoIs\Exceptions\EmptyDomainException;
+use Pentagonal\WhoIs\Exceptions\HttpException;
 use Pentagonal\WhoIs\Exceptions\InvalidDomainException;
 use Pentagonal\WhoIs\Exceptions\RequestLimitException;
 use Pentagonal\WhoIs\Exceptions\ResultException;
@@ -36,6 +37,16 @@ class Checker
     const VERSION = '2.0.0';
 
     /**
+     * Fake Comment that Domain is Registered from
+     */
+    const COMMENT_FAKE_RECORD = <<<FAKE
+% NOTE: The registry of domain does not provide or publish ownership information
+%       of domain for public usage. This data is represent for public domain data,
+%       data provide from Domain Name Server (DNS) existences.
+
+FAKE;
+
+    /**
      * cache Prefix
      */
     const CACHE_PREFIX = 'pentagonal_wc_';
@@ -49,6 +60,11 @@ class Checker
      * max retry if timeout
      */
     const MAX_RETRY = 5;
+
+    /**
+     * @var int
+     */
+    protected $cacheExpired = 3600;
 
     /**
      * Instance of validator
@@ -121,7 +137,7 @@ class Checker
     }
 
     /**
-     * Normalize cache key
+     * Normalize cache key to put on Cache storage
      *
      * @param string $key
      *
@@ -148,7 +164,8 @@ class Checker
     {
         return $this->cacheInstance->put(
             $this->normalizeCacheKey($key),
-            Sanitizer::maybeSerialize($value)
+            Sanitizer::maybeSerialize($value),
+            $this->cacheExpired
         );
     }
 
@@ -185,7 +202,54 @@ class Checker
     public function getRequest(string $domain, string $server, array $options = []) : WhoIsRequest
     {
         $request = new WhoIsRequest($domain, $server, $options);
-        return $request->send();
+        return $this->sanitizeAfterRequest($request->send());
+    }
+
+    /**
+     * Sanitize for Request this for child class that maybe
+     *
+     * @param WhoIsRequest $request
+     *
+     * @return WhoIsRequest
+     */
+    protected function sanitizeAfterRequest(WhoIsRequest $request) : WhoIsRequest
+    {
+        $domain = $request->getTargetName();
+        if ($domain && $this->getValidator()->isValidDomain($domain)) {
+            $extension = $this->getValidator()->splitDomainName($domain)->getBaseExtension();
+        }
+
+        if (empty($extension)) {
+            return $request;
+        }
+
+        // with extensions logic
+        switch ($extension) {
+            case 'ph':
+                if (stripos($request->getServer(), 'https://whois.dot.ph/?') !== 0) {
+                    return $request;
+                }
+                $body = $request->getBodyString();
+                if (trim($body) === '') {
+                    return $request;
+                }
+                preg_match(
+                    '~
+                      <div\b[^>]*?id\=(\")about\-whois(?:\\1)[^>]*+>\s*
+                          <div\b[^>]*+>
+                            ((?:(?!<\/main>)[\s\S])*)
+                    ~ix',
+                    $body,
+                    $match
+                );
+                if (!empty($match[2])) {
+                    $match = trim(preg_replace('~<br[^>]*>~i', "\n", $match[2]));
+                    $match = preg_replace('~^[ ]+~m', '', strip_tags($match));
+                    $request->setBodyString(trim($match));
+                }
+                break;
+        }
+        return $request;
     }
 
     /**
@@ -304,17 +368,127 @@ class Checker
     }
 
     /**
+     * @param string $domainName
+     *
+     * @return string
+     * @throws \Throwable
+     */
+    protected function createFakeResultFromEmptyServerDomain(string $domainName) : string
+    {
+        $record = trim(static::COMMENT_FAKE_RECORD);
+        $record .= "\n\nDomain Name: {$domainName}\n";
+        try {
+            $err = null;
+            // handle error
+            set_error_handler(function ($code, $message, $file, $line) use (&$err) {
+                $err = new HttpException(
+                    $message,
+                    $code
+                );
+
+                $err->setFile($file);
+                $err->setLine($line);
+            });
+            // get dns
+            $dns = (array)dns_get_record($domainName, DNS_NS);
+
+            restore_error_handler();
+            if ($err instanceof HttpException) {
+                throw $err;
+            }
+        } catch (\Throwable $e) {
+            throw $e;
+        }
+
+        if (!empty($dns)) {
+            $record .= "Domain Status: Taken\n\n";
+            foreach ($dns as $array) {
+                if (!empty($array['target'])) {
+                    $record .= "Name Server: {$array['target']}\n";
+                }
+            }
+        } else {
+            $record .= "Domain Status: Available\n";
+        }
+        try {
+            $string = $this
+                ->getFromDomainWithServer($domainName, DataParser::URI_IANA_WHOIS)
+                ->getOriginalResultString();
+            preg_match(
+                '~
+                    Registra(?:tion|ant|ar)s?\s+information(?:[^\:]+)?\:(?:\s*remarks:[\s]*)?
+                    ((?>https?\:\/\/)[^\n\r]+)
+                ~xi',
+                $string,
+                $match
+            );
+            if (!empty($match[1])) {
+                $match[1] = trim($match[1]);
+                $record .= "\n% For more information please visit : {$match[1]}";
+            }
+        } catch (\Throwable $e) {
+            //
+        }
+
+        return $record;
+    }
+
+    /**
      * Get From Domain
      *
      * @param string $domainName
      * @param bool $followServer follow server if whois server exists
+     * @param bool $allowEmptyServer use *Name Server (DNS)* if Server has empty default is true
      *
      * @return ArrayCollector|WhoIsResult[]
      * @throws \Throwable
      */
-    public function getFromDomain(string $domainName, bool $followServer = false) : ArrayCollector
-    {
-        $servers = $this->getWhoIsServerFor($domainName);
+    public function getFromDomain(
+        string $domainName,
+        bool $followServer = false,
+        bool $allowEmptyServer = true
+    ) : ArrayCollector {
+
+        $record = $this->getValidator()->splitDomainName($domainName);
+        if (! $record->isTopLevelDomain()) {
+            throw new InvalidDomainException(
+                sprintf(
+                    'Domain name %s is not a valid top domain',
+                    $record->getFullDomainName()
+                ),
+                E_NOTICE
+            );
+        }
+
+        $domainName = strtolower($record->getDomainName());
+        if ($allowEmptyServer && !$record->getWhoIsServers()) {
+            $keyCache = "{$domainName}_fake_record";
+            if (($result = $this->getCache($keyCache)) instanceof WhoIsResult) {
+                $result->useCacheNameServer = true;
+                return new ArrayCollector([$domainName => $result]);
+            }
+            try {
+                $result = new WhoIsResult(
+                    $record,
+                    $this->createFakeResultFromEmptyServerDomain($domainName)
+                );
+            } catch (HttpException $e) {
+                throw new ResultException(
+                    sprintf(
+                        'Could not get data for : %1$s, with error: %2$s',
+                        $domainName,
+                        $e->getMessage()
+                    )
+                );
+            }
+
+            $this->putCache($keyCache, $result);
+            /** @noinspection PhpUndefinedFieldInspection */
+            $result->useNameServerDNS = true;
+            return new ArrayCollector([$domainName => $result]);
+        }
+
+        $servers = $this->getWhoIsServerFor($record->getDomainName());
         $isLimit = false;
         $usedServer = null;
         foreach ($servers as $server) {
@@ -400,13 +574,29 @@ class Checker
             return true;
         }
 
-        $result = $this->getFromDomain($domainName);
+        if (!$record->getWhoIsServers()) {
+            $keyCache = $record->getDomainName() .'_availability';
+            if (($result = $this->getCache($keyCache)) instanceof \stdClass
+                && !empty($result->registered)
+                && is_array($result->registered)
+            ) {
+                return !empty($result->registered);
+            }
+
+            $dns = dns_get_record($record->getDomainName(), DNS_NS);
+            $result = new \stdClass();
+            $result->registered = $dns;
+            $this->putCache($keyCache, $result);
+            return ! empty($result->registered);
+        }
+
         /**
          * @var WhoIsResult $result
          */
+        $result = $this->getFromDomain($record->getMainDomainName());
         $result = $result->last();
         $parser = $result->getDataParser();
-        $status = $parser->hasRegisteredDomain($result->getOriginalResultString());
+        $status = $parser->getRegisteredDomainStatus($result->getOriginalResultString());
         return $status === $parser::REGISTERED
             || $status === $parser::RESERVED
             ? true

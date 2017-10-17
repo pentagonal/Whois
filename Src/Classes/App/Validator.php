@@ -20,8 +20,11 @@ use Pentagonal\WhoIs\Exceptions\EmptyDomainException;
 use Pentagonal\WhoIs\Exceptions\InvalidDomainException;
 use Pentagonal\WhoIs\Exceptions\InvalidExtensionException;
 use Pentagonal\WhoIs\Interfaces\RecordDomainNetworkInterface as DRI;
+use Pentagonal\WhoIs\Interfaces\RecordIPNetworkInterface as IPRI;
 use Pentagonal\WhoIs\Record\DomainRecord;
+use Pentagonal\WhoIs\Record\IPRecord;
 use Pentagonal\WhoIs\Util\BaseMailAddressProviderValidator;
+use Pentagonal\WhoIs\Util\DataParser;
 
 /**
  * Class Validator
@@ -442,27 +445,37 @@ class Validator
      */
     protected function reValidateDomainName(DomainRecord $collector, string $domainName) : DomainRecord
     {
-        $extension = $collector[DRI::NAME_BASE_EXTENSION];
         // remove dot and validate all domain name string
-        $domainNameNoPeriods = str_replace('.', '', $collector[DRI::NAME_BASE_DOMAIN_NAME]);
-        switch ($extension) {
+        $domainNameNoPeriods = str_replace('.', '', $collector->getBaseDomainName());
+        $mainDomainNameNoPeriods = str_replace('.', '', $collector->getMainDomainName());
+        switch ($collector->getBaseExtension()) {
             case 'id':
-                if (preg_match('/[^a-zA-Z0-9\-\_]/', $domainNameNoPeriods)) {
+                if (preg_match('/[^a-zA-Z0-9\-]/', $mainDomainNameNoPeriods)
+                    || preg_match('/[^a-zA-Z0-9\-\_]/', $domainNameNoPeriods)
+                ) {
                     $this->throwDomainNameHasInvalidCharacters($domainName);
                 }
                 break;
             default:
                 if (preg_match(
                     '/
-                        [^a-z0-9\-\P{Latin}\P{Hebrew}\P{Greek}\P{Cyrillic}
-                        \P{Han}\P{Arabic}\P{Gujarati}\P{Armenian}\P{Hiragana}\P{Thai}]
-                    /x',
+                            [^a-z0-9\-\P{Latin}\P{Hebrew}\P{Greek}\P{Cyrillic}
+                            \P{Han}\P{Arabic}\P{Gujarati}\P{Armenian}\P{Hiragana}\P{Thai}]
+                        /x',
+                    $mainDomainNameNoPeriods
+                ) || preg_match(
+                    '/
+                            [^a-z0-9\-\_\P{Latin}\P{Hebrew}\P{Greek}\P{Cyrillic}
+                            \P{Han}\P{Arabic}\P{Gujarati}\P{Armenian}\P{Hiragana}\P{Thai}]
+                        /x',
                     $domainNameNoPeriods
-                )) {
+                )
+                ) {
                     $this->throwDomainNameHasInvalidCharacters($domainName);
                 }
                 break;
         }
+
         // fallback result DomainRecord
         return $collector;
     }
@@ -600,7 +613,7 @@ class Validator
         // local host & ip is not allowed
         if (preg_match(
             '/^(?:
-                (?:127|192\.168|10?|169\.254|172\.16)\.
+                (?:127|192\.168|10|169\.254|172\.16)\.
                 |(?:
                     (?:
                         localhost|\:\:[0-9a-f]+|.+\.(?:dev|local(?:domain))
@@ -770,6 +783,44 @@ class Validator
      |                                IP VALIDATOR                                     |
      |---------------------------------------------------------------------------------|
      */
+
+    /**
+     * @param string $ip
+     *
+     * @return IPRecord
+     */
+    public function splitIP(string $ip) : IPRecord
+    {
+        $ipAddress = strtolower(trim($ip));
+        if ($ipAddress == '') {
+            throw new \InvalidArgumentException(
+                'IP Address could not be empty or whitespace only.',
+                E_WARNING
+            );
+        }
+        if (!$this->isValidIP($ip)) {
+            if (strpos($ip, '.') === false) {
+                throw new InvalidDomainException(
+                    sprintf(
+                        'IP address : %s is not valid',
+                        $ip
+                    ),
+                    E_WARNING,
+                    $ip
+                );
+            }
+        }
+
+        $isIpv6 = $this->isIPv6($ipAddress);
+        $isLocal = $this->isLocalIP($ipAddress);
+        return new IPRecord([
+            IPRI::NAME_IP_ADDRESS  => $ipAddress,
+            IPRI::NAME_IS_LOCAL_IP => $isLocal,
+            IPRI::WHOIS_SERVER     => [DataParser::URI_IANA_WHOIS],
+            IPRI::NAME_IS_IPV4     => ! $isIpv6,
+            IPRI::NAME_IS_IPV6     => $isIpv6,
+        ]);
+    }
 
     /**
      * Check if value valid IP

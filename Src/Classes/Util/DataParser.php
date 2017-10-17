@@ -56,6 +56,13 @@ class DataParser
         AFRINIC_NET_PREFIX_COMMAND = '-V Md5.2',
         LACNIC_NET_PREFIX_COMMAND  = '';
 
+    const
+        ARIN_SERVER     = 'whois.arin.net',
+        RIPE_SERVER     = 'whois.ripe.net',
+        APNIC_SERVER    = 'whois.apnic.net',
+        AFRINIC_SERVER  = 'whois.afrinic.net',
+        LACNIC_SERVER   = 'whois.lacnic.net';
+
     /**
      * @var array
      */
@@ -301,8 +308,9 @@ class DataParser
             '~
             (?:
                 \>\>\>?   # information
-                |Terms\s+of\s+Use\s*:\s+Users?\s+accessing  # terms
-                |URL\s+of\s+the\s+ICANN\s+WHOIS # informational from icann 
+                | Terms\s+of\s+Use\s*:\s+Users?\s+accessing  # terms
+                | URL\s+of\s+the\s+ICANN\s+WHOIS # informational from icann
+                | NOTICE\s+AND\s+TERMS\s+OF\s+USE\s*: # dot ph comment
             ).*
             ~isx',
             '',
@@ -351,7 +359,7 @@ class DataParser
      * @uses DataParser::LIMIT
      * @uses DataParser::UNKNOWN
      */
-    public static function hasRegisteredDomain(string $data)
+    public static function getRegisteredDomainStatus(string $data)
     {
         // check if empty result
         if (($cleanData = static::cleanUnwantedWhoIsResult($data)) === '') {
@@ -370,6 +378,7 @@ class DataParser
 
         // array check for detailed content only that below is not registered
         $matchUnRegistered = [
+            'domain is available',
             'domain not found',
             'not found',
             'no data found',
@@ -429,7 +438,7 @@ class DataParser
 
             if (preg_match(
                 '/(?:Domain\s+)?Status\s*\:\s*
-                    (NOT\s*AVAILABLE|RESERVED?|BANNED)
+                    (NOT\s*AVAILABLE|RESERVED?|BANNED|Taken|Registered)
                 /ix',
                 $cleanData,
                 $match
@@ -462,12 +471,12 @@ class DataParser
         // else check contact or status billing, tech or contact
         if (preg_match(
             '/
-                (
-                    Registr(?:ar|y|nt)\s[^\:]+
-                    | Whois\s+Server
-                    | (?:Phone|Registrar|Contact|(?:admin|tech)-c|Organisations?)
-                )\s*\:\s*([^\n]+)
-                /ix',
+                    (
+                        Registr(?:ar|y|nt)\s[^\:]+
+                        | Whois\s+Server
+                        | (?:Phone|Registrar|Contact|(?:admin|tech)-c|Organisations?)
+                    )\s*\:\s*([^\n]+)
+                    /ix',
             $cleanData,
             $matchData
         )
@@ -544,8 +553,8 @@ class DataParser
         if (trim($data) === '') {
             return false;
         }
-
-        preg_match('/Whois\s*Server\s*:([^\n]+)/i', $data, $match);
+        $data = static::cleanWhoIsResultComment($data);
+        preg_match('~Whois(?:\s*Server)?\s*\:\s*([^\n]+)~i', $data, $match);
         return !empty($match[1])
             ? strtolower(trim($match[1]))
             : false;
@@ -646,5 +655,28 @@ class DataParser
         }
 
         return $ip;
+    }
+
+    /**
+     * Is IP in Range
+     *
+     * @param string $ip
+     * @param string $ipRange
+     *
+     * @return bool
+     */
+    public static function isIPInRange(string $ip, string $ipRange) : bool
+    {
+        if (strpos($ipRange, '/') === false) {
+            $ipRange .= '/32';
+        }
+
+        // $range is in IP/CIDR format eg 127.0.0.1/24
+        list( $ipRange, $netMask ) = explode('/', $ipRange, 2);
+        $range_decimal = ip2long($ipRange);
+        $ip_decimal    = ip2long($ip);
+        $wildcard_decimal = pow(2, (32 - $netMask)) - 1;
+        $netMaskDecimal = ~ $wildcard_decimal;
+        return (($ip_decimal & $netMaskDecimal) === ($range_decimal & $netMaskDecimal));
     }
 }

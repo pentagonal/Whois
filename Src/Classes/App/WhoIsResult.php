@@ -17,6 +17,7 @@ namespace Pentagonal\WhoIs\App;
 use Pentagonal\WhoIs\Abstracts\WhoIsResultAbstract;
 use Pentagonal\WhoIs\Interfaces\RecordDomainNetworkInterface;
 use Pentagonal\WhoIs\Interfaces\RecordNetworkInterface;
+use Pentagonal\WhoIs\Util\DataParser;
 
 /**
  * Class WhoIsResult
@@ -59,14 +60,25 @@ class WhoIsResult extends WhoIsResultAbstract
      */
     protected function parseDetail() : ArrayCollector
     {
-        $this->dataDetail[static::KEY_DATA][static::KEY_RESULT][static::KEY_CLEAN] = $this
-            ->getDataParser()
+        $dataParser = $this->getDataParser();
+        $this->dataDetail[static::KEY_DATA][static::KEY_RESULT][static::KEY_CLEAN] = $dataParser
             ->cleanUnwantedWhoIsResult(
                 $this->getOriginalResultString()
             );
         if ($this->networkRecord instanceof RecordDomainNetworkInterface) {
+            $registeredStatus = DataParser::getRegisteredDomainStatus($this->getOriginalResultString());
+            $dataDomain  = $this->dataDetail[static::KEY_DOMAIN];
             // just check for first use especially for be domain
             $match = $this->parseDomainDetail($this->getOriginalResultString());
+            $dataDomain[static::KEY_REGISTERED] = $registeredStatus === $dataParser::UNKNOWN
+                ? null
+                : (
+                    $registeredStatus === $dataParser::RESERVED
+                    || $registeredStatus !== $dataParser::UNREGISTERED
+                       && ! empty($match['name_server'])
+                       && count($match['name_server']) > 0
+                );
+            $this->dataDetail[static::KEY_DOMAIN] = $dataDomain;
             if ($match->count() === 0) {
                 return $this->dataDetail;
             }
@@ -74,12 +86,11 @@ class WhoIsResult extends WhoIsResultAbstract
             $reportUrl = $this->getFirstOr($match, 'icann_report_url');
 
             // domain
-            $dataDomain = $this->dataDetail[static::KEY_DOMAIN];
-            $dataDomain[static::KEY_ID] = $this->getFirstOr($match, 'domain_id');
-            $dataDomain[static::KEY_STATUS] = (array) $match['domain_status'];
-            $dataDomain[static::KEY_NAME_SERVER] = (array) $match['name_server'];
+            $dataDomain[static::KEY_ID]                         = $this->getFirstOr($match, 'domain_id');
+            $dataDomain[static::KEY_STATUS]                     = (array) $match['domain_status'];
+            $dataDomain[static::KEY_NAME_SERVER]                = (array) $match['name_server'];
             $dataDomain[static::KEY_DNSSEC][static::KEY_STATUS] = $this->getFirstOr($match, 'domain_dnssec_status');
-            $dataDomain[static::KEY_DNSSEC][static::KEY_DATA] = (array) $match['domain_dnssec'];
+            $dataDomain[static::KEY_DNSSEC][static::KEY_DATA]   = (array) $match['domain_dnssec'];
             $this->dataDetail[static::KEY_DOMAIN] = $dataDomain;
 
             // date
@@ -93,6 +104,7 @@ class WhoIsResult extends WhoIsResultAbstract
             if ($updateDate && is_int($updateDateNew = @strtotime($updateDate))) {
                 $updateDate = gmdate('c', $updateDateNew);
             }
+
             if ($expireDate && is_int($expireDateNew = @strtotime($expireDate))) {
                 $expireDate = gmdate('c', $expireDateNew);
             }
@@ -113,16 +125,17 @@ class WhoIsResult extends WhoIsResultAbstract
             // registrar
             $registrar = $this->dataDetail[static::KEY_REGISTRAR];
             $registrar[static::KEY_IANA_ID] = $this->getFirstOr($match, 'registrar_iana_id');
-            $registrar[static::KEY_ID] = $this->getFirstOr($match, 'registrar_id');
-            $registrar[static::KEY_NAME] = $this->getFirstOr($match, 'registrar_name');
+            $registrar[static::KEY_ID]      = $this->getFirstOr($match, 'registrar_id');
+            $registrar[static::KEY_NAME]    = $this->getFirstOr($match, 'registrar_name');
             $registrar[static::KEY_ORGANIZATION] = $this->getFirstOr($match, 'registrar_org');
-            $registrar[static::KEY_EMAIL] = $this->getFirstOr($match, 'registrar_email');
-            $registrar[static::KEY_COUNTRY] = $this->getFirstOr($match, 'registrar_country');
-            $registrar[static::KEY_CITY] = $this->getFirstOr($match, 'registrar_city');
-            $registrar[static::KEY_POSTAL_CODE] = $this->getFirstOr($match, 'registrar_postal');
-            $registrar[static::KEY_STATE] = $this->getFirstOr($match, 'registrar_state');
-            $registrar[static::KEY_PHONE] = (array) $match['registrar_phone'];
-            $registrar[static::KEY_FAX] = (array) $match['registrar_fax'];
+            $registrar[static::KEY_EMAIL]        = $this->getFirstOr($match, 'registrar_email');
+            $registrar[static::KEY_COUNTRY]      = $this->getFirstOr($match, 'registrar_country');
+            $registrar[static::KEY_CITY]         = $this->getFirstOr($match, 'registrar_city');
+            $registrar[static::KEY_STREET]       = (array) $match['registrar_street'];
+            $registrar[static::KEY_POSTAL_CODE]  = $this->getFirstOr($match, 'registrar_postal');
+            $registrar[static::KEY_STATE]        = $this->getFirstOr($match, 'registrar_state');
+            $registrar[static::KEY_PHONE]        = (array) $match['registrar_phone'];
+            $registrar[static::KEY_FAX]          = (array) $match['registrar_fax'];
 
             $match['registrar_url'] = (array) $match->get('registrar_url');
             if (!empty($match['registrar_url'])) {
@@ -137,6 +150,14 @@ class WhoIsResult extends WhoIsResultAbstract
 
             $registrar[static::KEY_ABUSE][static::KEY_URL] = (array) $match['registrar_url'];
             $registrarAbuseEmail = (array) $match['registrar_abuse_mail'];
+            // filtering invalid mail contain double periods
+            $registrarAbuseEmail = array_map(function ($email) {
+                return ! $email || ! is_string($email) || strpos($email, '..') !== false
+                    ? null
+                    : $email;
+            }, $registrarAbuseEmail);
+            $registrarAbuseEmail = array_filter($registrarAbuseEmail);
+
             if (empty($registrarAbuseEmail) && !empty($registrar[static::KEY_EMAIL])) {
                 $registrarAbuseEmail = [$registrar[static::KEY_EMAIL]];
             }
@@ -151,53 +172,76 @@ class WhoIsResult extends WhoIsResultAbstract
 
             // ----------------- REGISTRANT
             $registrant = $this->dataDetail[static::KEY_REGISTRANT];
+            // check if is maybe invalid mail eg: dot ph is hidden
+            $email = $this->getFirstOr($match, 'registrant_email');
+            $email = ! $email || ! is_string($email) || strpos($email, '..') !== false
+                ? null
+                : $email;
             $registrant[static::KEY_DATA] = [
                 static::KEY_ID => $this->getFirstOr($match, 'registrant_id'),
                 static::KEY_NAME => $this->getFirstOr($match, 'registrant_name'),
                 static::KEY_ORGANIZATION => $this->getFirstOr($match, 'registrant_org'),
-                static::KEY_EMAIL        => $this->getFirstOr($match, 'registrant_email'),
+                static::KEY_EMAIL        => $email,
                 static::KEY_COUNTRY      => $this->getFirstOr($match, 'registrant_country'),
                 static::KEY_CITY         => $this->getFirstOr($match, 'registrant_city'),
-                static::KEY_STREET       => $this->getFirstOr($match, 'registrant_street'),
+                static::KEY_STREET       => (array) $match['registrant_street'],
                 static::KEY_POSTAL_CODE  => $this->getFirstOr($match, 'registrant_postal'),
                 static::KEY_STATE        => $this->getFirstOr($match, 'registrant_state'),
                 static::KEY_PHONE        => (array) $match['registrant_phone'],
                 static::KEY_FAX          => (array) $match['registrant_fax'],
             ];
+
+            // check if is maybe invalid mail eg: dot ph is hidden
+            $email = $this->getFirstOr($match, 'billing_email');
+            $email = ! $email || ! is_string($email) || strpos($email, '..') !== false
+                ? null
+                : $email;
             $registrant[static::KEY_BILLING] = [
                 static::KEY_ID           => $this->getFirstOr($match, 'billing_id'),
                 static::KEY_NAME         => $this->getFirstOr($match, 'billing_name'),
                 static::KEY_ORGANIZATION => $this->getFirstOr($match, 'billing_org'),
-                static::KEY_EMAIL        => $this->getFirstOr($match, 'billing_email'),
+                static::KEY_EMAIL        => $email,
                 static::KEY_COUNTRY      => $this->getFirstOr($match, 'billing_country'),
                 static::KEY_CITY         => $this->getFirstOr($match, 'billing_city'),
-                static::KEY_STREET       => $this->getFirstOr($match, 'billing_street'),
+                static::KEY_STREET       => (array) $match['billing_street'],
                 static::KEY_POSTAL_CODE  => $this->getFirstOr($match, 'billing_postal'),
                 static::KEY_STATE        => $this->getFirstOr($match, 'billing_state'),
                 static::KEY_PHONE        => (array) $match['billing_phone'],
                 static::KEY_FAX          => (array) $match['billing_fax'],
             ];
+
+            // check if is maybe invalid mail eg: dot ph is hidden
+            $email = $this->getFirstOr($match, 'tech_email');
+            $email = ! $email || ! is_string($email) || strpos($email, '..') !== false
+                ? null
+                : $email;
             $registrant[static::KEY_TECH] = [
                 static::KEY_ID           => $this->getFirstOr($match, 'tech_id'),
                 static::KEY_NAME         => $this->getFirstOr($match, 'tech_name'),
                 static::KEY_ORGANIZATION => $this->getFirstOr($match, 'tech_org'),
-                static::KEY_EMAIL        => $this->getFirstOr($match, 'tech_email'),
+                static::KEY_EMAIL        => $email,
                 static::KEY_COUNTRY      => $this->getFirstOr($match, 'tech_country'),
                 static::KEY_CITY         => $this->getFirstOr($match, 'tech_city'),
-                static::KEY_STREET       => $this->getFirstOr($match, 'tech_street'),
+                static::KEY_STREET       => (array) $match['tech_street'],
                 static::KEY_POSTAL_CODE  => $this->getFirstOr($match, 'tech_postal'),
                 static::KEY_STATE        => $this->getFirstOr($match, 'tech_state'),
                 static::KEY_PHONE        => (array) $match['tech_phone'],
                 static::KEY_FAX          => (array) $match['tech_fax'],
             ];
+
+            // check if is maybe invalid mail eg: dot ph is hidden
+            $email = $this->getFirstOr($match, 'admin_email');
+            $email = ! $email || ! is_string($email) || strpos($email, '..') !== false
+                ? null
+                : $email;
             $registrant[static::KEY_ADMIN] = [
                 static::KEY_ID           => $this->getFirstOr($match, 'admin_id'),
                 static::KEY_NAME         => $this->getFirstOr($match, 'admin_name'),
                 static::KEY_ORGANIZATION => $this->getFirstOr($match, 'admin_org'),
-                static::KEY_EMAIL        => $this->getFirstOr($match, 'admin_email'),
+                static::KEY_EMAIL        => $email,
                 static::KEY_COUNTRY      => $this->getFirstOr($match, 'admin_country'),
                 static::KEY_CITY         => $this->getFirstOr($match, 'admin_city'),
-                static::KEY_STREET       => $this->getFirstOr($match, 'admin_street'),
+                static::KEY_STREET       => (array) $match['admin_street'],
                 static::KEY_POSTAL_CODE  => $this->getFirstOr($match, 'admin_postal'),
                 static::KEY_STATE        => $this->getFirstOr($match, 'admin_state'),
                 static::KEY_PHONE        => (array) $match['admin_phone'],
@@ -215,7 +259,11 @@ class WhoIsResult extends WhoIsResultAbstract
             // merge whois server
             $whoIsServers = array_merge(
                 $whoIsServers,
-                $this->networkRecord->getWhoIsServers()
+                array_map(function ($server) {
+                    return is_string($server)
+                        ? str_replace('{{domain}}', $this->getDomainName(), $server)
+                        : $server;
+                }, $this->networkRecord->getWhoIsServers())
             );
 
             $whoIsServers = array_unique(array_filter($whoIsServers));
@@ -256,5 +304,15 @@ class WhoIsResult extends WhoIsResultAbstract
     final public function getCleanData() : string
     {
         return $this->getDataDetail()[static::KEY_DATA][static::KEY_RESULT][static::KEY_CLEAN];
+    }
+
+    /**
+     * Get if Registered
+     *
+     * @return bool|null null is unknown otherwise boolean (Reserved, Banned, Registered)
+     */
+    public function isRegistered()
+    {
+        return $this->getDataDetail()[static::KEY_DOMAIN][static::KEY_REGISTERED];
     }
 }

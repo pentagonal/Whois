@@ -21,42 +21,42 @@ namespace Pentagonal\WhoIs\Interfaces;
 interface ArrayCollectorInterface extends \IteratorAggregate, \ArrayAccess, \Serializable, \Countable, \JsonSerializable
 {
     /**
-     * Get First Value
+     * Get value from first offset
      *
      * @return mixed
      */
     public function first();
 
     /**
-     * Get First Value
+     * Get value from last offset
      *
      * @return mixed
      */
     public function last();
 
     /**
-     * Get Next Offset
+     * Get value from next data offset
      *
      * @return mixed
      */
     public function next();
 
     /**
-     * Current Offset
+     * Get value from current offset
      *
      * @return mixed
      */
     public function current();
 
     /**
-     * Previous Data
+     * Get value from prev data offset
      *
      * @return mixed
      */
     public function prev();
 
     /**
-     * Fill values
+     * Merge the values
      *
      * @param array $array
      *
@@ -65,13 +65,15 @@ interface ArrayCollectorInterface extends \IteratorAggregate, \ArrayAccess, \Ser
     public function merge(array $array);
 
     /**
-     * Clear data
+     * Clear all array data
      *
      * @return void
      */
     public function clear();
 
     /**
+     * Check if value exists by offset
+     *
      * @param mixed $keyName
      *
      * @return bool
@@ -88,20 +90,36 @@ interface ArrayCollectorInterface extends \IteratorAggregate, \ArrayAccess, \Ser
     public function contain($value) : bool;
 
     /**
-     * Remove offset
+     * Remove values by offset
      *
      * @param string $keyName
      */
     public function remove($keyName);
 
     /**
-     * Get as array
+     * Get array keys
+     *
+     * @return array
+     */
+    public function keys() : array;
+
+    /**
+     * Get array values
+     *
+     * @return array
+     */
+    public function values() : array;
+
+    /**
+     * Get as array -> all array
      *
      * @return array
      */
     public function toArray() : array;
 
     /**
+     * Returning array data that to be json serialize
+     *
      * @return array
      */
     public function jsonSerialize() : array;

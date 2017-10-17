@@ -56,6 +56,7 @@ abstract class WhoIsResultAbstract implements WhoIsNetworkResultInterface
     const KEY_DOMAIN      = 'domain';
     const KEY_NAME_SERVER = 'name_server';
     const KEY_DNSSEC      = 'dnssec';
+    const KEY_REGISTERED  = 'registered';
 
     const KEY_REGISTRAR  = 'registrar';
     const KEY_ABUSE      = 'abuse';
@@ -484,6 +485,7 @@ abstract class WhoIsResultAbstract implements WhoIsNetworkResultInterface
             $collection = [
                 static::KEY_DOMAIN     => [
                     static::KEY_ID          => null,
+                    static::KEY_REGISTERED  => null,
                     static::KEY_NAME        => $this->networkRecord->getDomainName(),
                     static::KEY_STATUS      => [],
                     static::KEY_NAME_SERVER => [],

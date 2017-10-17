@@ -170,6 +170,23 @@ class TLDCollector
     }
 
     /**
+     * Get List Of Empty Server
+     *
+     * @return array
+     */
+    public function getEmptyServersExtensions() : array
+    {
+        return array_keys(
+            array_filter(
+                $this->getAvailableServers(),
+                function ($data) {
+                    return empty($data);
+                }
+            )
+        );
+    }
+
+    /**
      * @return array
      */
     public function getAvailableExtensions() : array

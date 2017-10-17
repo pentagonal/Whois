@@ -54,25 +54,25 @@ class TLDCollectorTest extends TestCase
         $this->assertTrue(
             $tldCollector->isExtensionExists('com')
         );
-        $googleWhoises = $tldCollector->getServersFromExtension('google');
+        $googleWhoIs = $tldCollector->getServersFromExtension('google');
         $this->assertInstanceOf(
             ArrayCollector::class,
-            $googleWhoises
+            $googleWhoIs
         );
         $this->assertNotEmpty(
-            $googleWhoises
+            $googleWhoIs
         );
         $this->assertArrayHasKey(
             0,
-            $googleWhoises,
+            $googleWhoIs,
             true
         );
         $this->assertTrue(
-            in_array('whois.nic.google', $googleWhoises->toArray())
+            in_array('whois.nic.google', $googleWhoIs->toArray())
         );
         $this->assertEquals(
             $tldCollector->getServerFromExtension('google'),
-            reset($googleWhoises)
+            reset($googleWhoIs)
         );
         $this->assertNotEmpty(
             $tldCollector->getSubDomainFromExtension('id')
@@ -185,5 +185,13 @@ class TLDCollectorTest extends TestCase
                 $e
             );
         }
+    }
+
+    public function testEmptyServersExtensions()
+    {
+        $tldCollector = new TLDCollector();
+        $this->assertNotEmpty(
+            $tldCollector->getEmptyServersExtensions()
+        );
     }
 }

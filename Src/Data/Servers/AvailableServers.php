@@ -1994,6 +1994,7 @@ return [
     ],
     'id' => [
         'whois.id',
+        'whois.pandi.or.id',
     ],
     'ie' => [
         'whois.domainregistry.ie',
@@ -3064,7 +3065,9 @@ return [
         'whois.nic.pfizer',
     ],
     'pg' => [],
-    'ph' => [],
+    'ph' => [
+        'https://whois.dot.ph/?utf8=1&search={{domain}}'
+    ],
     'pharmacy' => [
         'whois.nic.pharmacy',
     ],

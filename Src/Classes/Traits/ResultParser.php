@@ -66,7 +66,7 @@ trait ResultParser
                 # Registrar Data
                 | Registr(?:ar|y)\s*ID\s*\:(?P<registrar_id>[^\n]+)
                 | Registr(?:ar|y)(?:\s*IANA)(?:[^\:]+)?ID\s*\:(?P<registrar_iana_id>[^\n]+)
-                | Registr(?:ar|y)\s*(?:Contact(?:[^\:]+)?)?Name(?:[^\:]+)?\:(?P<registrar_name>[^\n]+)
+                | Registr(?:ar|y)(\s*(?:Contact(?:[^\:]+)?)?Name(?:[^\:]+)?)?\:(?P<registrar_name>[^\n]+)
                 | Registr(?:ar|y)\s*(?:Contact(?:[^\:]+)?)?(?:Organiz[^\:]+|Company)(?:[^\:]+)?
                     \:(?P<registrar_org>[^\n]+)
                 | Registr(?:ar|y)\s*(?:Contact(?:[^\:]+)?)?(?:Contact\s*)?Email(?:[^\:]+)?\:(?P<registrar_email>[^\n]+)
@@ -144,17 +144,28 @@ trait ResultParser
         if (empty($match)) {
             return new ArrayCollector();
         }
-            // filtering result
-        $match = array_filter($match, function ($key) {
-            return ! is_int($key);
-        }, ARRAY_FILTER_USE_KEY);
-        $match = new ArrayCollector(
-            array_map(function ($v) {
-                $v = array_filter($v);
-                return new ArrayCollector(array_map('trim', array_values($v)));
-            }, $match)
+        // filtering result
+        $match =  array_filter($match, 'is_string', ARRAY_FILTER_USE_KEY);
+        // make 2D array as sorted integer start with 0 if not empty
+        $match = array_map(
+            'array_values',
+            // filter empty value
+            array_map(
+                function ($v) {
+                    return array_filter(array_map('trim', $v));
+                },
+                $match
+            )
         );
 
-        return $match;
+        if (!array_filter($match)) {
+            return new ArrayCollector();
+        }
+
+        return new ArrayCollector(
+            array_map(function ($v) {
+                return new ArrayCollector(array_map('trim', $v));
+            }, $match)
+        );
     }
 }

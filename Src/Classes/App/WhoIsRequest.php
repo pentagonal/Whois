@@ -36,7 +36,7 @@ final class WhoIsRequest
     /**
      * @var string
      */
-    protected $domainName;
+    protected $targetName;
 
     /**
      * @var string
@@ -94,6 +94,13 @@ final class WhoIsRequest
     protected $bodyString;
 
     /**
+     * Original Body String that use First Response From Request
+     *
+     * @var string
+     */
+    protected $originalBodyString;
+
+    /**
      * @var string
      */
     protected $socketMethod;
@@ -118,7 +125,7 @@ final class WhoIsRequest
             );
         }
 
-        $this->domainName = $domainName;
+        $this->targetName = $domainName;
         $this->server     = $server;
         $this->options    = $options;
         if (isset($this->options['method'])) {
@@ -143,9 +150,9 @@ final class WhoIsRequest
     /**
      * @return string
      */
-    public function getDomainName() : string
+    public function getTargetName() : string
     {
-        return $this->domainName;
+        return $this->targetName;
     }
 
     /**
@@ -223,15 +230,41 @@ final class WhoIsRequest
      */
     public function getBodyString() : string
     {
-        if (!isset($this->bodyString)) {
+        if (!is_string($this->bodyString) || ! is_string($this->originalBodyString)) {
             $this->send();
-            $this->bodyString = '';
+            $string = '';
             if (!$this->isError()) {
-                $this->bodyString = DataParser::convertResponseBodyToString($this->getResponse());
+                $string = DataParser::convertResponseBodyToString($this->getResponse());
             }
+            // just set if body string has not been set
+            if (!is_string($this->bodyString)) {
+                $this->bodyString = $string;
+            }
+            $this->originalBodyString = $string;
         }
 
         return $this->bodyString;
+    }
+
+    /**
+     * Get Original Body String, this maybe important to get Real Body String Response
+     *
+     * @return string
+     */
+    public function getOriginalBodyString() : string
+    {
+        $this->getBodyString();
+        return $this->originalBodyString;
+    }
+
+    /**
+     * Set Body String
+     *
+     * @param string $body
+     */
+    public function setBodyString(string $body)
+    {
+        $this->bodyString = $body;
     }
 
     /**
@@ -257,14 +290,14 @@ final class WhoIsRequest
         $this->isUseSocket = $this->uri->getPort() === TransportClient::DEFAULT_PORT;
         if ($this->isUseSocket) {
             $validator = new Validator();
-            $this->socketMethod = rtrim($this->domainName) ."\r\n";
-            if ($validator->isValidIP(trim($this->domainName))) {
+            $this->socketMethod = rtrim($this->targetName) . "\r\n";
+            if ($validator->isValidIP(trim($this->targetName))) {
                 $this->socketMethod = DataParser::buildNetworkAddressCommandServer(
-                    trim($this->domainName) . "\r\n",
+                    trim($this->targetName) . "\r\n",
                     $this->uri->getHost()
                 );
             } // resolve asn
-            elseif (preg_match(DataParser::ASN_REGEX, trim($this->domainName), $match)
+            elseif (preg_match(DataParser::ASN_REGEX, trim($this->targetName), $match)
                     && ! empty($match[2])
             ) {
                 $domainName = "{$match[1]}{$match[2]}";
@@ -276,6 +309,16 @@ final class WhoIsRequest
             if (empty($this->options['method'])) {
                 $this->setMethod($this->socketMethod);
             }
+        } elseif ($this->uri->getQuery() !== '') {
+            $query = $this->getUri()->getQuery();
+            if (strpos(rawurldecode($query), '{{domain}}')) {
+                $query = str_replace('{{domain}}', $this->targetName, rawurldecode($query));
+                $this->server = str_replace('{{domain}}', $this->targetName, rawurldecode($this->server));
+            } else {
+                $query = $this->getUri()->getQuery() . $this->targetName;
+            }
+            $this->uri  = $this->uri->withQuery($query);
+            $this->query = $this->uri->getQuery();
         }
     }
 
@@ -290,10 +333,6 @@ final class WhoIsRequest
                 $this->response = TransportClient::whoIsRequest($this->socketMethod, $this->getUri());
                 $this->status = self::SUCCESS;
                 return $this->response;
-            }
-            if (! isset($this->query) && $this->getUri()->getQuery() == '') {
-                $this->query = $this->getUri()->getQuery() . $this->domainName;
-                $this->uri   = $this->getUri()->withQuery($this->query);
             }
 
             $this->response = TransportClient::requestConnection(

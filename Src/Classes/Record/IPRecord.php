@@ -13,7 +13,9 @@
 namespace Pentagonal\WhoIs\Record;
 
 use Pentagonal\WhoIs\App\ArrayCollector;
+use Pentagonal\WhoIs\App\WhoIsRequest;
 use Pentagonal\WhoIs\Interfaces\RecordIPNetworkInterface;
+use Pentagonal\WhoIs\Util\DataParser;
 
 /**
  * Class IPRecord
@@ -21,6 +23,11 @@ use Pentagonal\WhoIs\Interfaces\RecordIPNetworkInterface;
  */
 class IPRecord extends ArrayCollector implements RecordIPNetworkInterface
 {
+    /**
+     * @var bool
+     */
+    protected $whoIsServerHasCheck = false;
+
     /**
      * {@inheritdoc}
      */
@@ -35,6 +42,21 @@ class IPRecord extends ArrayCollector implements RecordIPNetworkInterface
      */
     public function getWhoIsServers(): array
     {
+        if (!$this->whoIsServerHasCheck) {
+            $servers = (array) $this[self::WHOIS_SERVER];
+            $server = DataParser::URI_IANA_WHOIS;
+            $this->whoIsServerHasCheck = true;
+            if (!$this->isLocalIP()) {
+                try {
+                    $request = new WhoIsRequest($this->getIPAddress(), $server);
+                    $server = DataParser::getWhoIsServerFromResultData($request->getBodyString()) ?: $server;
+                    $this[self::WHOIS_SERVER] = array_merge([$server], $servers);
+                } catch (\Throwable $e) {
+                    // pass
+                }
+            }
+        }
+
         return (array) $this[self::WHOIS_SERVER];
     }
 
@@ -68,5 +90,14 @@ class IPRecord extends ArrayCollector implements RecordIPNetworkInterface
     public function IPv6() : bool
     {
         return $this[self::NAME_IS_IPV6];
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function jsonSerialize(): array
+    {
+        $this->getWhoIsServers();
+        return parent::jsonSerialize();
     }
 }

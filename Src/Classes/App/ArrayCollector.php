@@ -24,8 +24,7 @@ class ArrayCollector extends \ArrayObject implements ArrayCollectorInterface
 {
     /**
      * Collection constructor.
-     *
-     * @param array $input
+     * {@inheritdoc}
      */
     public function __construct(array $input = [])
     {
@@ -33,10 +32,7 @@ class ArrayCollector extends \ArrayObject implements ArrayCollectorInterface
     }
 
     /**
-     * @param string $keyName
-     * @param null $default
-     *
-     * @return mixed
+     * {@inheritdoc}
      */
     public function get($keyName, $default = null)
     {
@@ -46,11 +42,7 @@ class ArrayCollector extends \ArrayObject implements ArrayCollectorInterface
     }
 
     /**
-     * Check if exists
-     *
-     * @param string $keyName
-     *
-     * @return bool
+     * {@inheritdoc}
      */
     public function exist($keyName) : bool
     {
@@ -58,9 +50,7 @@ class ArrayCollector extends \ArrayObject implements ArrayCollectorInterface
     }
 
     /**
-     * Get First Value
-     *
-     * @return mixed
+     * {@inheritdoc}
      */
     public function first()
     {
@@ -68,9 +58,7 @@ class ArrayCollector extends \ArrayObject implements ArrayCollectorInterface
     }
 
     /**
-     * Get First Value
-     *
-     * @return mixed
+     * {@inheritdoc}
      */
     public function last()
     {
@@ -78,9 +66,7 @@ class ArrayCollector extends \ArrayObject implements ArrayCollectorInterface
     }
 
     /**
-     * Get Next Offset
-     *
-     * @return mixed
+     * {@inheritdoc}
      */
     public function next()
     {
@@ -88,9 +74,7 @@ class ArrayCollector extends \ArrayObject implements ArrayCollectorInterface
     }
 
     /**
-     * Current Offset
-     *
-     * @return mixed
+     * {@inheritdoc}
      */
     public function current()
     {
@@ -98,15 +82,12 @@ class ArrayCollector extends \ArrayObject implements ArrayCollectorInterface
     }
 
     /**
-     * Previous Data
-     *
-     * @return mixed
+     * {@inheritdoc}
      */
     public function prev()
     {
         return prev($this);
     }
-
 
     /**
      * {@inheritdoc}
@@ -117,25 +98,19 @@ class ArrayCollector extends \ArrayObject implements ArrayCollectorInterface
     }
 
     /**
-     * Fill values
-     *
-     * @param array $array
+     * {@inheritdoc}
      */
     public function merge(array $array)
     {
-        foreach ($array as $key => $value) {
-            $this[$key] = $value;
-        }
+        $this->exchangeArray(array_merge((array) $this, $array));
     }
 
     /**
-     * Clear data
+     * {@inheritdoc}
      */
     public function clear()
     {
-        foreach ((array) $this as $key => $value) {
-            unset($this[$key]);
-        }
+        $this->exchangeArray([]);
     }
 
     /**
@@ -160,10 +135,38 @@ class ArrayCollector extends \ArrayObject implements ArrayCollectorInterface
     }
 
     /**
+     * {@inheritdoc}
+     * @return array
+     */
+    public function keys() : array
+    {
+        return array_keys((array) $this);
+    }
+
+    /**
+     * {@inheritdoc}
+     * @return array
+     */
+    public function values() : array
+    {
+        return array_values((array) $this);
+    }
+
+    /**
      * @return array
      */
     public function jsonSerialize() : array
     {
         return $this->toArray();
+    }
+
+    /**
+     * Magic Method to string
+     *
+     * @return string
+     */
+    public function __toString() : string
+    {
+        return json_encode($this, JSON_PRETTY_PRINT);
     }
 }

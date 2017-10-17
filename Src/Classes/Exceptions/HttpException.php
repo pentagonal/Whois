@@ -71,6 +71,7 @@ class HttpException extends RequestException
             : null;
         $code = $code === 0 && $response ? $response->getStatusCode() : $code;
         $this->setCode($code);
+        $this->message = $message;
         if ($request instanceof RequestException
             && ($response === null || $response instanceof ResponseInterface)
         ) {
@@ -103,9 +104,9 @@ class HttpException extends RequestException
     }
 
     /**
-     * @param string $line
+     * @param int $line
      */
-    public function setLine(string $line)
+    public function setLine(int $line)
     {
         $this->line = $line;
     }
