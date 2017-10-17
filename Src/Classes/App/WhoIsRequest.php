@@ -290,7 +290,6 @@ final class WhoIsRequest
         $this->isUseSocket = $this->uri->getPort() === TransportClient::DEFAULT_PORT;
         if ($this->isUseSocket) {
             $validator = new Validator();
-            $this->socketMethod = rtrim($this->targetName) . "\r\n";
             if ($validator->isValidIP(trim($this->targetName))) {
                 $this->socketMethod = DataParser::buildNetworkAddressCommandServer(
                     trim($this->targetName) . "\r\n",
@@ -306,6 +305,13 @@ final class WhoIsRequest
                     $this->uri->getHost()
                 );
             }
+
+            $target = rtrim($this->targetName);
+            $pathExtension = pathinfo($target, PATHINFO_EXTENSION);
+            if ($target && $pathExtension && strtolower($pathExtension) === 'jp') {
+                $target .= '/e';
+            }
+            $this->socketMethod = rtrim($target) . "\r\n";
             if (empty($this->options['method'])) {
                 $this->setMethod($this->socketMethod);
             }
@@ -334,11 +340,18 @@ final class WhoIsRequest
                 $this->status = self::SUCCESS;
                 return $this->response;
             }
-
+            $options = $this->options;
+            if (!isset($options['headers'])) {
+                $options['headers'] = [];
+            }
+            // auto referer
+            if (!isset($options['headers']['referer'])) {
+                $options['headers']['referer'] = (string) $this->getUri()->withQuery('');
+            }
             $this->response = TransportClient::requestConnection(
                 $this->getMethod(),
                 $this->getUri(),
-                $this->options
+                $options
             );
             $this->status = self::SUCCESS;
         } catch (\Throwable $e) {

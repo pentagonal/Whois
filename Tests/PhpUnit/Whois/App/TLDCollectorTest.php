@@ -194,4 +194,19 @@ class TLDCollectorTest extends TestCase
             $tldCollector->getEmptyServersExtensions()
         );
     }
+
+    public function testGetCountryCodeList()
+    {
+        $tldCollector = new TLDCollector();
+        $this->assertNotEmpty(
+            $tldCollector->getCountryExtensionList()
+        );
+        foreach ($tldCollector->getCountryExtensionList() as $ext) {
+            // extension must be have 2 characters
+            $this->assertEquals(
+                2,
+                strlen($ext)
+            );
+        }
+    }
 }

@@ -15,6 +15,7 @@ declare(strict_types=1);
 namespace Pentagonal\WhoIs\Record;
 
 use Pentagonal\WhoIs\App\ArrayCollector;
+use Pentagonal\WhoIs\App\TLDCollector;
 use Pentagonal\WhoIs\Interfaces\RecordDomainNetworkInterface;
 
 /**
@@ -23,6 +24,20 @@ use Pentagonal\WhoIs\Interfaces\RecordDomainNetworkInterface;
  */
 class DomainRecord extends ArrayCollector implements RecordDomainNetworkInterface
 {
+    /**
+     * List of sub extension that disallow to Register
+     * @var array
+     */
+    protected $subExtensionDisallowRegister = [
+        'blogspot',
+        'amazonaws',
+        'blogspot.com',
+        'barsy',
+        'cloudns',
+        'dydns',
+        'cupcake',
+    ];
+
     /**
      * {@inheritdoc}
      * @return string
@@ -39,6 +54,47 @@ class DomainRecord extends ArrayCollector implements RecordDomainNetworkInterfac
     public function getWhoIsServers(): array
     {
         return (array) $this[self::WHOIS_SERVER];
+    }
+
+    /**
+     * Check if Country Code Top Level Domain extension
+     *
+     * @return bool
+     */
+    public function isCCTLDExtension() : bool
+    {
+        static $collector;
+        if (!isset($collector)) {
+            $collector = new TLDCollector();
+        }
+        return in_array($this->getBaseExtension(), $collector->getCountryExtensionList());
+    }
+
+    /**
+     * Check if is Do Not Allow To registered
+     *
+     * @return bool
+     */
+    public function isMaybeDisAllowToRegistered() : bool
+    {
+        if (!$this->isTopLevelDomain()) {
+            return false;
+        }
+
+        if ($this->isGTLD()) {
+            return true;
+        }
+        $sub = $this->getSubExtension();
+        if (in_array($sub, $this->subExtensionDisallowRegister)
+            // sub tld only allow for country domain
+            || ! $this->isCCTLDExtension()
+            // amazon, contain dns name or elasticbeanstalk is not allowed
+            || preg_match('~amazon|elasticbeanstalk|[a-z]+dns~i', $sub)
+        ) {
+            return true;
+        }
+
+        return false;
     }
 
     /**

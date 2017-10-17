@@ -163,6 +163,7 @@ class DataParser
     public static function normalizeWhoIsDomainResultData(string $data) : string
     {
         $data = str_replace("\r", "", $data);
+        // sanitize for .BE domain
         if (strpos($data, ":\n\t")) {
             $arr = explode("\n", $data);
             $currentKey = null;
@@ -191,6 +192,85 @@ class DataParser
             $data = implode("\n", $arr);
             unset($arr);
         }
+
+        // sanitize .kr domain
+        if (preg_match('/Name\s*Server\s+Host\s*Name[^\:]+\:/mi', $data)) {
+            $callBack = function ($match) {
+                $prefix = stripos($match[0], 'Primary') !== false
+                    ? 'Primary'
+                    : 'Secondary';
+                $match = $match[1];
+                $match = preg_replace(
+                    [
+                        '/\s*IP\s*Address[^\n]+/smi',
+                        '/\s*Host\s*Name\s*/smi',
+                    ],
+                    ['', "\n{$prefix} Name Server"],
+                    $match
+                );
+                return trim($match);
+            };
+            $data = preg_replace_callback(
+                [
+                    '~
+                      Primary\s+Name\s*Server[\n]+\s*
+                        ((?:Host\s*Name|IP\s*Address)[^\:]+\:\s+(?:(?!\n\n)[\s\S])*)
+                    ~xsmi',
+                    '~
+                      Secondary\s+Name\s*Server[\n]+\s*
+                        ((?:Host\s*Name|IP\s*Address)[^\:]+\:\s+(?:(?!\n\n)[\s\S])*)      
+                    ~xsmi',
+                ],
+                $callBack,
+                $data
+            );
+        }
+        // sanitize .jp domain
+        if (strpos($data, 'jp') !== false
+            && preg_match('~\[Name\]|\[Name\s+Server\]~xsi', $data)
+        ) {
+            $arrayData = [];
+            // convert comment
+            $data = preg_replace('/\[\s+([^\n]+)\]/m', '% $1', $data);
+            $arrayDataSplit = explode("\n\n", $data);
+            foreach ($arrayDataSplit as $key => $v) {
+                $v = preg_replace('/^(?:[a-z]+\.\s?)?\[([^\]]+)\]/m', '$1:', $v);
+                if (stripos(trim($v), 'Domain Information') === 0
+                    || ($isContact = stripos(trim($v), 'Contact Information') === 0)
+                ) {
+                    $v = ltrim(preg_replace('/^[^\n]+/', '', ltrim($v)));
+                    $v = preg_replace('/\n\s+/', ' ', $v);
+                    if (isset($isContact) && $isContact) {
+                        $v = preg_replace('~^([^\:]+\:)~m', 'Registrant $1', $v);
+                        $v = preg_replace('/Postal\s+(Address(?:[^\:]+)?\:)/i', '$1       ', $v);
+                        // split city, state & address
+                        $v = preg_replace_callback(
+                            '/^Registrant\s+Address\:[^\n]+/m',
+                            function ($match) {
+                                $match = rtrim($match[0]);
+                              // get space
+                                preg_match('/^Registrant\s+Address\:(\s*)/', $match, $space);
+                                $space = !empty($space[1]) ? $space[1] : '    ';
+                                $explodeArrayAddress = array_map('trim', explode(',', $match));
+                                $state  = array_pop($explodeArrayAddress);
+                                $city   = array_pop($explodeArrayAddress);
+                                $street = implode(', ', $explodeArrayAddress);
+                                $content = "{$street}\n";
+                                $content .= "Registrant City:   {$space}{$city}\n";
+                                $content .= "Registrant State:  {$space}{$state}\n";
+                                return $content;
+                            },
+                            $v
+                        );
+                    }
+                }
+                $arrayData[] = $v;
+            }
+
+            $data = implode("\n\n", $arrayData);
+            unset($arrayDataSplit);
+        }
+
         if (stripos($data, 'Algorithm') === false || stripos($data, 'Digest') === false) {
             return $data;
         }
@@ -304,6 +384,7 @@ class DataParser
      */
     public static function cleanWhoIsResultInformationalData(string $data)
     {
+        $data = preg_replace('/query[^\:]+[^\n]+/mi', '', $data);
         $data = preg_replace(
             '~
             (?:
@@ -311,8 +392,9 @@ class DataParser
                 | Terms\s+of\s+Use\s*:\s+Users?\s+accessing  # terms
                 | URL\s+of\s+the\s+ICANN\s+WHOIS # informational from icann
                 | NOTICE\s+AND\s+TERMS\s+OF\s+USE\s*: # dot ph comment
+                | (\#\s*KOREAN\s*\(UTF8\)\s*)?상기\s*도메인이름은 
             ).*
-            ~isx',
+            ~isxu',
             '',
             $data
         );
@@ -372,7 +454,9 @@ class DataParser
         }
 
         // if invalid domain
-        if (stripos($cleanData, 'Failure to locate a record in ') !== false) {
+        if (stripos($cleanData, 'Failure to locate a record in ') !== false
+            || stripos($cleanData, 'The requested domain name is restricted because') !== false
+        ) {
             return static::UNKNOWN;
         }
 
@@ -468,30 +552,45 @@ class DataParser
             return static::RESERVED;
         }
 
-        // else check contact or status billing, tech or contact
+        // match for name server
         if (preg_match(
-            '/
-                    (
-                        Registr(?:ar|y|nt)\s[^\:]+
-                        | Whois\s+Server
-                        | (?:Phone|Registrar|Contact|(?:admin|tech)-c|Organisations?)
-                    )\s*\:\s*([^\n]+)
-                    /ix',
+            '/(?:(?:Name\s+Servers?|n(?:ame)?servers?)(?:[^\:]+)?\:\s*)([^\n]+)/i',
             $cleanData,
-            $matchData
+            $matchServer
         )
+            && preg_match(
+                '/(
+                    (?:Registrant|owner)
+                    (?:
+                        (?:Contact|Name|E\-?mail|Phone|Fax|Street)(?:[^\:]+)?
+                        |\s*
+                    )
+                )
+                \:/xi',
+                $cleanData,
+                $match
+            )
+            && !empty($match[1])
+            // else check contact or status billing, tech or contact
+            || preg_match(
+                '/
+                    (
+                        Registr(?:ar|y|nt)
+                        | Whois\s+Server
+                        | (?:Phone|Registrar|Contact|(?:admin|tech)-c|Organi[z|s]ations?)
+                    )(?:[^\:]+)?\:\s*([^\n]+)
+                    /ix',
+                $cleanData,
+                $matchData
+            )
             && !empty($matchData[1])
             && (
-               // match for name server
-               preg_match(
-                   '/(?:(?:Name\s+Servers?|n(?:ame)?servers?)\s*\:\s*)([^\n]+)/i',
-                   $cleanData,
-                   $matchServer
-               )
-               && !empty($matchServer[1])
                // match for billing
-               || preg_match(
-                   '/(?:Billing|Tech)\s+Email\s*:([^\n]+)/i',
+               preg_match(
+                   '/(?:Billing|Tech|AC|Registrant)
+                        (?:\s+Contact)?\s+
+                        (?:E\-?mail|Phone|Fax|Organi)(?:[^\:]+)?:([^\n]+)
+                    /ix',
                    $cleanData,
                    $matchDataResult
                ) && !empty($matchDataResult[1])
@@ -554,7 +653,7 @@ class DataParser
             return false;
         }
         $data = static::cleanWhoIsResultComment($data);
-        preg_match('~Whois(?:\s*Server)?\s*\:\s*([^\n]+)~i', $data, $match);
+        preg_match('~Whois(?:\s*Server)?\s*\[\:\]]\s*([^\n]+)~i', $data, $match);
         return !empty($match[1])
             ? strtolower(trim($match[1]))
             : false;

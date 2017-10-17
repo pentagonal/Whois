@@ -410,7 +410,7 @@ class Validator
         $result[DRI::WHOIS_SERVER] = (array) $this
             ->getTldCollector()
             ->getServersFromExtension(
-                $result[DRI::NAME_EXTENSION]
+                $result[DRI::NAME_BASE_EXTENSION]
             );
 
         return $this->reValidateDomainName(new DomainRecord($result), $domainName);

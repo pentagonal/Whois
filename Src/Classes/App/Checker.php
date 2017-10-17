@@ -115,6 +115,13 @@ FAKE;
     ];
 
     /**
+     * @var array
+     */
+    protected $disAllowMainDomainExtension = [
+        'kr'
+    ];
+
+    /**
      * Checker constructor.
      *
      * @param Validator      $validator Validator instance
@@ -253,12 +260,13 @@ FAKE;
     }
 
     /**
-     * @param string $domainName
+     * @param string $domainName     the domain Name
+     * @param bool $requestFromIAna  try to get whois server from IANA
      *
      * @return array
      * @throws \Throwable
      */
-    public function getWhoIsServerFor(string $domainName) : array
+    public function getWhoIsServerFor(string $domainName, bool $requestFromIAna = false) : array
     {
         $domainName = trim($domainName);
         if ($domainName === '') {
@@ -276,7 +284,7 @@ FAKE;
             $domainKey = strtolower($domainName);
             $keyWhoIs = "{$domainKey}_whs";
             $whoIsServer = $this->getCache($keyWhoIs);
-            if (empty($whoIsServer) || !is_array($whoIsServer)) {
+            if ($requestFromIAna && (empty($whoIsServer) || !is_array($whoIsServer))) {
                 $iAnaRequest = $this->getRequest($domainName, DataParser::URI_IANA_WHOIS);
                 if ($iAnaRequest->isTimeOut()) {
                     $iAnaRequest = $this->getRequest($domainName, DataParser::URI_IANA_WHOIS);
@@ -342,6 +350,28 @@ FAKE;
                 sprintf(
                     'Domain name %s is not a valid top domain',
                     $record->getFullDomainName()
+                ),
+                E_NOTICE
+            );
+        }
+
+        if ($record->isGTLD()
+            && in_array($record->getBaseExtension(), $this->disAllowMainDomainExtension)
+        ) {
+            throw new InvalidDomainException(
+                sprintf(
+                    'Domain name Extension: (.%s) GTLD is not for public registration',
+                    $record->getBaseExtension()
+                ),
+                E_NOTICE
+            );
+        }
+
+        if ($record->isSTLD() && $record->isMaybeDisAllowToRegistered()) {
+            throw new InvalidDomainException(
+                sprintf(
+                    'Domain name : %s has invalid as top level domain as STLD',
+                    $domainName
                 ),
                 E_NOTICE
             );
@@ -439,6 +469,7 @@ FAKE;
      * @param string $domainName
      * @param bool $followServer follow server if whois server exists
      * @param bool $allowEmptyServer use *Name Server (DNS)* if Server has empty default is true
+     * @param bool $requestFromIAna  try to get whois server from IANA
      *
      * @return ArrayCollector|WhoIsResult[]
      * @throws \Throwable
@@ -446,7 +477,8 @@ FAKE;
     public function getFromDomain(
         string $domainName,
         bool $followServer = false,
-        bool $allowEmptyServer = true
+        bool $allowEmptyServer = true,
+        bool $requestFromIAna = false
     ) : ArrayCollector {
 
         $record = $this->getValidator()->splitDomainName($domainName);
@@ -488,7 +520,7 @@ FAKE;
             return new ArrayCollector([$domainName => $result]);
         }
 
-        $servers = $this->getWhoIsServerFor($record->getDomainName());
+        $servers = $this->getWhoIsServerFor($record->getDomainName(), $requestFromIAna);
         $isLimit = false;
         $usedServer = null;
         foreach ($servers as $server) {
