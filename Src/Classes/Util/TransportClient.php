@@ -58,6 +58,12 @@ class TransportClient
     const DEFAULT_PORT = DataParser::PORT_WHOIS;
 
     /**
+     * User Agent
+     */
+    public $userAgent = 'Mozilla/5.0 (X11; Linux x86_64) '
+            . 'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36';
+
+    /**
      * @var Client
      */
     protected $client;
@@ -79,8 +85,13 @@ class TransportClient
             'handler' => $this->createStackHandler(),
             'ssl'    => [
                 'certificate_authority' => DataParser::PATH_CACERT,
-            ]
+            ],
         ];
+        if (is_string($this->userAgent)) {
+            $this->defaultOptions['headers'] = [
+                'User-Agent' => $this->userAgent
+            ];
+        }
     }
 
     /**
@@ -113,6 +124,25 @@ class TransportClient
             $options['stream'] = false;
             $options['curl'][CURLOPT_CUSTOMREQUEST] = $method;
         }
+
+        // override
+        if (!empty($uri->postMethod)) {
+            $method = 'POST';
+            $postData = [];
+            $postExplode = array_filter(explode('&', $uri->postMethod));
+            array_map(function ($query) use (&$postData) {
+                preg_match('/^([^\=]+)\=(.+)?/', ltrim($query), $match);
+                if (!empty($match[1])) {
+                    $postData[$match[1]] = $match[2];
+                }
+            }, $postExplode);
+            $params = isset($options['form_params'])
+                && is_array($options['form_params'])
+                ? array_merge($options['form_params'], $postData)
+                : $postData;
+            $options['form_params'] = $params;
+        }
+
         try {
             return $this->getClient()->request($method, $uri, $options);
         } catch (ConnectException $e) {
@@ -314,6 +344,18 @@ class TransportClient
         $args = func_get_args();
         array_shift($args);
         $clone = self::createForStreamSocket();
+        $headers = $clone->getClient()->getConfig('headers');
+        if (($method === 'GET' || $method === 'POST')
+            && (
+                empty($headers['User-Agent'])
+                || is_string($headers['User-Agent'])
+                && strpos($headers['User-Agent'], 'GuzzleHttp') === 0
+            )
+            && is_string($clone->userAgent)
+        ) {
+            $clone = $clone->withUserAgent($clone->userAgent);
+        }
+
         if (! $uri instanceof UriInterface) {
             if (!is_string($uri)) {
                 throw new \InvalidArgumentException(
@@ -410,6 +452,15 @@ class TransportClient
      */
     public static function createUri($server, int $port = null) : Uri
     {
+        if (is_string($server)
+            && preg_match('~^POST\[([^\]]+)\]\|(.+)~', $server, $match)
+            && !empty($match[2])
+        ) {
+            $server = new Uri($match[2]);
+            /** @noinspection PhpUndefinedFieldInspection */
+            $server->postMethod = $match[1];
+        }
+
         $uri = $server instanceof UriInterface ? $server : new Uri($server);
         if ($uri->getScheme() === null) {
             $uri = $uri->withScheme('');

@@ -118,7 +118,9 @@ FAKE;
      * @var array
      */
     protected $disAllowMainDomainExtension = [
-        'kr'
+        'kr',
+        'zw',
+        'bd',
     ];
 
     /**
@@ -225,7 +227,6 @@ FAKE;
         if ($domain && $this->getValidator()->isValidDomain($domain)) {
             $extension = $this->getValidator()->splitDomainName($domain)->getBaseExtension();
         }
-
         if (empty($extension)) {
             return $request;
         }
@@ -242,7 +243,7 @@ FAKE;
                 }
                 preg_match(
                     '~
-                      <div\b[^>]*?id\=(\")about\-whois(?:\\1)[^>]*+>\s*
+                      <div\b[^>]*?id\=(\[\"\'])about\-whois(?:\\1)[^>]*+>\s*
                           <div\b[^>]*+>
                             ((?:(?!<\/main>)[\s\S])*)
                     ~ix',
@@ -252,6 +253,29 @@ FAKE;
                 if (!empty($match[2])) {
                     $match = trim(preg_replace('~<br[^>]*>~i', "\n", $match[2]));
                     $match = preg_replace('~^[ ]+~m', '', strip_tags($match));
+                    $request->setBodyString(trim($match));
+                }
+                break;
+            case 'vi':
+                if (stripos($request->getServer(), 'https://secure.nic.vi/whois-lookup') !== 0) {
+                    return $request;
+                }
+                $body = $request->getBodyString();
+                if (trim($body) === '') {
+                    return $request;
+                }
+                preg_match(
+                    '~
+                      <pre\b[^>]*?class\=([\"\'])(?:[^\\1]+)?result\-pre(?:[^\\1]+)?(?:\\1)[^>]*+>\s*
+                       (?:((?!<\/pre[^>]*>)[\s\S]*)<\/pre[^>]*>)
+                    ~ix',
+                    $body,
+                    $match
+                );
+                if (!empty($match[2]) || strpos($match[0], '</pre>') !== false) {
+                    $match[2] = empty($match[2]) ? $match[0] : $match[2];
+                    $match = trim(preg_replace('~<\/?(?:span|font|br)([^>]+)?>~i', "", $match[2]));
+                    $match = preg_replace('~^[^\n]+~', '', $match);
                     $request->setBodyString(trim($match));
                 }
                 break;
@@ -392,7 +416,27 @@ FAKE;
         }
 
         $whoIsResultClass = static::WHOIS_RESULT_CLASS;
+        /**
+         * @var WhoIsResult $result
+         */
         $result = new $whoIsResultClass($record, $request->getBodyString(), $request->getServer());
+        $dataParser =  $result->getDataParser();
+        if ($dataParser::hasContainLimitedResultData($result->getOriginalResultString())) {
+            if (!$result->getNote()) {
+                $result->setNote('Request domain data has limit exceeded');
+            }
+            $limit = new RequestLimitException(
+                sprintf(
+                    'Request for %1$s on %2$s has limit exceeded',
+                    $domainName,
+                    $request->getServer()
+                )
+            );
+            /** @noinspection PhpUndefinedFieldInspection */
+            $limit->result = $result;
+            throw $limit;
+        }
+
         $this->putCache($keyCache, $result);
         return $result;
     }

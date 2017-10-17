@@ -284,7 +284,6 @@ final class WhoIsRequest
         if ($this->uri instanceof UriInterface) {
             return;
         }
-
         $this->uri = TransportClient::createUri($this->server);
         $this->socketMethod = $this->method;
         $this->isUseSocket = $this->uri->getPort() === TransportClient::DEFAULT_PORT;
@@ -326,6 +325,10 @@ final class WhoIsRequest
             $this->uri  = $this->uri->withQuery($query);
             $this->query = $this->uri->getQuery();
         }
+        if (isset($this->uri->postMethod)) {
+            $this->uri->postMethod = str_replace('{{domain}}', $this->targetName, $this->uri->postMethod);
+            $this->server = (string) $this->uri;
+        }
     }
 
     /**
@@ -353,6 +356,7 @@ final class WhoIsRequest
                 $this->getUri(),
                 $options
             );
+
             $this->status = self::SUCCESS;
         } catch (\Throwable $e) {
             $this->status = self::FAILED;

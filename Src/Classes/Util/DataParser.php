@@ -331,7 +331,7 @@ class DataParser
             '/
                 (?:\>\>\>?)?\s*
                 (Last\s*Update\s*(?:[a-z0-9\s]+)?Whois\s*Database)\s*
-                \:\s*((?:[0-9]+[0-9\-\:\s\+TZGMU]+)?)
+                \:\s*((?:[0-9]+[0-9\-\:\s\+TZGMU\.]+)?)
             /ix',
             $data,
             $match
@@ -522,7 +522,10 @@ class DataParser
 
             if (preg_match(
                 '/(?:Domain\s+)?Status\s*\:\s*
-                    (NOT\s*AVAILABLE|RESERVED?|BANNED|Taken|Registered)
+                    (
+                        NOT\s*AVAILABLE|RESERVED?|BANNED|Taken|Registered
+                        |No\s*Object\s*Found
+                    )
                 /ix',
                 $cleanData,
                 $match
@@ -629,7 +632,7 @@ class DataParser
                 '/
                 (?:Resource|Whois)\s+Limit
                 | exceeded\s(.+)?limit
-                | limit\s+exceed
+                | (?:limit|quota)\s+exceed
                 |allow(?:ed|ing)?\s+quer(?:ies|y)\s+exceeded
             /ix',
                 $data

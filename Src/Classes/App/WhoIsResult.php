@@ -18,6 +18,7 @@ use Pentagonal\WhoIs\Abstracts\WhoIsResultAbstract;
 use Pentagonal\WhoIs\Interfaces\RecordDomainNetworkInterface;
 use Pentagonal\WhoIs\Interfaces\RecordNetworkInterface;
 use Pentagonal\WhoIs\Util\DataParser;
+use Pentagonal\WhoIs\Util\TransportClient;
 
 /**
  * Class WhoIsResult
@@ -131,7 +132,14 @@ class WhoIsResult extends WhoIsResultAbstract
 
         $updateDb = $this->getFirstOr($match, 'date_last_update_db');
         $updateDb = $updateDb
-            ? preg_replace('/^[^\:]+\:\s*/', '', $updateDb)
+            ? str_replace(['. ', '. '], '', trim($updateDb, '.'))
+            : $updateDb;
+        $updateDb = $updateDb
+            ? (
+                @strtotime($updateDb)
+                ? $updateDb
+                : preg_replace('/^[^\:]+\:\s*/', '', $updateDb)
+            )
             : null;
         if ($updateDb && ($updateDbNew = strtotime($updateDb))) {
             $updateDb = gmdate('c', $updateDbNew);
@@ -279,6 +287,9 @@ class WhoIsResult extends WhoIsResultAbstract
         $whoIsServers = array_merge(
             $whoIsServers,
             array_map(function ($server) {
+                if (stripos($server, 'POST[') === 0) {
+                    return trim(preg_replace('~^POST[^\|]+\|~', '', $server));
+                }
                 return is_string($server)
                     ? str_replace('{{domain}}', $this->getDomainName(), $server)
                     : $server;

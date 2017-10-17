@@ -136,7 +136,7 @@ LICENSE;
 
             $extension = implode('.', $extArray);
             $extension = $collector->encode($extension);
-            $extArray = explode('.', $extension);
+            $extArray  = explode('.', $extension);
             $ext = array_pop($extArray);
             // ck domain has no stld
             if (!isset($arrayData[$ext])

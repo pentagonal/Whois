@@ -4185,7 +4185,9 @@ return [
     'vg' => [
         'whois.nic.vg',
     ],
-    'vi' => [],
+    'vi' => [
+        'POST[domain={{domain}}]|https://secure.nic.vi/whois-lookup/'
+    ],
     'viajes' => [
         'whois.donuts.co',
         'whois.nic.viajes',

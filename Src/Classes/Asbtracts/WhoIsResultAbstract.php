@@ -41,6 +41,7 @@ abstract class WhoIsResultAbstract implements WhoIsNetworkResultInterface
     const KEY_RESULT    = 'result';
     const KEY_ORIGINAL  = 'original';
     const KEY_CLEAN     = 'clean';
+    const KEY_NOTE      = 'note';
 
     // for helper serialize
     const KEY_NETWORK = 'network';
@@ -453,6 +454,7 @@ abstract class WhoIsResultAbstract implements WhoIsNetworkResultInterface
 
         $collection = [
             static::KEY_DATA => [
+                static::KEY_NOTE     => null,
                 static::KEY_REFERRAL => null,
                 static::KEY_RESELLER => null,
                 static::KEY_RESULT => [
@@ -533,6 +535,32 @@ abstract class WhoIsResultAbstract implements WhoIsNetworkResultInterface
         }
 
         return new ArrayCollector($collection);
+    }
+
+    /**
+     * Set NOTE Detail
+     *
+     * @param string $note
+     */
+    public function setNote(string $note)
+    {
+        $this->dataDetail[static::KEY_DATA][static::KEY_NOTE] = $note;
+    }
+
+    /**
+     * Clear Note Detail
+     */
+    public function clearNote()
+    {
+        $this->dataDetail[static::KEY_DATA][static::KEY_NOTE] = null;
+    }
+
+    /**
+     * @return string|null
+     */
+    public function getNote()
+    {
+        return $this->dataDetail[static::KEY_DATA][static::KEY_NOTE];
     }
 
     /**

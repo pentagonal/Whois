@@ -5,6 +5,15 @@
 
 **VERSION 2.0.0**
 
+
+## Donate
+
+[![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=KSR5SW7J22JXU)
+
+
+**\#\# UNDER DEVELOPMENT \#\#**
+
+
 ## DESCRIPTION
 
 This Package contains email validator, domain & network checker that `API READY`
@@ -55,9 +64,19 @@ if (count($collector) > 0) {
 
 ```
 
+## NOTE
+
+```
+Some extension does not provide whois server,
+because some of registrar or TLD provider 
+does not permit their whois data for public.
+```
+
+You can get `Whois Servers` list on : [Src/Data/Servers/AvailableServers.php](Src/Data/Servers/AvailableServers.php)
+
+
 
 ## LICENSE
 
 `GPL-3.0` see [LICENSE](LICENSE)
 
-## UNDER DEVELOPMENT

@@ -59,7 +59,7 @@ trait ResultParser
                 # Last Update DB & Status
                 | (?:\>\>\>?)?\s*
                    (Last\s*Update\s*(?:[a-z0-9\s]+)?Whois\s*Database)\s*
-                      \:\s*(?P<date_last_update_db>(?:[0-9]+[0-9\-\:\s\+TZGMU]+)?)
+                      \:\s*(?P<date_last_update_db>(?:[0-9]+[0-9\-\:\s\+TZGMU\.]+)?)
                 | (?:Domain\s*)?(?:Flags|Status)\s*\:(?P<domain_status>[^\n]+)
 
                 # Other Data
@@ -84,7 +84,7 @@ trait ResultParser
                     \:(?P<registrar_org>[^\n]+)
 
                 | Registr(?:ar|y)\s*
-                    (?:Contact(?:[^\:]+)?)?(?:Contact\s*)?E\-mail(?:[^\:]+)?\:(?P<registrar_email>[^\n]+)
+                    (?:Contact(?:[^\:]+)?)?(?:Contact\s*)?(E\-?)?mail(?:[^\:]+)?\:(?P<registrar_email>[^\n]+)
                 | Registr(?:ar|y)\s*(?:Contact(?:[^\:]+)?)?Country(?:[^\:]+)?\:(?P<registrar_country>[^\n]+)
                 | Registr(?:ar|y)\s*(?:Contact(?:[^\:]+)?)?(?:State|Province)(?:[^\:]+)?
                     \:(?P<registrar_state>[^\n]+)
@@ -96,14 +96,15 @@ trait ResultParser
                 | Registr(?:ar|y)\s*(?:Contact(?:[^\:]+)?)?Phone(?:[^\:]+)?\:(?P<registrar_phone>[^\n]+)
                 | Registr(?:ar|y)\s*(?:Contact(?:[^\:]+)?)?Fax(?:[^\:]+)?\:(?P<registrar_fax>[^\n]+)
 
-                | (?:Registr(?:ar|y)\s*)?Abuse\s*[^\:]+e?mail(?:[^\:]+)?\:(?P<registrar_abuse_mail>[^\n]+)
+                | (?:Registr(?:ar|y)\s*)?(Abuse|Customer\s+Service)
+                    [^\:]+(?:E\-?)?mail(?:[^\:]+)?\:(?P<registrar_abuse_mail>[^\n]+)
                 | (?:Registr(?:ar|y)\s*)?Abuse\s*[^\:]+phone(?:[^\:]+)?\:(?P<registrar_abuse_phone>[^\n]+)
 
                 # Registrant Data
                 | (?:Registrant|owner)\s*ID(?:[^\:]+)?\:(?P<registrant_id>[^\n]+)
                 | (?:Registrant|owner)(?:Contact)?(?:\s*Name(?:[^\:]+)?|\s*)\:(?P<registrant_name>[^\n]+)
                 | ((?:Registrant|owner)\s*|\n)(?:Organi[zs][^\:]+|Company)(?:[^\:]+)?\:(?P<registrant_org>[^\n]+)
-                | (?:Registrant|owner)\s*(?:Contact\s*)?E\-?mail(?:[^\:]+)?\:(?P<registrant_email>[^\n]+)
+                | (?:Registrant|owner)\s*(?:Contact\s*)?(?:E\-?)?mail(?:[^\:]+)?\:(?P<registrant_email>[^\n]+)
                 | (?:Registrant|owner)\s*Country(?:[^\:]+)?\:(?P<registrant_country>[^\n]+)
                 | (?:Registrant|owner)\s*(?:State|Province)(?:[^\:]+)?\:(?P<registrant_state>[^\n]+)
                 | (?:Registrant|owner)\s*City(?:[^\:]+)?\:(?P<registrant_city>[^\n]+)
@@ -116,7 +117,7 @@ trait ResultParser
                 | (?:Bill(?:s|ing)?)\s*ID(?:[^\:]+)?\:(?P<billing_id>[^\n]+)
                 | (?:Bill(?:s|ing)?)\s*(?:Contact)?(?:\s*Name(?:[^\:]+)?|\s*)\:(?P<billing_name>[^\n]+)
                 | (?:Bill(?:s|ing)?)\s*(?:Organi[zs][^\:]+|Company)(?:[^\:]+)?\:(?P<billing_org>[^\n]+)
-                | (?:Bill(?:s|ing)?)\s*(?:Contact\s*)?E\-?mail(?:[^\:]+)?\:(?P<billing_email>[^\n]+)
+                | (?:Bill(?:s|ing)?)\s*(?:Contact\s*)?(?:E\-?)?mail(?:[^\:]+)?\:(?P<billing_email>[^\n]+)
                 | (?:Bill(?:s|ing)?)\s*Country(?:[^\:]+)?\:(?P<billing_country>[^\n]+)
                 | (?:Bill(?:s|ing)?)\s*(?:State|Province)(?:[^\:]+)?\:(?P<billing_state>[^\n]+)
                 | (?:Bill(?:s|ing)?)\s*City(?:[^\:]+)?\:(?P<billing_city>[^\n]+)
@@ -130,7 +131,7 @@ trait ResultParser
                 | (?:Admin(?:istrative)?|AC\s+)\s*ID(?:[^\:]+)?\:(?P<admin_id>[^\n]+)
                 | (?:Admin(?:istrative)?|AC\s+)\s*(?:Contact)?(?:\s*Name(?:[^\:]+)?|\s*)\:(?P<admin_name>[^\n]+)
                 | (?:Admin(?:istrative)?|AC\s+)\s*(?:Organi[zs][^\:]+|Company)(?:[^\:]+)?\:(?P<admin_org>[^\n]+)
-                | (?:Admin(?:istrative)?|AC\s+)\s*(?:Contact\s*)?E\-?mail(?:[^\:]+)?\:(?P<admin_email>[^\n]+)
+                | (?:Admin(?:istrative)?|AC\s+)\s*(?:Contact\s*)?(?:E\-?)?mail(?:[^\:]+)?\:(?P<admin_email>[^\n]+)
                 | (?:Admin(?:istrative)?|AC\s+)\s*Country(?:[^\:]+)?\:(?P<admin_country>[^\n]+)
                 | (?:Admin(?:istrative)?|AC\s+)\s*(?:State|Province)(?:[^\:]+)?\:(?P<admin_state>[^\n]+)
                 | (?:Admin(?:istrative)?|AC\s+)\s*City(?:[^\:]+)?\:(?P<admin_city>[^\n]+)
