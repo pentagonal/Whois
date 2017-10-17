@@ -2827,6 +2827,8 @@ return [
     ],
     'neustar' => [
         'whois.nic.neustar',
+        'whois.dnrs.neustar',
+        'whois.den.dnrs.neustar',
     ],
     'new' => [
         'whois.nic.google',
@@ -4738,7 +4740,10 @@ return [
     'yamaxun' => [
         'whois.nic.yamaxun',
     ],
-    'yandex' => [],
+    'yandex' => [
+        'whois.dnrs.neustar',
+        'whois.den.dnrs.neustar',
+    ],
     'ye' => [],
     'yodobashi' => [
         'whois.nic.gmo',
