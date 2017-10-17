@@ -117,7 +117,15 @@ LICENSE;
                 continue;
             }
             $extension = trim(strtolower($extension));
-            if (strpos($extension, '.') === false) {
+            if (strpos($extension, '.') === false
+                // blogspot is not valid
+                || strpos($extension, 'blogspot') === 0
+                // amazon aws is not valid
+                || strpos($extension, 'amazonaws') !== false
+                // contains dash (-) is not valid
+                || stripos($extension, 'xn--')  === false
+                   && strpos($extension, '-') !== false
+            ) {
                 continue;
             }
 
@@ -125,14 +133,21 @@ LICENSE;
             if (strpos($extension, '*') === 0) {
                 array_shift($extArray);
             }
+
             $extension = implode('.', $extArray);
             $extension = $collector->encode($extension);
             $extArray = explode('.', $extension);
             $ext = array_pop($extArray);
-            if (!isset($arrayData[$ext]) || empty($extArray)) {
+            // ck domain has no stld
+            if (!isset($arrayData[$ext])
+                 || empty($extArray)
+                 || !in_array($ext, $collector->getCountryExtensionList())
+            ) {
                 continue;
             }
-            $arrayData[$ext][] = implode('.', $extArray);
+
+            $extension = ltrim(implode('.', $extArray), '!');
+            $arrayData[$ext][] = $extension;
         }
 
         unset($iAna, $suffix);
@@ -248,7 +263,7 @@ LICENSE;
                 $server = array_filter($server);
                 if (!empty($server)) {
                     $serverArr .= "\n{$repeatedSeparator}'"
-                          . implode("', \n{$repeatedSeparator}'", $server)
+                          . implode("',\n{$repeatedSeparator}'", $server)
                           . "',\n{$baseSeparator}";
                 }
             }
