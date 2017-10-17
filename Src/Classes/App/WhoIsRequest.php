@@ -307,9 +307,12 @@ final class WhoIsRequest
 
             $target = rtrim($this->targetName);
             $pathExtension = pathinfo($target, PATHINFO_EXTENSION);
+
+            // add command to .JP domain
             if ($target && $pathExtension && strtolower($pathExtension) === 'jp') {
                 $target .= '/e';
             }
+
             $this->socketMethod = rtrim($target) . "\r\n";
             if (empty($this->options['method'])) {
                 $this->setMethod($this->socketMethod);

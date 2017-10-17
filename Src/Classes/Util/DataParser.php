@@ -64,14 +64,16 @@ class DataParser
         LACNIC_SERVER   = 'whois.lacnic.net';
 
     /**
+     * Prefix List command
+     *
      * @var array
      */
     protected static $serverPrefixList = [
-        'whois.arin.net'    => self::ARIN_NET_PREFIX_COMMAND,
-        'whois.ripe.net'    => self::RIPE_NET_PREFIX_COMMAND,
-        'whois.apnic.net'   => self::APNIC_NET_PREFIX_COMMAND,
-        'whois.afrinic.net' => self::AFRINIC_NET_PREFIX_COMMAND,
-        'whois.lacnic.net'  => self::LACNIC_NET_PREFIX_COMMAND,
+        self::ARIN_SERVER    => self::ARIN_NET_PREFIX_COMMAND,
+        self::RIPE_SERVER    => self::RIPE_NET_PREFIX_COMMAND,
+        self::APNIC_SERVER   => self::APNIC_NET_PREFIX_COMMAND,
+        self::AFRINIC_SERVER => self::AFRINIC_NET_PREFIX_COMMAND,
+        self::LACNIC_SERVER  => self::LACNIC_NET_PREFIX_COMMAND,
     ];
 
     /**
