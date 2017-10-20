@@ -1,0 +1,77 @@
+#  This package contains some code that reused by other repository(es) for private uses.
+#  But on some certain conditions, it will also allowed to used as commercials project.
+#  Some code & coding standard also used from other repositories as inspiration ideas.
+#  And also uses 3rd-Party as to be used as result value without their permission but permit to be used.
+# 
+#  @license GPL-3.0  {@link https://www.gnu.org/licenses/gpl-3.0.en.html}
+#  @copyright (c) 2017. Pentagonal Development
+#  @author pentagonal <org@pentagonal.org>
+#
+# =========================================================================================================
+#
+# This file contains auto generated ASN (Autonomous System Numbers) Please does not edit directly.
+# 
+# 32-bit Autonomous System Numbers
+#
+# Database Provided by IANA ASN Delegation Table
+# For more information, please refer to https://www.iana.org/assignments/as-numbers/as-numbers.xhtml
+#
+# NOTE:
+#     whois.ripe.net as example starting collection key server
+#     123-567         The ( - ) is as separator that define it about `asn` is has range start and ending.
+#                     If has no separator and end of asn number, it mean it was single `asn` with no range
+#     New line separator is CRLF (Windows) or as is : \r\n
+#
+# [reserved]         : ASN is Reserved by IANA
+# [reserved_sample]  : ASN is Reserved for use in documentation and sample code
+# [reserved_private] : ASN is Reserved for Private Use
+# [unallocated]      : ASN is Unallocated or has not been yet registered
+#
+[reserved]
+65552-131071
+4294967295
+[reserved_private]
+4200000000-4294967294
+[reserved_sample]
+65536-65551
+[unallocated]
+137530-196607
+207260-262143
+268701-327679
+328704-393215
+397213-4199999999
+[whois.afrinic.net]
+327680-328703
+[whois.apnic.net]
+131072-132095
+132096-133119
+133120-133631
+133632-134556
+134557-135580
+135581-136505
+136506-137529
+[whois.arin.net]
+393216-394239
+394240-395164
+395165-396188
+396189-397212
+[whois.lacnic.net]
+262144-263167
+263168-263679
+263680-264604
+264605-265628
+265629-266652
+266653-267676
+267677-268700
+[whois.ripe.net]
+196608-197631
+197632-198655
+198656-199679
+199680-200191
+200192-201215
+201216-202239
+202240-203263
+203264-204287
+204288-205211
+205212-206235
+206236-207259

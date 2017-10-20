@@ -1,0 +1,80 @@
+#  This package contains some code that reused by other repository(es) for private uses.
+#  But on some certain conditions, it will also allowed to used as commercials project.
+#  Some code & coding standard also used from other repositories as inspiration ideas.
+#  And also uses 3rd-Party as to be used as result value without their permission but permit to be used.
+# 
+#  @license GPL-3.0  {@link https://www.gnu.org/licenses/gpl-3.0.en.html}
+#  @copyright (c) 2017. Pentagonal Development
+#  @author pentagonal <org@pentagonal.org>
+#
+# =========================================================================================================
+#
+# This file contains auto generated IPv6 Address Record Please does not edit directly.
+# 
+#
+# Database Provided by IANA IPv6 Address Table Space
+# For more information, please refer to https://www.iana.org/assignments/ipv6-unicast-address-assignments/ipv6-unicast-address-assignments.xhtml
+#
+# NOTE:
+#     whois.ripe.net as example starting collection key server
+#     123/12 or 123:345::/23
+#               The (/) is as separator that define it about `CIDR`.
+#               If has no separator and end of rangeIP number, it mean it was single `rangeIP` with no range
+#     New line separator is CRLF (Windows) or as is : \r\n
+#
+# [reserved]           : Reserved By IANA
+# [reserved_private]   : IP has been allocated for private
+# [reserved_local]     : IP has been allocated for local network
+# [reserved_multicast] : Multicast (formerly "Class D")
+# [reserved_future]    : Reserved for future release
+#
+[reserved]
+2001:3c00::/22
+2d00:0000::/8
+2e00:0000::/7
+3000:0000::/4
+3ffe::/16
+5f00::/8
+[whois.afrinic.net]
+2001:4200::/23
+2c00:0000::/12
+[whois.apnic.net]
+2001:0200::/23
+2001:0c00::/23
+2001:0e00::/23
+2001:4400::/23
+2001:8000::/19
+2001:a000::/20
+2001:b000::/20
+2400:0000::/12
+[whois.arin.net]
+2001:0400::/23
+2001:1800::/23
+2001:4800::/23
+2600:0000::/12
+2610:0000::/23
+2620:0000::/23
+[whois.iana.org]
+2001:0000::/23
+2002:0000::/16
+[whois.lacnic.net]
+2001:1200::/23
+2800:0000::/12
+[whois.ripe.net]
+2001:0600::/23
+2001:0800::/23
+2001:0a00::/23
+2001:1400::/23
+2001:1600::/23
+2001:1a00::/23
+2001:1c00::/22
+2001:2000::/20
+2001:3000::/21
+2001:3800::/22
+2001:4000::/23
+2001:4600::/23
+2001:4a00::/23
+2001:4c00::/23
+2001:5000::/20
+2003:0000::/18
+2a00:0000::/12
