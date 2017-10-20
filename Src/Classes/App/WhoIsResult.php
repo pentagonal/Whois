@@ -351,6 +351,7 @@ class WhoIsResult extends WhoIsResultAbstract
      * @param ArrayCollector $collector
      *
      * @return ArrayCollector
+     * @todo completion parsing detail
      */
     protected function parseDetailDataForASN(string $data, ArrayCollector $collector) : ArrayCollector
     {
@@ -364,6 +365,7 @@ class WhoIsResult extends WhoIsResultAbstract
      * @param ArrayCollector $collector
      *
      * @return ArrayCollector
+     * @todo completion parsing detail
      */
     protected function parseDetailDataForIP(string $data, ArrayCollector $collector) : ArrayCollector
     {
@@ -371,7 +373,9 @@ class WhoIsResult extends WhoIsResultAbstract
     }
 
     /**
-     * @todo completion parsing detail
+     * Parse Detail
+     *
+     * @return ArrayCollector
      */
     protected function parseDetail() : ArrayCollector
     {

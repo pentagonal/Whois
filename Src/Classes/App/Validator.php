@@ -32,7 +32,7 @@ use Pentagonal\WhoIs\Util\DataParser;
  * Class Validator
  * @package Pentagonal\WhoIs\App
  *
- * @todo Completion for method
+ * Object class validator to validate network type & much of features.
  */
 class Validator
 {
