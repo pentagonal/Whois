@@ -23,18 +23,25 @@ echo "==============================================\n";
 echo " Starting Generate AS Number Block List data\n";
 echo "==============================================\n";
 
-$countArray = DataGenerator::generateASNumberFileData();
-if (!is_array($countArray)) {
-    echo "There was an error\n";
-    exit(255);
-}
+try {
+    $countArray = DataGenerator::generateASNumberFileData();
+    if (!is_array($countArray)) {
+        throw new \RuntimeException(
+            'There was an error',
+            E_WARNING
+        );
+    }
 
-echo <<<BLOCK
+    echo <<<BLOCK
 Successfully Generate total [{$countArray['total']}] Block Data.
 
 ASN 16 Bit : {$countArray['asn16']} Blocks Range
 ASN 32 Bit : {$countArray['asn32']} Blocks Range
 \n
 BLOCK;
+
+} catch (\Exception $e) {
+  echo "[ERROR] {$e->getMessage()}\n";
+}
 
 echo "==============================================\n\n";

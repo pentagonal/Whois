@@ -33,8 +33,6 @@ use Pentagonal\WhoIs\Util\TransportClient as Transport;
  */
 final class DataGenerator
 {
-    const ERR_DENIED = -1;
-
     const LICENSE = <<<LICENSE
 /**
  * This package contains some code that reused by other repository(es) for private uses.
@@ -55,26 +53,49 @@ LICENSE;
         $fileServers = $collector->getAvailableServersFile();
         $dirFileTLDExtensions = dirname($fileTLDExtensions);
         $dirFileServers = dirname($fileServers);
-        if (!file_exists($fileTLDExtensions) && !is_writeable($dirFileTLDExtensions)
+        if (! file_exists($fileTLDExtensions) && !is_writeable($dirFileTLDExtensions)
             || !file_exists($fileServers) && !is_writeable($dirFileServers)
         ) {
-            return self::ERR_DENIED;
+            throw new ResourceException(
+                sprintf(
+                    'File %s is not writable',
+                    file_exists($fileTLDExtensions)
+                        ? $fileTLDExtensions
+                        : $fileServers
+                ),
+                E_ERROR
+            );
         }
 
         if (!file_exists($fileTLDExtensions)) {
             if (!touch($fileTLDExtensions)) {
-                return self::ERR_DENIED;
+                throw new ResourceException(
+                    sprintf(
+                        'Could not write %s',
+                        $fileTLDExtensions
+                    ),
+                    E_ERROR
+                );
             }
         }
 
         if (!file_exists($fileServers)) {
             if (!touch($fileServers)) {
-                return self::ERR_DENIED;
+                throw new ResourceException(
+                    sprintf(
+                        'Could not write %s',
+                        $fileServers
+                    ),
+                    E_ERROR
+                );
             }
         }
 
         if (!is_writeable($fileTLDExtensions) || !is_writeable($fileServers)) {
-            return self::ERR_DENIED;
+            throw new ResourceException(
+                'Could not write file for extensions',
+                E_ERROR
+            );
         }
 
         try {
@@ -234,12 +255,26 @@ LICENSE;
         $fileExists = file_exists(DataParser::PATH_CACERT);
         if ($fileExists) {
             if (!is_writeable(DataParser::PATH_CACERT)) {
-                return self::ERR_DENIED;
+                throw new ResourceException(
+                    sprintf(
+                        'File %s is not writable',
+                        DataParser::PATH_CACERT
+                    ),
+                    E_ERROR
+                );
             }
         }
+
         if (!$fileExists && !is_writeable(dirname(DataParser::PATH_CACERT))) {
-            return self::ERR_DENIED;
+            throw new ResourceException(
+                sprintf(
+                    'Directory %s is not writable',
+                    dirname(DataParser::PATH_CACERT)
+                ),
+                E_ERROR
+            );
         }
+
         try {
             $response = Transport::get(DataParser::URI_CACERT);
         } catch (TimeOutException $e) {
@@ -269,7 +304,7 @@ LICENSE;
     /**
      * Generate AS Block Number
      *
-     * @return int|array -1 if denied and total data stored and array if success
+     * @return array total data stored and array if success
      */
     public static function generateASNumberFileData()
     {
@@ -655,7 +690,7 @@ COMMENT;
     /**
      * Generate IP Data
      *
-     * @return int|array -1 if denied and total data stored and array if success
+     * @return array total data stored and array if success
      */
     public static function generateIPv64FileData()
     {

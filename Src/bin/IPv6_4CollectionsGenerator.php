@@ -23,18 +23,22 @@ echo "==============================================\n";
 echo "    Starting Generate IP Range List data\n";
 echo "==============================================\n";
 
-$countArray = DataGenerator::generateIPv64FileData();
-if (!is_array($countArray)) {
-    echo "There was an error\n";
-    exit(255);
-}
+try {
+    $countArray = DataGenerator::generateIPv64FileData();
+    if ( ! is_array($countArray)) {
+        echo "There was an error\n";
+        exit(255);
+    }
 
-echo <<<BLOCK
+    echo <<<BLOCK
 Successfully Generate total [{$countArray['total']}] IP Data.
 
 IPv4 : {$countArray['ipv4']} IP Range
 IPv6 : {$countArray['ipv6']} IP Range
 \n
 BLOCK;
+} catch (\Exception $e) {
+    echo "[ERROR] {$e->getMessage()}\n";
+}
 
 echo "==============================================\n\n";

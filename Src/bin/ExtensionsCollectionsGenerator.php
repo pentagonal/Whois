@@ -23,23 +23,29 @@ echo "==============================================\n";
 echo "  Starting Generate Whois & Server List data\n";
 echo "==============================================\n";
 
-$array = DataGenerator::generateDefaultExtensionServerList();
-$count = count($array);
-$totalSubDomain = 0;
-array_filter($array, function ($m) use(&$totalSubDomain) {
-    if (count($m) > 0) {
-        $totalSubDomain += count($m);
-        return true;
-    }
-    return false;
-});
+try {
+    $array          = DataGenerator::generateDefaultExtensionServerList();
+    $count          = count($array);
+    $totalSubDomain = 0;
+    array_filter($array, function ($m) use (&$totalSubDomain) {
+        if (count($m) > 0) {
+            $totalSubDomain += count($m);
 
-echo <<<BLOCK
+            return true;
+        }
+
+        return false;
+    });
+
+    echo <<<BLOCK
 Successfully Generate [{$count}] TLD Extensions.
 
 TLD Extensions : {$count} Extensions List
 STLD Extensions: {$totalSubDomain} Extensions List
 \n
 BLOCK;
+} catch (\Exception $e) {
+    echo "[ERROR] {$e->getMessage()}\n";
+}
 
 echo "==============================================\n\n";
