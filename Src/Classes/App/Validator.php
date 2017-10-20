@@ -19,8 +19,10 @@ use Pentagonal\WhoIs\Exceptions\DomainSTLDException;
 use Pentagonal\WhoIs\Exceptions\EmptyDomainException;
 use Pentagonal\WhoIs\Exceptions\InvalidDomainException;
 use Pentagonal\WhoIs\Exceptions\InvalidExtensionException;
+use Pentagonal\WhoIs\Interfaces\RecordASNNetworkInterface as RAN;
 use Pentagonal\WhoIs\Interfaces\RecordDomainNetworkInterface as DRI;
-use Pentagonal\WhoIs\Interfaces\RecordIPNetworkInterface as IPRI;
+use Pentagonal\WhoIs\Interfaces\RecordIPNetworkInterface as RNI;
+use Pentagonal\WhoIs\Record\ASNRecord;
 use Pentagonal\WhoIs\Record\DomainRecord;
 use Pentagonal\WhoIs\Record\IPRecord;
 use Pentagonal\WhoIs\Util\BaseMailAddressProviderValidator;
@@ -38,11 +40,11 @@ class Validator
      * Determine Length Of Domain
      */
     const MAX_LENGTH_BASE_DOMAIN_NAME = 63;
-    const MAX_LENGTH_DOMAIN_NAME      = 255;
+    const MAX_LENGTH_DOMAIN_NAME = 255;
 
-    const NAME_HOST             = 'HOST';
-    const NAME_EMAIL            = 'EMAIL';
-    const NAME_IS_IP            = 'IS_IP_ADDRESS';
+    const NAME_HOST = 'HOST';
+    const NAME_EMAIL = 'EMAIL';
+    const NAME_IS_IP = 'IS_IP_ADDRESS';
 
     /**
      * Special characters is not allowed on domain for common keyboard US Layout
@@ -56,14 +58,27 @@ class Validator
      * @uses Validator::isValidEmail()
      */
     protected $commonEmailProvider = [
-        'gmail', 'hotmail', 'outlook', 'live',
+        'gmail',
+        'hotmail',
+        'outlook',
+        'live',
         // yahoo
-        'yahoo', 'ymail', 'rocketmail', 'aol',
+        'yahoo',
+        'ymail',
+        'rocketmail',
+        'aol',
         // yandex
         'yandex',
         // mail com provider
-        'hushmail', 'null', 'hush', 'email', 'programmer',
-        'hackermail', 'mail', 'gmx', 'inbox',
+        'hushmail',
+        'null',
+        'hush',
+        'email',
+        'programmer',
+        'hackermail',
+        'mail',
+        'gmx',
+        'inbox',
     ];
 
     /**
@@ -92,10 +107,10 @@ class Validator
      */
     public function __construct(TLDCollector $collector = null, string $validator = null)
     {
-        $this->tldCollector = $collector?: new TLDCollector();
+        $this->tldCollector = $collector ?: new TLDCollector();
         if ($validator) {
             $this->baseMailProviderValidatorClass = $validator;
-            if (!class_exists($validator)) {
+            if (! class_exists($validator)) {
                 throw new \InvalidArgumentException(
                     sprintf(
                         'Validator class of %s has not exists',
@@ -117,9 +132,9 @@ class Validator
         }
 
         // revert to default if object class invalid
-        if (!is_string($this->baseMailProviderValidatorClass)
-            || !class_exists($this->baseMailProviderValidatorClass)
-            || is_subclass_of($validator, BaseMailAddressProviderValidator::class)
+        if (! is_string($this->baseMailProviderValidatorClass)
+             || ! class_exists($this->baseMailProviderValidatorClass)
+             || is_subclass_of($validator, BaseMailAddressProviderValidator::class)
         ) {
             $this->baseMailProviderValidatorClass = BaseMailAddressProviderValidator::class;
         }
@@ -130,7 +145,7 @@ class Validator
      *
      * @return TLDCollector
      */
-    public function getTldCollector() : TLDCollector
+    public function getTldCollector(): TLDCollector
     {
         return $this->tldCollector;
     }
@@ -144,7 +159,7 @@ class Validator
      */
     public function getBaseMailProviderValidator(
         string $baseAddress
-    ) : BaseMailAddressProviderValidator {
+    ): BaseMailAddressProviderValidator {
         return new $this->baseMailProviderValidatorClass($baseAddress);
     }
 
@@ -159,7 +174,7 @@ class Validator
      * @return DomainRecord
      * @throws InvalidDomainException
      */
-    public function splitDomainName(string $domainName) : DomainRecord
+    public function splitDomainName(string $domainName): DomainRecord
     {
         $domainName = strtolower(trim($domainName));
         if ($domainName == '') {
@@ -208,10 +223,10 @@ class Validator
             );
         }
 
-        $domainArray = explode('.', $domainName);
-        $extension   = array_pop($domainArray);
+        $domainArray   = explode('.', $domainName);
+        $extension     = array_pop($domainArray);
         $subDomainList = $this->tldCollector->getSubDomainFromExtension($extension);
-        if (!$subDomainList) {
+        if (! $subDomainList) {
             throw new InvalidExtensionException(
                 sprintf(
                     'Domain name %1$s is invalid extension with %2$s',
@@ -224,7 +239,7 @@ class Validator
             );
         }
 
-        $utf8Domain = $this->tldCollector->decode($domainName);
+        $utf8Domain      = $this->tldCollector->decode($domainName);
         $domainNameAscii = $this->tldCollector->encode($utf8Domain);
 
         $result = [
@@ -260,10 +275,10 @@ class Validator
             $result[DRI::NAME_IS_GTLD_DOMAIN] = true;
         }
 
-        $domainNameSub   = implode('.', $domainArray);
+        $domainNameSub    = implode('.', $domainArray);
         $countDomainArray = count($domainArray);
-        $subExtension    = array_pop($domainArray);
-        $mainDomain      = $subExtension;
+        $subExtension     = array_pop($domainArray);
+        $mainDomain       = $subExtension;
         if ($countDomainArray < 2) {
             $result[DRI::NAME_IS_TOP_DOMAIN]  = true;
             $result[DRI::NAME_IS_GTLD_DOMAIN] = true;
@@ -280,20 +295,20 @@ class Validator
                         $domainName
                     );
                 }
-                $result[DRI::NAME_MAIN_DOMAIN_NAME] = $topDomain;
+                $result[DRI::NAME_MAIN_DOMAIN_NAME]       = $topDomain;
                 $result[DRI::NAME_MAIN_DOMAIN_NAME_ASCII] = $this->tldCollector->encode($topDomain);
             }
         }
 
         $subExtensionAscii = $this->tldCollector->encode($subExtension);
-        $extensionAscii = $this->tldCollector->encode($extension);
+        $extensionAscii    = $this->tldCollector->encode($extension);
 
-        $extension                                 = $this->tldCollector->decode($extensionAscii);
+        $extension                                = $this->tldCollector->decode($extensionAscii);
         $result[DRI::NAME_FULL_DOMAIN_NAME_ASCII] = $domainNameAscii;
         $result[DRI::NAME_BASE_EXTENSION]         = $extension;
         $result[DRI::NAME_BASE_EXTENSION_ASCII]   = $extensionAscii;
         if ($countDomainArray >= 2) {
-            $domainNameSub = $this->tldCollector->decode($domainNameSub);
+            $domainNameSub                           = $this->tldCollector->decode($domainNameSub);
             $result[DRI::NAME_SUB_DOMAIN_NAME]       = $domainNameSub;
             $result[DRI::NAME_SUB_DOMAIN_NAME_ASCII] = $this->tldCollector->encode($domainNameSub);
         }
@@ -310,30 +325,30 @@ class Validator
                 );
             }
 
-            $result[DRI::NAME_IS_STLD_DOMAIN]      = !($result[DRI::NAME_IS_TOP_DOMAIN]);
+            $result[DRI::NAME_IS_STLD_DOMAIN]      = ! ($result[DRI::NAME_IS_TOP_DOMAIN]);
             $result[DRI::NAME_IS_TOP_DOMAIN]       = count($domainArray) === 1;
             $result[DRI::NAME_SUB_EXTENSION_ASCII] = $subExtensionAscii;
             $result[DRI::NAME_SUB_EXTENSION]       = $subExtension;
         }
 
-        if (!empty($subNestedDomain)) {
+        if (! empty($subNestedDomain)) {
             foreach ($subNestedDomain as $ext) {
                 $extPeriod = ".{$ext}.{$extensionAscii}";
                 if (substr($domainNameAscii, -strlen($extPeriod)) == $extPeriod) {
-                    $extArray      = explode('.', "{$ext}.{$extensionAscii}");
-                    $countExt      = count($extArray)-2;
-                    $domainArray   = explode('.', $domainName);
+                    $extArray    = explode('.', "{$ext}.{$extensionAscii}");
+                    $countExt    = count($extArray) - 2;
+                    $domainArray = explode('.', $domainName);
                     // remove extension
                     array_pop($extArray);
                     array_pop($domainArray);
                     // remove both sub
                     array_pop($domainArray);
-                    $subExtensionArray  = [array_pop($extArray)];
+                    $subExtensionArray = [array_pop($extArray)];
                     while ($countExt > 0) {
                         $countExt--;
                         array_unshift($subExtensionArray, array_pop($domainArray));
                     }
-                    $subExtension                           = implode('.', $subExtensionArray);
+                    $subExtension                          = implode('.', $subExtensionArray);
                     $result[DRI::NAME_IS_STLD_DOMAIN]      = true;
                     $result[DRI::NAME_SUB_EXTENSION_ASCII] = $subExtension;
                     $result[DRI::NAME_SUB_EXTENSION]       = $subExtension;
@@ -356,14 +371,14 @@ class Validator
             }
         }
 
-        $isTopDomain = isset($topDomain) || count($domainArray) < 2;
-        $result[DRI::NAME_IS_TOP_DOMAIN]  = $isTopDomain;
-        $result[DRI::NAME_IS_SUB_DOMAIN]  = ! $isTopDomain;
-        $result[DRI::NAME_IS_GTLD_DOMAIN] = ! $result[DRI::NAME_IS_STLD_DOMAIN];
-        $topDomain = isset($topDomain)
+        $isTopDomain                        = isset($topDomain) || count($domainArray) < 2;
+        $result[DRI::NAME_IS_TOP_DOMAIN]    = $isTopDomain;
+        $result[DRI::NAME_IS_SUB_DOMAIN]    = ! $isTopDomain;
+        $result[DRI::NAME_IS_GTLD_DOMAIN]   = ! $result[DRI::NAME_IS_STLD_DOMAIN];
+        $topDomain                          = isset($topDomain)
             ? $topDomain
             : ($isTopDomain ? array_pop($domainArray) : $mainDomain);
-        $result[DRI::NAME_MAIN_DOMAIN_NAME]       = $topDomain;
+        $result[DRI::NAME_MAIN_DOMAIN_NAME] = $topDomain;
 
         // check if domain name is too long
         if (strlen($topDomain) > static::MAX_LENGTH_BASE_DOMAIN_NAME) {
@@ -381,8 +396,8 @@ class Validator
             ? $result[DRI::NAME_MAIN_DOMAIN_NAME_ASCII]
             : $this->tldCollector->encode($topDomain);
 
-        if (!$isTopDomain) {
-            $subDomain = implode('.', $domainArray);
+        if (! $isTopDomain) {
+            $subDomain                               = implode('.', $domainArray);
             $result[DRI::NAME_SUB_DOMAIN_NAME_ASCII] = $this->tldCollector->encode($subDomain);
             $result[DRI::NAME_SUB_DOMAIN_NAME]       = $this->tldCollector->decode($subDomain);
         }
@@ -397,17 +412,17 @@ class Validator
         $result[DRI::NAME_EXTENSION_ASCII] = $fullExtensionASCII;
 
         $result[DRI::NAME_BASE_DOMAIN_NAME] = $result[DRI::NAME_SUB_DOMAIN_NAME];
-        if (!empty($result[DRI::NAME_SUB_DOMAIN_NAME])) {
+        if (! empty($result[DRI::NAME_SUB_DOMAIN_NAME])) {
             $result[DRI::NAME_BASE_DOMAIN_NAME] .= ".";
         }
-        $result[DRI::NAME_BASE_DOMAIN_NAME] .=  $result[DRI::NAME_MAIN_DOMAIN_NAME];
+        $result[DRI::NAME_BASE_DOMAIN_NAME] .= $result[DRI::NAME_MAIN_DOMAIN_NAME];
 
         $result[DRI::NAME_BASE_DOMAIN_NAME_ASCII] = $result[DRI::NAME_SUB_DOMAIN_NAME_ASCII];
-        if (!empty($result[DRI::NAME_SUB_DOMAIN_NAME_ASCII])) {
+        if (! empty($result[DRI::NAME_SUB_DOMAIN_NAME_ASCII])) {
             $result[DRI::NAME_BASE_DOMAIN_NAME_ASCII] .= ".";
         }
         $result[DRI::NAME_BASE_DOMAIN_NAME_ASCII] .= $result[DRI::NAME_MAIN_DOMAIN_NAME_ASCII];
-        $result[DRI::WHOIS_SERVER] = (array) $this
+        $result[DRI::WHOIS_SERVER]                = (array)$this
             ->getTldCollector()
             ->getServersFromExtension(
                 $result[DRI::NAME_BASE_EXTENSION]
@@ -420,6 +435,7 @@ class Validator
      * Throw Helper
      *
      * @param string $domainName
+     *
      * @throws InvalidDomainException
      */
     protected function throwDomainNameHasInvalidCharacters(string $domainName)
@@ -443,10 +459,10 @@ class Validator
      *
      * @return DomainRecord
      */
-    protected function reValidateDomainName(DomainRecord $collector, string $domainName) : DomainRecord
+    protected function reValidateDomainName(DomainRecord $collector, string $domainName): DomainRecord
     {
         // remove dot and validate all domain name string
-        $domainNameNoPeriods = str_replace('.', '', $collector->getBaseDomainName());
+        $domainNameNoPeriods     = str_replace('.', '', $collector->getBaseDomainName());
         $mainDomainNameNoPeriods = str_replace('.', '', $collector->getMainDomainName());
         switch ($collector->getBaseExtension()) {
             case 'id':
@@ -487,10 +503,11 @@ class Validator
      *
      * @return bool
      */
-    public function isValidDomain(string $domainName) : bool
+    public function isValidDomain(string $domainName): bool
     {
         try {
             $this->splitDomainName($domainName);
+
             return true;
         } catch (\Exception $e) {
             return false;
@@ -504,10 +521,11 @@ class Validator
      *
      * @return bool
      */
-    public function isValidTopLevelDomain(string $domainName) : bool
+    public function isValidTopLevelDomain(string $domainName): bool
     {
         try {
             $domain = $this->splitDomainName($domainName);
+
             return $domain->isTopLevelDomain();
         } catch (\Exception $e) {
             return false;
@@ -523,12 +541,12 @@ class Validator
      * Check if email is valid
      *
      * @param string $email email address
-     * @param bool   $allowIP allowed IP address as target
-     * @param bool   $checkMX by default check MX record from dns
+     * @param bool $allowIP allowed IP address as target
+     * @param bool $checkMX by default check MX record from dns
      *
      * @return bool
      */
-    public function isValidEmail(string $email, $allowIP = false, $checkMX = true) : bool
+    public function isValidEmail(string $email, $allowIP = false, $checkMX = true): bool
     {
         $domain = $this->reValidateEmailAddress($email, $allowIP, $checkMX);
         if (is_bool($domain)) {
@@ -546,10 +564,10 @@ class Validator
      *
      * @return ArrayCollector
      */
-    public function splitEmailDomain(string $email, $checkMX = true) : ArrayCollector
+    public function splitEmailDomain(string $email, $checkMX = true): ArrayCollector
     {
         $domain = $this->reValidateEmailAddress($email, true, $checkMX);
-        if (!$domain) {
+        if (! $domain) {
             throw new \InvalidArgumentException(
                 sprintf(
                     '%s is not a valid email',
@@ -600,11 +618,11 @@ class Validator
         }
 
         // split into array
-        $emailArray   = explode('@', $email);
+        $emailArray = explode('@', $email);
         // get email address
         $emailAddress = strtolower(array_shift($emailArray));
         // get domain
-        $domain       = implode('.', $emailArray);
+        $domain = implode('.', $emailArray);
         // it was must be invalid stop here
         if ($this->getBaseMailProviderValidator($emailAddress)->isMustBeInvalid()) {
             return false;
@@ -613,7 +631,7 @@ class Validator
         // local host & ip is not allowed
         if (preg_match(
             '/^(?:
-                (?:127|192\.168|10|169\.254|172\.16)\.
+                (?:127|192\.168|1?0|169\.254|172\.16)\.
                 |(?:
                     (?:
                         localhost|\:\:[0-9a-f]+|.+\.(?:dev|local(?:domain))
@@ -630,7 +648,7 @@ class Validator
         // split into array
         $domainNameArray = explode('.', $domainName);
         // get extension
-        $extEnd       = array_pop($domainNameArray);
+        $extEnd = array_pop($domainNameArray);
         // base sub domain
         $baseOrSub = array_pop($domainNameArray);
 
@@ -656,17 +674,17 @@ class Validator
                 : false;
         }
 
-        if (!empty($domainNameArray)) {
+        if (! empty($domainNameArray)) {
             // check common mail provider
             if (in_array($baseOrSub, $this->commonEmailProvider)) {
                 return false;
             }
 
             $commonProvider = ['hotmail', 'outlook', 'live', 'yahoo', 'rocketmail', 'ymail'];
-            $baseDomain = array_pop($domainNameArray);
+            $baseDomain     = array_pop($domainNameArray);
             if ($baseOrSub == 'co') {
                 $isCommon = in_array($baseDomain, $commonProvider);
-                if ($isCommon && !empty($domainNameArray)) {
+                if ($isCommon && ! empty($domainNameArray)) {
                     return false;
                 }
             }
@@ -684,7 +702,7 @@ class Validator
 
         // validate email
         if (! filter_var($email, FILTER_VALIDATE_EMAIL)
-            || ! $this->tldCollector->isExtensionExists($extEnd)
+             || ! $this->tldCollector->isExtensionExists($extEnd)
         ) {
             return false;
         }
@@ -702,9 +720,9 @@ class Validator
      * Please use parent::isCommonMailValid() and then check your mail to child method
      * on child classes
      *
-     * @param string $emailAddress  email address
-     * @param string $baseDomain    base domain detect
-     * @param string $ext           base extension
+     * @param string $emailAddress email address
+     * @param string $baseDomain base domain detect
+     * @param string $ext base extension
      *
      * @return bool|null  returning null if has no check and bool if check true if valid otherwise false
      */
@@ -717,7 +735,7 @@ class Validator
 
         // make base domain lower
         $baseDomain = strtolower($baseDomain);
-        $ext = $ext ? strtolower($ext) : '';
+        $ext        = $ext ? strtolower($ext) : '';
         switch ($baseDomain) {
             case 'gmail':
                 return $baseMailValidator->isValidGMail();
@@ -731,27 +749,27 @@ class Validator
             case 'aol':
                 return $baseMailValidator->isValidYahooMail();
             case 'hushmail':
-                    // husmail support com & me only
+                // husmail support com & me only
                 return $ext && in_array($ext, ['com', 'me'])
-                        ? $baseMailValidator->isValidMailComMail()
-                        : null;
+                    ? $baseMailValidator->isValidMailComMail()
+                    : null;
             case 'hush':
-                    // husmail with hush domain support com & ai only
+                // husmail with hush domain support com & ai only
                 return $ext && in_array($ext, ['com', 'ai'])
-                        ? $baseMailValidator->isValidMailComMail()
-                        : null;
+                    ? $baseMailValidator->isValidMailComMail()
+                    : null;
             case 'null':
             case 'programmer':
                 return $ext == 'net'
-                        ? $baseMailValidator->isValidMailComMail()
-                        : null;
+                    ? $baseMailValidator->isValidMailComMail()
+                    : null;
             case 'email':
             case 'hackermail':
             case 'mail':
             case 'inbox':
                 return $ext == 'com'
-                        ? $baseMailValidator->isValidMailComMail()
-                        : null;
+                    ? $baseMailValidator->isValidMailComMail()
+                    : null;
             case 'gmx':
                 return $baseMailValidator->isValidMailComMail();
             case 'yandex':
@@ -768,12 +786,12 @@ class Validator
      *
      * @return bool
      */
-    public function isMXExists(string $domainName) : bool
+    public function isMXExists(string $domainName): bool
     {
         if (! $this->isLocalIP($domainName) # don't allow local IP
-            && getmxrr($domainName, $mx)
+             && getmxrr($domainName, $mx)
         ) {
-            return !empty($mx);
+            return ! empty($mx);
         }
 
         return false;
@@ -789,7 +807,7 @@ class Validator
      *
      * @return IPRecord
      */
-    public function splitIP(string $ip) : IPRecord
+    public function splitIP(string $ip): IPRecord
     {
         $ipAddress = strtolower(trim($ip));
         if ($ipAddress == '') {
@@ -798,7 +816,7 @@ class Validator
                 E_WARNING
             );
         }
-        if (!$this->isValidIP($ip)) {
+        if (! $this->isValidIP($ip)) {
             if (strpos($ip, '.') === false) {
                 throw new InvalidDomainException(
                     sprintf(
@@ -811,15 +829,104 @@ class Validator
             }
         }
 
-        $isIpv6 = $this->isIPv6($ipAddress);
+        $isIpv6  = $this->isIPv6($ipAddress);
         $isLocal = $this->isLocalIP($ipAddress);
+        $servers = [DataParser::URI_IANA_WHOIS];
+        $path    = !$isIpv6
+            ? DataParser::PATH_IP4_BLOCKS
+            : DataParser::PATH_IP6_BLOCKS;
+        $isReserved  = false;
+        $server      = '';
+        $found = '';
+        foreach (file(
+            $path,
+            FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES
+        ) as $value) {
+            $value = trim($value);
+            if (! $value || $value[0] == '#') {
+                continue;
+            }
+            if ($value[0] === '[') {
+                $server = trim(trim($value, '[]'));
+                continue;
+            }
+
+            if (!$server) {
+                continue;
+            }
+            if (!$isIpv6) {
+                $value = explode('/', $value);
+                $value = reset($value);
+                if ($value[0] === '0') {
+                    $value = substr($value, 1);
+                }
+                if (strpos($ip, "{$value}.") === 0) {
+                    $found = $server;
+                    break;
+                }
+                continue;
+            }
+
+            if ($this->isIPv6OnRange($ipAddress, $value)) {
+                $found = $server;
+                break;
+            }
+        }
+
+        $server = $found;
+        $isPrivate   = $server === DataParser::RESERVED_PRIVATE;
+        $future      = $server === DataParser::RESERVED_FUTURE;
+        $isReserved  = $isPrivate || $future || $isLocal ? true : $isReserved;
+        if ($server && ! $isPrivate && strpos($server, '.') !== false) {
+            $servers = array_values(array_unique(array_merge([$server], $servers)));
+        }
+
         return new IPRecord([
-            IPRI::NAME_IP_ADDRESS  => $ipAddress,
-            IPRI::NAME_IS_LOCAL_IP => $isLocal,
-            IPRI::WHOIS_SERVER     => [DataParser::URI_IANA_WHOIS],
-            IPRI::NAME_IS_IPV4     => ! $isIpv6,
-            IPRI::NAME_IS_IPV6     => $isIpv6,
+            RNI::NAME_IP_ADDRESS  => $ipAddress,
+            RNI::NAME_IS_LOCAL_IP => $isLocal || $isPrivate,
+            RNI::NAME_IS_RESERVED => $isReserved,
+            RNI::NAME_IS_RESERVED_PRIVATE => $isReserved && $isPrivate,
+            RNI::NAME_IS_RESERVED_FUTURE => $isReserved && $future,
+            RNI::NAME_IS_IPV4     => ! $isIpv6,
+            RNI::NAME_IS_IPV6     => $isIpv6,
+            RNI::WHOIS_SERVER     => $servers,
         ]);
+    }
+
+    protected function isIPv6OnRange(string $ip, string $range) : bool
+    {
+        if (strpos($range, '/') === false) {
+            $range .= '/32';
+        }
+
+        list($net, $maskBits) = explode('/', $range);
+
+        $ip = inet_pton($ip);
+        $maskBits    = (int) $maskBits;
+        $binaryIP    = $this->iNet2Bits($ip);
+        $binaryNet   = $this->iNet2Bits(inet_pton($net));
+        $ip_net_bits = substr($binaryIP, 0, $maskBits);
+        $net_bits    = substr($binaryNet, 0, $maskBits);
+
+        return $ip_net_bits === $net_bits;
+    }
+
+    /**
+     * Convert Inet pyton to bits
+     * @param string $net
+     *
+     * @return string
+     */
+    protected function iNet2Bits(string $net) : string
+    {
+        $unpacked = unpack('A16', $net);
+        $unpacked = str_split($unpacked[1]);
+        $BinaryIp = '';
+        foreach ($unpacked as $char) {
+            $BinaryIp .= str_pad(decbin(ord($char)), 8, '0', STR_PAD_LEFT);
+        }
+
+        return $BinaryIp;
     }
 
     /**
@@ -829,7 +936,7 @@ class Validator
      *
      * @return bool
      */
-    public function isValidIP(string $ip) : bool
+    public function isValidIP(string $ip): bool
     {
         return $this->isIPv4($ip) || $this->isIPv6($ip);
     }
@@ -853,11 +960,14 @@ class Validator
      *
      * @return bool
      */
-    public function isIPv4(string $ipv4) : bool
+    public function isIPv4(string $ipv4): bool
     {
+        if (trim($ipv4) === '') {
+            return false;
+        }
         return filter_var($ipv4, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)
-            # no range allowed maybe used / for range
-            && ! preg_match('/[^0-9\.]/', $ipv4);
+               # no range allowed maybe used / for range
+               && ! preg_match('/[^0-9\.]/', $ipv4);
     }
 
     /**
@@ -867,12 +977,15 @@ class Validator
      *
      * @return bool
      */
-    public function isIPv6(string $ipv6) : bool
+    public function isIPv6(string $ipv6): bool
     {
+        if (trim($ipv6) === '') {
+            return false;
+        }
         return $ipv6 === '::1' # this is local address
-            || filter_var($ipv6, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)
-            # no range allowed maybe used / for range
-            && ! preg_match('/[^a-f0-9\:]/i', $ipv6);
+               || filter_var($ipv6, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)
+                  # no range allowed maybe used / for range
+                  && ! preg_match('/[^a-f0-9\:]/i', $ipv6);
     }
 
     /**
@@ -882,16 +995,20 @@ class Validator
      *
      * @return bool
      */
-    public function isLocalIPv4(string $ipv4) : bool
+    public function isLocalIPv4(string $ipv4): bool
     {
+        if (trim($ipv4) === '') {
+            return false;
+        }
+
         # no range allowed maybe used / for range
-        return ! preg_match('/(127|1?0|192\.168|169\.254|172\.16)\.|[^0-9\.]/', $ipv4)
-            && $this->isIPv4($ipv4)
-            && ! filter_var(
-                $ipv4,
-                FILTER_VALIDATE_IP,
-                FILTER_FLAG_IPV4 | FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
-            );
+        return preg_match('/(127|1?0|192\.168|169\.254|172\.16)\.|[^0-9\.]/', $ipv4)
+               && $this->isIPv4($ipv4)
+               && ! filter_var(
+                   $ipv4,
+                   FILTER_VALIDATE_IP,
+                   FILTER_FLAG_IPV4 | FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
+               );
     }
 
     /**
@@ -901,16 +1018,151 @@ class Validator
      *
      * @return bool
      */
-    public function isLocalIPv6(string $ipv6) : bool
+    public function isLocalIPv6(string $ipv6): bool
     {
         # no range allowed maybe used / for range
         return $this->isIPv6($ipv6)
-            && ( $ipv6 === '::1' # this is local IP
-                 || filter_var(
-                     $ipv6,
-                     FILTER_VALIDATE_IP,
-                     FILTER_FLAG_IPV6 | FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
-                 )
-           );
+               && ($ipv6 === '::1' # this is local IP
+                   || ! filter_var(
+                       $ipv6,
+                       FILTER_VALIDATE_IP,
+                       FILTER_FLAG_IPV6 | FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
+                   )
+               );
+    }
+
+    /* --------------------------------------------------------------------------------*
+     |                               ASN VALIDATOR                                     |
+     |---------------------------------------------------------------------------------|
+     */
+
+    /**
+     * Check if is valid asn
+     *
+     * @param string $asn
+     *
+     * @return bool
+     */
+    public function isValidASN(string $asn): bool
+    {
+        $asn = trim($asn);
+        if ($asn == '') {
+            return false;
+        }
+
+        return preg_match(DataParser::ASN_REGEX, $asn, $match) && ! empty($match[1]);
+    }
+
+    /**
+     * Split asn into Record
+     *
+     * @param string $asn
+     *
+     * @return ASNRecord
+     */
+    public function splitASN(string $asn) : ASNRecord
+    {
+        $asn = strtolower(trim($asn));
+        if ($asn == '') {
+            throw new \InvalidArgumentException(
+                'ASN could not be empty or whitespace only.',
+                E_WARNING
+            );
+        }
+
+        if (!preg_match(DataParser::ASN_REGEX, $asn, $match) || empty($match[2])) {
+            throw new InvalidDomainException(
+                sprintf(
+                    'Autonomous System Number %s is not valid',
+                    $asn
+                ),
+                E_WARNING,
+                $asn
+            );
+        }
+
+        $match = abs($match[2]);
+        $is32Bit = $match > DataParser::ASN16_MAX_RANGE;
+        $isReserved  = false;
+        $server      = '';
+        $servers = [DataParser::URI_IANA_WHOIS];
+        $found = '';
+        if (in_array($match, [
+            DataParser::ASN16_MAX_RANGE,
+            DataParser::ASN16_MIN_RANGE,
+            DataParser::ASN32_MIN_RANGE,
+            DataParser::ASN32_MIN_RANGE,
+        ])) {
+            $isReserved = DataParser::RESERVED;
+        } else {
+            $path    = $is32Bit
+                ? DataParser::PATH_AS32_DEL_BLOCKS
+                : DataParser::PATH_AS16_DEL_BLOCKS;
+            foreach (file(
+                $path,
+                FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES
+            ) as $value) {
+                $value = trim($value);
+                if (! $value || $value[0] == '#') {
+                    continue;
+                }
+                if ($value[0] === '[') {
+                    $server = trim(trim($value, '[]'));
+                    continue;
+                }
+                if (!$server) {
+                    continue;
+                }
+
+                if (strpos($value, '-')) {
+                    $explode = array_map('trim', explode('-', $value));
+                    if (count($explode) > 2) {
+                        continue;
+                    }
+                    $explode = array_values(array_filter($explode, 'is_numeric'));
+                    if (count($explode) === 0) {
+                        continue;
+                    }
+                    if (count($explode) === 2) {
+                        $first = abs(reset($explode));
+                        $last  = abs(next($explode));
+                        if ($first > $last) {
+                            continue;
+                        }
+                        if ($match >= $first && $match <= $last) {
+                            break;
+                        }
+                        continue;
+                    } elseif (abs(reset($explode)) === $match) {
+                        break;
+                    }
+                    continue;
+                }
+                if (abs($value) === $match) {
+                    $found = $server;
+                    break;
+                }
+            }
+        }
+        $server = $found;
+        $unAllocated = ! $isReserved && $server === DataParser::UNALLOCATED ;
+        $private     = $server === DataParser::RESERVED_PRIVATE;
+        $sample      = $server === DataParser::RESERVED_SAMPLE;
+        $isReserved  = $private || $sample ? true : $isReserved;
+        if ($server && !$isReserved && !$unAllocated) {
+            $servers = array_unique(array_merge([$server], $servers));
+        }
+
+        return new ASNRecord([
+            RAN::NAME_ASN_ADDRESS   => $match,
+            RAN::NAME_ASN_16        => !$is32Bit,
+            RAN::NAME_ASN_32        => $is32Bit,
+            RAN::NAME_ASN_TYPE => $is32Bit ? RAN::NAME_ASN_32 : RAN::NAME_ASN_16,
+            RAN::NAME_IS_UNALLOCATED      => $unAllocated,
+            RAN::NAME_IS_RESERVED         => $isReserved,
+            RAN::NAME_IS_RESERVED_SAMPLE  => $isReserved && $sample,
+            RAN::NAME_IS_RESERVED_PRIVATE => $isReserved && $private,
+            RAN::WHOIS_SERVER             => $servers
+        ]);
     }
 }

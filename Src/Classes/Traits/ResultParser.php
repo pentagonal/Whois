@@ -46,15 +46,15 @@ trait ResultParser
             '~
                 # DNSSEC Data & Status
                 DNSSEC\s*\:(?P<domain_dnssec_status>[^\n]+)
-                | DNSSEC\s+(?:[^\:]+)\:(?P<domain_dnssec>[^\n]+)
+                | (DNSSEC\s+(?:[^\:]+)|Signing\s*Key(?:[^\:]+)?)\:(?P<domain_dnssec>[^\n]+)
 
                 # Domain ID
                 | (?:Registry)?\s*Domain\s+ID\:(?P<domain_id>[^\n]+)
 
                 # Date
                 | (Updated?\s*Date|Last\s*Updated?)(?:([^\:]+)?On)?(?:[^\:]+)?\:(?P<date_updated>[^\n]+)
-                | (?:Creat(?:e[ds]?|ions?)\s*(On|Date)|Registered)(?:[^\:]+)?\:(?P<date_created>[^\n]+)
-                | Expir(?:e[ds]?|y|ations?)\s*Date(?:([^\:]+)?On)?\s*\:(?P<date_expired>[^\n]+)
+                | (?:Creat(?:e[ds]?|ions?)\s*(On|Date)|(?:Date\s*)?Registered)(?:[^\:]+)?\:(?P<date_created>[^\n]+)
+                | Expir(?:e[ds]?|y|ations?)\s*(?:Date)?(?:([^\:]+)?On)?\s*\:(?P<date_expired>[^\n]+)
                 
                 # Last Update DB & Status
                 | (?:\>\>\>?)?\s*
@@ -77,14 +77,13 @@ trait ResultParser
                 | Registr(?:ar|y)(?:\s*IANA)(?:[^\:]+)?ID\s*\:(?P<registrar_iana_id>[^\n]+)
                 | Registr(?:ar|y)(?:Contact)?(?:\s*Name(?:[^\:]+)?|\s*)\:(?P<registrar_name>[^\n]+)
                 | (?:
-                    Registr(?:ar|y)\s*(?:Contact(?:[^\:]+)?)?(?:Organi[zs][^\:]+|Company)
+                    Registr(?:ar|y)\s*(?:Contact(?:[^\:]+)?)?(?:Organi[zs][^\:]+|Company|Org\.?\s*)
                     | Authorized\s*Agency
                   )
                   (?:[^\:]+)?
                     \:(?P<registrar_org>[^\n]+)
 
-                | Registr(?:ar|y)\s*
-                    (?:Contact(?:[^\:]+)?)?(?:Contact\s*)?(E\-?)?mail(?:[^\:]+)?\:(?P<registrar_email>[^\n]+)
+                | Registr(?:ar|y)\s*((?:Contact|Admin)\s+)?E\-?mail(?:[^\:]+)?\:(?P<registrar_email>[^\n]+)
                 | Registr(?:ar|y)\s*(?:Contact(?:[^\:]+)?)?Country(?:[^\:]+)?\:(?P<registrar_country>[^\n]+)
                 | Registr(?:ar|y)\s*(?:Contact(?:[^\:]+)?)?(?:State|Province)(?:[^\:]+)?
                     \:(?P<registrar_state>[^\n]+)
@@ -102,8 +101,9 @@ trait ResultParser
 
                 # Registrant Data
                 | (?:Registrant|owner)\s*ID(?:[^\:]+)?\:(?P<registrant_id>[^\n]+)
-                | (?:Registrant|owner)(?:Contact)?(?:\s*Name(?:[^\:]+)?|\s*)\:(?P<registrant_name>[^\n]+)
-                | ((?:Registrant|owner)\s*|\n)(?:Organi[zs][^\:]+|Company)(?:[^\:]+)?\:(?P<registrant_org>[^\n]+)
+                | (?:Registrant|owner)(?:(?:Contact)?(?:\s*Name(?:[^\:]+)?|\s*))\:(?P<registrant_name>[^\n]+)
+                | (?:(?:Registrant|owner)\s*|\n)(?:Organi[zs][^\:]+|Company|Org\.?\s*)
+                    (?:[^\:]+)?\:(?P<registrant_org>[^\n]+)
                 | (?:Registrant|owner)\s*(?:Contact\s*)?(?:E\-?)?mail(?:[^\:]+)?\:(?P<registrant_email>[^\n]+)
                 | (?:Registrant|owner)\s*Country(?:[^\:]+)?\:(?P<registrant_country>[^\n]+)
                 | (?:Registrant|owner)\s*(?:State|Province)(?:[^\:]+)?\:(?P<registrant_state>[^\n]+)
@@ -116,7 +116,7 @@ trait ResultParser
                 # Registrant Billing
                 | (?:Bill(?:s|ing)?)\s*ID(?:[^\:]+)?\:(?P<billing_id>[^\n]+)
                 | (?:Bill(?:s|ing)?)\s*(?:Contact)?(?:\s*Name(?:[^\:]+)?|\s*)\:(?P<billing_name>[^\n]+)
-                | (?:Bill(?:s|ing)?)\s*(?:Organi[zs][^\:]+|Company)(?:[^\:]+)?\:(?P<billing_org>[^\n]+)
+                | (?:Bill(?:s|ing)?)\s*(?:Organi[zs][^\:]+|Company|Org\.?\s*)(?:[^\:]+)?\:(?P<billing_org>[^\n]+)
                 | (?:Bill(?:s|ing)?)\s*(?:Contact\s*)?(?:E\-?)?mail(?:[^\:]+)?\:(?P<billing_email>[^\n]+)
                 | (?:Bill(?:s|ing)?)\s*Country(?:[^\:]+)?\:(?P<billing_country>[^\n]+)
                 | (?:Bill(?:s|ing)?)\s*(?:State|Province)(?:[^\:]+)?\:(?P<billing_state>[^\n]+)
@@ -128,30 +128,35 @@ trait ResultParser
 
 
                 # Registrant Admin
-                | (?:Admin(?:istrative)?|AC\s+)\s*ID(?:[^\:]+)?\:(?P<admin_id>[^\n]+)
-                | (?:Admin(?:istrative)?|AC\s+)\s*(?:Contact)?(?:\s*Name(?:[^\:]+)?|\s*)\:(?P<admin_name>[^\n]+)
-                | (?:Admin(?:istrative)?|AC\s+)\s*(?:Organi[zs][^\:]+|Company)(?:[^\:]+)?\:(?P<admin_org>[^\n]+)
-                | (?:Admin(?:istrative)?|AC\s+)\s*(?:Contact\s*)?(?:E\-?)?mail(?:[^\:]+)?\:(?P<admin_email>[^\n]+)
-                | (?:Admin(?:istrative)?|AC\s+)\s*Country(?:[^\:]+)?\:(?P<admin_country>[^\n]+)
-                | (?:Admin(?:istrative)?|AC\s+)\s*(?:State|Province)(?:[^\:]+)?\:(?P<admin_state>[^\n]+)
-                | (?:Admin(?:istrative)?|AC\s+)\s*City(?:[^\:]+)?\:(?P<admin_city>[^\n]+)
-                | (?:Admin(?:istrative)?|AC\s+)\s*(?:Street|Address)(?:[^\:]+)?\:(?P<admin_street>[^\n]+)
-                | (?:Admin(?:istrative)?|AC\s+)\s*(?:Postal|Post|Zip)(?:[^\:]+)?\:(?P<admin_postal>[^\n]+)
-                | (?:Admin(?:istrative)?|AC\s+)\s*Phone(?:[^\:]+)?\:(?P<admin_phone>[^\n]+)
-                | (?:Admin(?:istrative)?|AC\s+)\s*Fax(?:[^\:]+)?\:(?P<admin_fax>[^\n]+)
+                | (?:Admin(?:istra(?:tive|sions?))?|AC\s+)\s*ID(?:[^\:]+)?\:(?P<admin_id>[^\n]+)
+                | (?:Admin(?:istrative(?:tive|sions?))?|AC\s+)\s*
+                      (?:(?:Contact)?(?:\s*Name(?:[^\:]+)?|\s*))\:(?P<admin_name>[^\n]+)
+                | (?:Admin(?:istrative(?:tive|sions?))?|AC\s+)\s*(?:Organi[zs][^\:]+|Company|Org\.?\s*)
+                      (?:[^\:]+)?\:(?P<admin_org>[^\n]+)
+                | (?:Admin(?:istrative(?:tive|sions?))?|AC\s+)\s*(?:Contact\s*)?(?:E\-?)?mail(?:[^\:]+)?\:
+                    (?P<admin_email>[^\n]+)
+                | (?:Admin(?:istrative(?:tive|sions?))?|AC\s+)\s*Country(?:[^\:]+)?\:(?P<admin_country>[^\n]+)
+                | (?:Admin(?:istrative(?:tive|sions?))?|AC\s+)\s*(?:State|Province)(?:[^\:]+)?\:(?P<admin_state>[^\n]+)
+                | (?:Admin(?:istrative(?:tive|sions?))?|AC\s+)\s*City(?:[^\:]+)?\:(?P<admin_city>[^\n]+)
+                | (?:Admin(?:istrative(?:tive|sions?))?|AC\s+)\s*(?:Street|Address)
+                    (?:[^\:]+)?\:(?P<admin_street>[^\n]+)
+                | (?:Admin(?:istrative(?:tive|sions?))?|AC\s+)\s*(?:Postal|Post|Zip)(?:[^\:]+)?\:
+                    (?P<admin_postal>[^\n]+)
+                | (?:Admin(?:istrative(?:tive|sions?))?|AC\s+)\s*Phone(?:[^\:]+)?\:(?P<admin_phone>[^\n]+)
+                | (?:Admin(?:istrative(?:tive|sions?))?|AC\s+)\s*Fax(?:[^\:]+)?\:(?P<admin_fax>[^\n]+)
 
                 # Registrant Tech
-                | (?:Tech(?:[^\:]+)?)\s*ID(?:[^\:]+)?\:(?P<tech_id>[^\n]+)
-                | (?:Tech(?:[^\:]+)?)\s*(?:Contact)?(?:\s*Name(?:[^\:]+)?|\s*)\:(?P<tech_name>[^\n]+)
-                | (?:Tech(?:[^\:]+)?)\s*(?:Organi[zs][^\:]+|Company)(?:[^\:]+)?\:(?P<tech_org>[^\n]+)
-                | (?:Tech(?:[^\:]+)?)\s*(?:Contact\s*)?Email(?:[^\:]+)?\:(?P<tech_email>[^\n]+)
-                | (?:Tech(?:[^\:]+)?)\s*Country(?:[^\:]+)?\:(?P<tech_country>[^\n]+)
-                | (?:Tech(?:[^\:]+)?)\s*(?:State|Province)(?:[^\:]+)?\:(?P<tech_state>[^\n]+)
-                | (?:Tech(?:[^\:]+)?)\s*City(?:[^\:]+)?\:(?P<tech_city>[^\n]+)
-                | (?:Tech(?:[^\:]+)?)\s*(?:Street|Addre)(?:[^\:]+)?\:(?P<tech_street>[^\n]+)
-                | (?:Tech(?:[^\:]+)?)\s*(?:Postal|Post)(?:[^\:]+)?\:(?P<tech_postal>[^\n]+)
-                | (?:Tech(?:[^\:]+)?)\s*Phone(?:[^\:]+)?\:(?P<tech_phone>[^\n]+)
-                | (?:Tech(?:[^\:]+)?)\s*Fax(?:[^\:]+)?\:(?P<tech_fax>[^\n]+)
+                | (?:Tech(?:[^\:\s]+)?)\s*ID(?:[^\:]+)?\:(?P<tech_id>[^\n]+)
+                | (?:Tech(?:[^\:\s]+)?)\s*(?:(?:Contact)?(?:\s*Name(?:[^\:]+)?|\s*))\:(?P<tech_name>[^\n]+)
+                | (?:Tech(?:[^\:\s]+)?)\s*(?:Organi[zs][^\:]+|Company|Org\.?\s*)(?:[^\:]+)?\:(?P<tech_org>[^\n]+)
+                | (?:Tech(?:[^\:\s]+)?)\s*(?:Contact\s*)?Email(?:[^\:]+)?\:(?P<tech_email>[^\n]+)
+                | (?:Tech(?:[^\:\s]+)?)\s*Country(?:[^\:]+)?\:(?P<tech_country>[^\n]+)
+                | (?:Tech(?:[^\:\s]+)?)\s*(?:State|Province)(?:[^\:]+)?\:(?P<tech_state>[^\n]+)
+                | (?:Tech(?:[^\:\s]+)?)\s*City(?:[^\:]+)?\:(?P<tech_city>[^\n]+)
+                | (?:Tech(?:[^\:\s]+)?)\s*(?:Street|Addre)(?:[^\:]+)?\:(?P<tech_street>[^\n]+)
+                | (?:Tech(?:[^\:\s]+)?)\s*(?:Postal|Post)(?:[^\:]+)?\:(?P<tech_postal>[^\n]+)
+                | (?:Tech(?:[^\:\s]+)?)\s*Phone(?:[^\:]+)?\:(?P<tech_phone>[^\n]+)
+                | (?:Tech(?:[^\:\s]+)?)\s*Fax(?:[^\:]+)?\:(?P<tech_fax>[^\n]+)
 
                 # ICANN Report Url
                 | URL\s+of(?:\s+the)?\s+ICANN[^\:]+\:\s*(?P<icann_report_url>https?\:\/\/[^\n]+)

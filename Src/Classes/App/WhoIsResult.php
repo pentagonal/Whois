@@ -15,6 +15,7 @@ declare(strict_types=1);
 namespace Pentagonal\WhoIs\App;
 
 use Pentagonal\WhoIs\Abstracts\WhoIsResultAbstract;
+use Pentagonal\WhoIs\Interfaces\RecordASNNetworkInterface;
 use Pentagonal\WhoIs\Interfaces\RecordDomainNetworkInterface;
 use Pentagonal\WhoIs\Interfaces\RecordNetworkInterface;
 use Pentagonal\WhoIs\Util\DataParser;
@@ -32,7 +33,10 @@ class WhoIsResult extends WhoIsResultAbstract
      |                                   UTILITY                                       |
      |---------------------------------------------------------------------------------|
      */
+
     /**
+     * Helper to Get First Data or ->
+     *
      * @param ArrayCollector $collector
      * @param $offset
      * @param null $default
@@ -73,11 +77,11 @@ class WhoIsResult extends WhoIsResultAbstract
         $collector[static::KEY_DOMAIN] = $dataDomain;
         if ($match->count() === 0) {
             $registeredStatus = DataParser::getRegisteredDomainStatus($data);
-            $dataDomain[static::KEY_REGISTERED] = $registeredStatus === $dataParser::UNKNOWN
+            $dataDomain[static::KEY_REGISTERED] = $registeredStatus === $dataParser::STATUS_UNKNOWN
                 ? null
                 : (
-                    $registeredStatus === $dataParser::RESERVED
-                    || $registeredStatus !== $dataParser::UNREGISTERED
+                    $registeredStatus === $dataParser::STATUS_RESERVED
+                    || $registeredStatus !== $dataParser::STATUS_UNREGISTERED
                        && ! empty($match['name_server'])
                        && count($match['name_server']) > 0
                 );
@@ -86,22 +90,27 @@ class WhoIsResult extends WhoIsResultAbstract
 
         $reportUrl = $this->getFirstOr($match, 'icann_report_url');
         $dnsSecStatusArray = (array) $match['domain_dnssec_status'];
-        $dnssec_status = reset($dnsSecStatusArray) ?: null;
+        $dnsSecStatus = reset($dnsSecStatusArray) ?: null;
         if (count($dnsSecStatusArray) > 0) {
-            $dnssec_status = reset($dnsSecStatusArray);
+            $dnsSecStatus = reset($dnsSecStatusArray);
             foreach ($dnsSecStatusArray as $value) {
                 if (preg_match('/[^a-z0-9\_\-\s]/i', $value)) {
                     continue;
                 }
-                $dnssec_status = $value;
+                $dnsSecStatus = $value;
                 break;
             }
         }
+
         // domain
         $dataDomain[static::KEY_ID]                         = $this->getFirstOr($match, 'domain_id');
         $dataDomain[static::KEY_STATUS]                     = (array) $match['domain_status'];
         $dataDomain[static::KEY_NAME_SERVER]                = (array) $match['name_server'];
-        $dataDomain[static::KEY_DNSSEC][static::KEY_STATUS] = $dnssec_status;
+        $dataDomain[static::KEY_NAME_SERVER]                = array_map(
+            'strtolower',
+            array_map('trim', $dataDomain[static::KEY_NAME_SERVER])
+        );
+        $dataDomain[static::KEY_DNSSEC][static::KEY_STATUS] = $dnsSecStatus;
         $dataDomain[static::KEY_DNSSEC][static::KEY_DATA]   = (array) $match['domain_dnssec'];
         $collector[static::KEY_DOMAIN] = $dataDomain;
 
@@ -321,11 +330,11 @@ class WhoIsResult extends WhoIsResultAbstract
 
         if (!$hasSet) {
             $registeredStatus = DataParser::getRegisteredDomainStatus($this->getOriginalResultString());
-            $registeredStatus = $registeredStatus === $dataParser::UNKNOWN
+            $registeredStatus = $registeredStatus === $dataParser::STATUS_UNKNOWN
                 ? null
                 : (
-                    $registeredStatus === $dataParser::RESERVED
-                    || $registeredStatus !== $dataParser::UNREGISTERED
+                    $registeredStatus === $dataParser::STATUS_RESERVED
+                    || $registeredStatus !== $dataParser::STATUS_UNREGISTERED
                        && ! empty($dataDomain[static::KEY_NAME_SERVER])
                        && count($dataDomain[static::KEY_NAME_SERVER]) > 0
                 );
@@ -336,18 +345,51 @@ class WhoIsResult extends WhoIsResultAbstract
     }
 
     /**
+     * Parse Result Autonomous System Numbers
+     *
+     * @param string $data
+     * @param ArrayCollector $collector
+     *
+     * @return ArrayCollector
+     */
+    protected function parseDetailDataForASN(string $data, ArrayCollector $collector) : ArrayCollector
+    {
+        return $collector;
+    }
+
+    /**
+     * Parse Result IP Address
+     *
+     * @param string $data
+     * @param ArrayCollector $collector
+     *
+     * @return ArrayCollector
+     */
+    protected function parseDetailDataForIP(string $data, ArrayCollector $collector) : ArrayCollector
+    {
+        return $collector;
+    }
+
+    /**
      * @todo completion parsing detail
      */
     protected function parseDetail() : ArrayCollector
     {
         $dataParser = $this->getDataParser();
+
         $this->dataDetail[static::KEY_DATA][static::KEY_RESULT][static::KEY_CLEAN] = $dataParser
             ->cleanUnwantedWhoIsResult(
                 $this->getOriginalResultString()
             );
 
         if ($this->networkRecord instanceof RecordDomainNetworkInterface) {
-            $this->dataDetail = $this->parseDetailDataForDomain(
+            return $this->dataDetail = $this->parseDetailDataForDomain(
+                $this->getOriginalResultString(),
+                $this->dataDetail
+            );
+        }
+        if ($this->networkRecord instanceof RecordASNNetworkInterface) {
+            return $this->dataDetail = $this->parseDetailDataForASN(
                 $this->getOriginalResultString(),
                 $this->dataDetail
             );

@@ -72,7 +72,7 @@ because some of registrar or TLD provider
 does not permit their whois data for public.
 ```
 
-You can get `Whois Servers` list on : [Src/Data/Servers/AvailableServers.php](Src/Data/Servers/AvailableServers.php)
+You can get `Whois Servers` list on : [Src/Data/Servers/AvailableServers.php](Src/Data/Extensions/AvailableServers.php)
 
 
 

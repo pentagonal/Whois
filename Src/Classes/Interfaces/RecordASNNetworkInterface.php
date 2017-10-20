@@ -21,6 +21,14 @@ namespace Pentagonal\WhoIs\Interfaces;
 interface RecordASNNetworkInterface extends RecordNetworkInterface
 {
     const NAME_ASN_ADDRESS = 'ASN_ADDRESS';
+    const NAME_ASN_TYPE    = 'ASN_TYPE';
+    const NAME_ASN_32      = 'ASN_32_BIT';
+    const NAME_ASN_16      = 'ASN_16_BIT';
+
+    const NAME_IS_RESERVED = 'IS_RESERVED';
+    const NAME_IS_RESERVED_PRIVATE = 'IS_PRIVATE';
+    const NAME_IS_RESERVED_SAMPLE  = 'IS_SAMPLE';
+    const NAME_IS_UNALLOCATED      = 'IS_UNALLOCATED';
 
     /**
      * Get ASN Number
@@ -28,4 +36,32 @@ interface RecordASNNetworkInterface extends RecordNetworkInterface
      * @return string
      */
     public function getASNumber() : string;
+
+    /**
+     * Check if ASN is Reserved
+     *
+     * @return bool
+     */
+    public function isReserved() : bool;
+
+    /**
+     * Check if ASN is Reserved And for private
+     *
+     * @return bool
+     */
+    public function isReservedPrivate() : bool;
+
+    /**
+     * Check if ASN is Reserved And for sample
+     *
+     * @return bool
+     */
+    public function isReservedSample() : bool;
+
+    /**
+     * Check if ASN is Unallocated
+     *
+     * @return bool
+     */
+    public function isUnallocated() : bool;
 }

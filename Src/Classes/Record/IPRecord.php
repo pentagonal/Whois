@@ -24,39 +24,18 @@ use Pentagonal\WhoIs\Util\DataParser;
 class IPRecord extends ArrayCollector implements RecordIPNetworkInterface
 {
     /**
-     * @var bool
-     */
-    protected $whoIsServerHasCheck = false;
-
-    /**
      * {@inheritdoc}
      */
-    public function getPointer(): string
+    public function getPointer() : string
     {
         return $this->getIPAddress();
     }
 
     /**
      * {@inheritdoc}
-     * @return array
      */
-    public function getWhoIsServers(): array
+    public function getWhoIsServers() : array
     {
-        if (!$this->whoIsServerHasCheck) {
-            $servers = (array) $this[self::WHOIS_SERVER];
-            $server = DataParser::URI_IANA_WHOIS;
-            $this->whoIsServerHasCheck = true;
-            if (!$this->isLocalIP()) {
-                try {
-                    $request = new WhoIsRequest($this->getIPAddress(), $server);
-                    $server = DataParser::getWhoIsServerFromResultData($request->getBodyString()) ?: $server;
-                    $this[self::WHOIS_SERVER] = array_merge([$server], $servers);
-                } catch (\Throwable $e) {
-                    // pass
-                }
-            }
-        }
-
         return (array) $this[self::WHOIS_SERVER];
     }
 
@@ -73,7 +52,7 @@ class IPRecord extends ArrayCollector implements RecordIPNetworkInterface
      */
     public function isLocalIP() : bool
     {
-        return $this[self::NAME_IS_LOCAL_IP];
+        return $this[self::NAME_IS_LOCAL_IP] === true;
     }
 
     /**
@@ -81,7 +60,7 @@ class IPRecord extends ArrayCollector implements RecordIPNetworkInterface
      */
     public function IPv4() : bool
     {
-        return $this[self::NAME_IS_IPV4];
+        return $this[self::NAME_IS_IPV4] === true;
     }
 
     /**
@@ -89,7 +68,37 @@ class IPRecord extends ArrayCollector implements RecordIPNetworkInterface
      */
     public function IPv6() : bool
     {
-        return $this[self::NAME_IS_IPV6];
+        return $this[self::NAME_IS_IPV6] === true;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function isReserved() : bool
+    {
+        if ($this[self::NAME_IS_RESERVED] !== true) {
+            $this[self::NAME_IS_RESERVED] = $this->isLocalIP()
+                || $this->isReservedPrivate()
+                || $this->isReservedFuture();
+        }
+
+        return $this[self::NAME_IS_RESERVED];
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function isReservedPrivate() : bool
+    {
+        return $this[self::NAME_IS_RESERVED_PRIVATE] === true;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function isReservedFuture(): bool
+    {
+        return $this[self::NAME_IS_RESERVED_FUTURE];
     }
 
     /**

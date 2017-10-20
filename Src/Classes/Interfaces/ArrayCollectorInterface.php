@@ -97,6 +97,16 @@ interface ArrayCollectorInterface extends \IteratorAggregate, \ArrayAccess, \Ser
     public function remove($keyName);
 
     /**
+     * Get value by Offset
+     *
+     * @param mixed $offset
+     * @param mixed $default
+     *
+     * @return mixed
+     */
+    public function get($offset, $default = null);
+
+    /**
      * Get array keys
      *
      * @return array

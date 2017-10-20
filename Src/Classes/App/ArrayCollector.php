@@ -33,12 +33,15 @@ class ArrayCollector extends \ArrayObject implements ArrayCollectorInterface
 
     /**
      * {@inheritdoc}
+     * @return mixed
      */
     public function get($keyName, $default = null)
     {
-        return $this->exist($keyName)
-            ? $this[$keyName]
-            : $default;
+        if (array_key_exists($keyName, (array) $this)) {
+            return $this[$keyName];
+        }
+
+        return $default;
     }
 
     /**
@@ -51,6 +54,7 @@ class ArrayCollector extends \ArrayObject implements ArrayCollectorInterface
 
     /**
      * {@inheritdoc}
+     * @return mixed
      */
     public function first()
     {
@@ -59,6 +63,7 @@ class ArrayCollector extends \ArrayObject implements ArrayCollectorInterface
 
     /**
      * {@inheritdoc}
+     * @return mixed
      */
     public function last()
     {
@@ -67,6 +72,7 @@ class ArrayCollector extends \ArrayObject implements ArrayCollectorInterface
 
     /**
      * {@inheritdoc}
+     * @return mixed
      */
     public function next()
     {
@@ -75,6 +81,7 @@ class ArrayCollector extends \ArrayObject implements ArrayCollectorInterface
 
     /**
      * {@inheritdoc}
+     * @return mixed
      */
     public function current()
     {
@@ -83,6 +90,7 @@ class ArrayCollector extends \ArrayObject implements ArrayCollectorInterface
 
     /**
      * {@inheritdoc}
+     * @return mixed
      */
     public function prev()
     {
@@ -114,11 +122,7 @@ class ArrayCollector extends \ArrayObject implements ArrayCollectorInterface
     }
 
     /**
-     * check if contains expected value
-     *
-     * @param string $value
-     *
-     * @return bool
+     * {@inheritdoc}
      */
     public function contain($value) : bool
     {
@@ -127,7 +131,6 @@ class ArrayCollector extends \ArrayObject implements ArrayCollectorInterface
 
     /**
      * {@inheritdoc}
-     * @return array
      */
     public function toArray(): array
     {
@@ -136,7 +139,6 @@ class ArrayCollector extends \ArrayObject implements ArrayCollectorInterface
 
     /**
      * {@inheritdoc}
-     * @return array
      */
     public function keys() : array
     {
@@ -145,7 +147,6 @@ class ArrayCollector extends \ArrayObject implements ArrayCollectorInterface
 
     /**
      * {@inheritdoc}
-     * @return array
      */
     public function values() : array
     {

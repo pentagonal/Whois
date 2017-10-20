@@ -20,6 +20,7 @@ use Pentagonal\WhoIs\Interfaces\RecordDomainNetworkInterface;
 use Pentagonal\WhoIs\Interfaces\RecordIPNetworkInterface;
 use Pentagonal\WhoIs\Interfaces\RecordNetworkInterface;
 use Pentagonal\WhoIs\Interfaces\WhoIsNetworkResultInterface;
+use Pentagonal\WhoIs\Record\DomainRecord;
 use Pentagonal\WhoIs\Traits\ResultParser;
 use Pentagonal\WhoIs\Util\DataParser;
 
@@ -99,6 +100,11 @@ abstract class WhoIsResultAbstract implements WhoIsNetworkResultInterface
     use ResultParser;
 
     /**
+     * @var bool
+     */
+    protected $hasParsed = false;
+
+    /**
      * @var DataParser|string
      */
     protected $dataParser = DataParser::class;
@@ -107,11 +113,6 @@ abstract class WhoIsResultAbstract implements WhoIsNetworkResultInterface
      * @var ArrayCollector
      */
     protected $dataDetail;
-
-    /**
-     * @var bool
-     */
-    protected $hasParsed = false;
 
     /**
      * @var RecordNetworkInterface
@@ -167,6 +168,8 @@ abstract class WhoIsResultAbstract implements WhoIsNetworkResultInterface
      */
 
     /**
+     * Magic Method for @uses json_encode()
+     *
      * @return array
      */
     public function jsonSerialize() : array
@@ -448,10 +451,14 @@ abstract class WhoIsResultAbstract implements WhoIsNetworkResultInterface
     protected function createArrayCollector(string $stringData) : ArrayCollector
     {
         $whoIsServer = [];
-        if (($server = DataParser::getWhoIsServerFromResultData($stringData))) {
-            $whoIsServer = [$server];
+        if ($this->networkRecord instanceof DomainRecord) {
+            if (($server = DataParser::getWhoIsServerFromResultData($stringData))) {
+                $whoIsServer = [$server];
+            }
         }
 
+        $servers = $this->networkRecord->getWhoIsServers();
+        $whoIsServer = array_merge($whoIsServer, $servers);
         $collection = [
             static::KEY_DATA => [
                 static::KEY_NOTE     => null,

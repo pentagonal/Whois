@@ -12,6 +12,7 @@
 
 namespace Pentagonal\WhoIs\Util;
 
+use Pentagonal\WhoIs\App\ArrayCollector;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\StreamInterface;
@@ -25,29 +26,53 @@ use Psr\Http\Message\StreamInterface;
  */
 class DataParser
 {
-    const REGISTERED    = true;
-    const RESERVED      = 1;
-    const UNREGISTERED  = false;
+    // status
+    const STATUS_REGISTERED    = true;
+    const STATUS_RESERVED      = 1;
+    const STATUS_UNREGISTERED  = false;
+    const STATUS_UNKNOWN = 'UNKNOWN';
+    const STATUS_LIMIT   = 'LIMIT';
 
-    const UNKNOWN = 'UNKNOWN';
-    const LIMIT   = 'LIMIT';
+    // 16bit = 0-65535 & 32 bit 65536-4199999999
+    const ASN_REGEX = '/^(ASN?)?([0-9]|[1-9][0-9]{0,4}|[1-4][1]?[0-9]{0,8})$/i';
+    // asn bit range
+    const ASN16_MIN_RANGE = 0;
+    const ASN16_MAX_RANGE = 65535;
+    const ASN32_MIN_RANGE = 65536;
+    const ASN32_MAX_RANGE = 4199999999;
 
-    const ASN_REGEX = '/^(ASN?)?([0-9]{1,20})$/i';
-
+    // base socket whois server port
     const PORT_WHOIS = 43;
 
-    // Uri
+    // URL
     const
         URI_IANA_WHOIS = 'whois.iana.org',
         URI_IANA_IDN   = 'https://data.iana.org/TLD/tlds-alpha-by-domain.txt',
         URI_PUBLIC_SUFFIX = 'https://publicsuffix.org/list/effective_tld_names.dat',
-        URI_CACERT     = 'https://curl.haxx.se/ca/cacert.pem';
+        URI_CACERT     = 'https://curl.haxx.se/ca/cacert.pem',
+        // asn table
+        URI_IANA_ASN_TABLE     = 'https://www.iana.org/assignments/as-numbers/as-numbers.xhtml',
+        URI_IANA_ASN_TABLE_XML = 'https://www.iana.org/assignments/as-numbers/as-numbers.xml',
+        // ip table
+        URI_IANA_IPV4_TABLE     = 'https://www.iana.org/assignments/ipv4-address-space/ipv4-address-space.xhtml',
+        URI_IANA_IPV4_TABLE_XML = 'https://www.iana.org/assignments/ipv4-address-space/ipv4-address-space.xml',
+        URI_IANA_IPV6_TABLE     = 'https://www.iana.org/assignments'
+                              . '/ipv6-unicast-address-assignments/ipv6-unicast-address-assignments.xhtml',
+        URI_IANA_IPV6_TABLE_XML = 'https://www.iana.org/assignments'
+                              . '/ipv6-unicast-address-assignments/ipv6-unicast-address-assignments.xml';
 
     // Path
     const
-        PATH_WHOIS_SERVERS = __DIR__ . '/../../Data/Servers/AvailableServers.php',
-        PATH_EXTENSIONS_AVAILABLE = __DIR__ . '/../../Data/Servers/AvailableExtensions.php',
-        PATH_CACERT     = __DIR__ . '/../../Data/Certs/cacert.pem';
+        DATA_PATH          = __DIR__ . '/../../Data',
+        PATH_WHOIS_SERVERS = self::DATA_PATH . '/Extensions/AvailableServers.php',
+        PATH_EXTENSIONS_AVAILABLE = self::DATA_PATH . '/Extensions/AvailableExtensions.php',
+        PATH_CACERT     = self::DATA_PATH . '/Certs/cacert.pem',
+        // ASN
+        PATH_AS16_DEL_BLOCKS  = self::DATA_PATH . '/Blocks/ASN16Blocks.dat',
+        PATH_AS32_DEL_BLOCKS  = self::DATA_PATH . '/Blocks/ASN32Blocks.dat',
+        // IPv(6|4)
+        PATH_IP4_BLOCKS  = self::DATA_PATH . '/Blocks/IPv4Blocks.dat',
+        PATH_IP6_BLOCKS  = self::DATA_PATH . '/Blocks/Ipv6Blocks.dat';
 
     const
         ARIN_NET_PREFIX_COMMAND    = 'n +',
@@ -57,11 +82,18 @@ class DataParser
         LACNIC_NET_PREFIX_COMMAND  = '';
 
     const
-        ARIN_SERVER     = 'whois.arin.net',
-        RIPE_SERVER     = 'whois.ripe.net',
-        APNIC_SERVER    = 'whois.apnic.net',
-        AFRINIC_SERVER  = 'whois.afrinic.net',
-        LACNIC_SERVER   = 'whois.lacnic.net';
+        ARIN_SERVER      = 'whois.arin.net',
+        RIPE_SERVER      = 'whois.ripe.net',
+        APNIC_SERVER     = 'whois.apnic.net',
+        AFRINIC_SERVER   = 'whois.afrinic.net',
+        LACNIC_SERVER    = 'whois.lacnic.net',
+        UNALLOCATED      = 'unallocated',
+        RESERVED         = 'reserved',
+        RESERVED_LOCAL   = 'reserved_local',
+        RESERVED_FUTURE  = 'reserved_future',
+        RESERVED_MULTICAST = 'reserved_multicast',
+        RESERVED_PRIVATE = 'reserved_private',
+        RESERVED_SAMPLE  = 'reserved_sample';
 
     /**
      * Prefix List command
@@ -78,9 +110,11 @@ class DataParser
 
     /**
      * DataParser constructor.
+     * @final
      */
     final public function __construct()
     {
+        // pass empty for @fina;
     }
 
     /**
@@ -228,27 +262,67 @@ class DataParser
             );
         }
         // sanitize .jp domain
-        if (strpos($data, 'jp') !== false
-            && preg_match('~\[Name\]|\[Name\s+Server\]~xsi', $data)
-        ) {
+        if (stripos($data, '.jp') !== false && preg_match('~\[(Domain\s*)?Name\]|\[Name\s+Server\]~xsi', $data)) {
             $arrayData = [];
             // convert comment
             $data = preg_replace('/\[\s+([^\n]+)\]/m', '% $1', $data);
+            if (stripos($data, '[Registrant]') !== false && strpos($data, '[Name]') !== false) {
+                $data = str_ireplace("\n[Registrant]", "\n[Registrar] ", $data);
+            }
             $arrayDataSplit = explode("\n\n", $data);
             foreach ($arrayDataSplit as $key => $v) {
                 $v = preg_replace('/^(?:[a-z]+\.\s?)?\[([^\]]+)\]/m', '$1:', $v);
+                print_r($v);
+                if ($v && $v[0] != '%' && preg_match('~([a-z]+[^\n]+)(\n\s{3,}[^\n]+)+~smi', $v)) {
+                    $v = preg_replace_callback(
+                        '~(?P<name>^[a-z]+[^\:]+)(?P<line>\:[^\n]+)(?P<val>(?:\n\s{3,}[^\n]+)+)~smi',
+                        function ($match) {
+                            $match = array_filter($match, 'is_string', ARRAY_FILTER_USE_KEY);
+                            $match['name'] = rtrim($match['name']);
+                            $match['line'] = rtrim($match['line'], '( )');
+                            $match['val']  = preg_replace(
+                                '~(\s)+~',
+                                '$1',
+                                str_replace("\n", ' ', $match['val'])
+                            );
+                            $match['val'] = rtrim($match['val'], '( )');
+                            return ($match['name'] . $match['line'] . $match['val']);
+                        },
+                        $v
+                    );
+                }
                 if (stripos(trim($v), 'Domain Information') === 0
                     || ($isContact = stripos(trim($v), 'Contact Information') === 0)
                 ) {
                     $v = ltrim(preg_replace('/^[^\n]+/', '', ltrim($v)));
                     $v = preg_replace('/\n\s+/', ' ', $v);
                     if (isset($isContact) && $isContact) {
-                        $v = preg_replace('~^([^\:]+\:)~m', 'Registrant $1', $v);
+                        // fix name
+                        $v = preg_replace_callback(
+                            '~^([^\:]+\:)([^\n]+)?~m',
+                            function ($match) {
+                                $registrant = 'Registrant';
+                                // fix spaces
+                                $length   = strlen($registrant) + 1;
+                                $match[1] = "{$registrant} {$match[1]}";
+                                $match[2] = preg_replace(
+                                    "~^[\s]{1,{$length}}~",
+                                    '',
+                                    $match[2]
+                                );
+                                return $match[1] . $match[2];
+                            },
+                            $v
+                        );
+                        $matchCountry = false;
+                        if (preg_match('~Country\:\s+([^\n]+)?~', $data, $match)) {
+                            $matchCountry = $match[1];
+                        }
                         $v = preg_replace('/Postal\s+(Address(?:[^\:]+)?\:)/i', '$1       ', $v);
                         // split city, state & address
                         $v = preg_replace_callback(
                             '/^Registrant\s+Address\:[^\n]+/m',
-                            function ($match) {
+                            function ($match) use ($matchCountry) {
                                 $match = rtrim($match[0]);
                               // get space
                                 preg_match('/^Registrant\s+Address\:(\s*)/', $match, $space);
@@ -256,16 +330,28 @@ class DataParser
                                 $explodeArrayAddress = array_map('trim', explode(',', $match));
                                 $state  = array_pop($explodeArrayAddress);
                                 $city   = array_pop($explodeArrayAddress);
+                                $country = $matchCountry;
                                 $street = implode(', ', $explodeArrayAddress);
+                                if (!$country && preg_match('~(.+)\s+([0-9]+[0-9\-][0-9]{2,})$~', $city, $match)) {
+                                    $country = $state;
+                                    $state  = $match[1];
+                                    if (substr_count($street, ' ') > 2) {
+                                        $explodeArrayAddress = explode(' ', $street);
+                                        $city = array_pop($explodeArrayAddress);
+                                        $street = rtrim(implode(' ', $explodeArrayAddress));
+                                    }
+                                }
                                 $content = "{$street}\n";
                                 $content .= "Registrant City:   {$space}{$city}\n";
                                 $content .= "Registrant State:  {$space}{$state}\n";
+                                $content .= "Registrant Country:  {$space}{$country}\n";
                                 return $content;
                             },
                             $v
                         );
                     }
                 }
+
                 $arrayData[] = $v;
             }
 
@@ -418,7 +504,7 @@ class DataParser
      */
     public static function cleanUnwantedWhoIsResult(string $data)
     {
-        if (!trim($data) === '') {
+        if (trim($data) === '') {
             return '';
         }
 
@@ -440,8 +526,8 @@ class DataParser
      * @param string $data
      *
      * @return bool|string string if unknown result or maybe empty result / limit exceeded or bool if registered or not
-     * @uses DataParser::LIMIT
-     * @uses DataParser::UNKNOWN
+     * @uses DataParser::STATUS_LIMIT
+     * @uses DataParser::STATUS_UNKNOWN
      */
     public static function getRegisteredDomainStatus(string $data)
     {
@@ -449,17 +535,17 @@ class DataParser
         if (($cleanData = static::cleanUnwantedWhoIsResult($data)) === '') {
             // if cleanData is empty & data is not empty check entries
             if ($data && preg_match('/No\s+entries(?:\s+found)?|Not(?:hing)?\s+found/i', $data)) {
-                return static::UNREGISTERED;
+                return static::STATUS_UNREGISTERED;
             }
 
-            return static::UNKNOWN;
+            return static::STATUS_UNKNOWN;
         }
 
         // if invalid domain
         if (stripos($cleanData, 'Failure to locate a record in ') !== false
             || stripos($cleanData, 'The requested domain name is restricted because') !== false
         ) {
-            return static::UNKNOWN;
+            return static::STATUS_UNKNOWN;
         }
 
         // array check for detailed content only that below is not registered
@@ -480,7 +566,7 @@ class DataParser
             // for za domain eg: co.za
             || stripos($cleanData, 'Available') === 0 && strpos($cleanData, 'Domain:')
         ) {
-            return static::UNREGISTERED;
+            return static::STATUS_UNREGISTERED;
         }
 
         // regex not match or not found on start tag
@@ -507,7 +593,7 @@ class DataParser
                 $cleanData
             )
         ) {
-            return static::UNREGISTERED;
+            return static::STATUS_UNREGISTERED;
         }
 
         // match domain with name and with status available extension for eg: .be
@@ -519,7 +605,7 @@ class DataParser
                 /ix',
                 $cleanData
             )) {
-                return static::UNREGISTERED;
+                return static::STATUS_UNREGISTERED;
             }
 
             if (preg_match(
@@ -533,17 +619,17 @@ class DataParser
                 $match
             )) {
                 if (!empty($match[1]) && stripos($match[1], 'Reserv') !== false) {
-                    return static::RESERVED;
+                    return static::STATUS_RESERVED;
                 }
 
-                return static::REGISTERED;
+                return static::STATUS_REGISTERED;
             }
         }
 
         if (stripos($cleanData, 'Status: Not Registered') !== false
             && preg_match('/[\n]+Query\s*\:[^\n]+/', $cleanData)
         ) {
-            return static::UNREGISTERED;
+            return static::STATUS_UNREGISTERED;
         }
 
         // Reserved Domain
@@ -554,7 +640,7 @@ class DataParser
                 /ix',
             $cleanData
         )) {
-            return static::RESERVED;
+            return static::STATUS_RESERVED;
         }
 
         // match for name server
@@ -601,15 +687,15 @@ class DataParser
                ) && !empty($matchDataResult[1])
            )
         ) {
-            return static::REGISTERED;
+            return static::STATUS_REGISTERED;
         }
 
         // check if on limit whois check
         if (static::hasContainLimitedResultData($data)) {
-            return static::LIMIT;
+            return static::STATUS_LIMIT;
         }
 
-        return static::UNREGISTERED;
+        return static::STATUS_UNREGISTERED;
     }
 
     /**
@@ -666,49 +752,48 @@ class DataParser
 
     /**
      * @param RequestInterface $request
-     * @param bool $useClone
      *
      * @return string
      */
-    public static function convertRequestBodyToString(RequestInterface $request, $useClone = true) : string
+    public static function convertRequestBodyToString(RequestInterface $request) : string
     {
-        return self::convertStreamToString($request->getBody(), $useClone);
+        return self::convertStreamToString($request->getBody());
     }
 
     /**
      * Convert ResponseInterface body to string
      *
      * @param ResponseInterface $response
-     * @param bool $useClone
      *
      * @return string
      */
-    public static function convertResponseBodyToString(ResponseInterface $response, $useClone = true) : string
+    public static function convertResponseBodyToString(ResponseInterface $response) : string
     {
-        return self::convertStreamToString($response->getBody(), $useClone);
+        return self::convertStreamToString($response->getBody());
     }
 
     /**
      * Convert the given stream to string result
+     * Behaviour to make sure the content size is *not a huge size*
      *
      * @param StreamInterface $stream   the stream resource
-     * @param bool            $useClone true if resource clone
      *
      * @return string
      */
-    public static function convertStreamToString(StreamInterface $stream, $useClone = true) : string
+    public static function convertStreamToString(StreamInterface $stream) : string
     {
         $data = '';
-        $stream = $useClone ? clone $stream : $stream;
+        // Rewind position
+        if ($stream->isSeekable()) {
+            $stream->rewind();
+        }
         while (!$stream->eof()) {
             $data .= $stream->read(4096);
         }
 
-        // if use clone close the resource otherwise let it open
-        $useClone && $stream->close();
-
         return $data;
     }
+
     /**
      * @param string $ip
      * @param string $server
@@ -762,25 +847,64 @@ class DataParser
     }
 
     /**
-     * Is IP in Range
+     * Parse The Selector Matches
      *
-     * @param string $ip
-     * @param string $ipRange
+     * @param string $tag
+     * @param string $html
      *
-     * @return bool
+     * @return ArrayLoopAbleCallback|ArrayCollector[]
      */
-    public static function isIPInRange(string $ip, string $ipRange) : bool
+    public static function htmlParenthesisParser(string $tag, string $html) : ArrayLoopAbleCallback
     {
-        if (strpos($ipRange, '/') === false) {
-            $ipRange .= '/32';
+        if (preg_match('/[^a-z0-9\-\_]/i', $tag)) {
+            throw new \InvalidArgumentException(
+                sprintf(
+                    '%s is Invalid html tag',
+                    $tag
+                )
+            );
         }
 
-        // $range is in IP/CIDR format eg 127.0.0.1/24
-        list( $ipRange, $netMask ) = explode('/', $ipRange, 2);
-        $range_decimal = ip2long($ipRange);
-        $ip_decimal    = ip2long($ip);
-        $wildcard_decimal = pow(2, (32 - $netMask)) - 1;
-        $netMaskDecimal = ~ $wildcard_decimal;
-        return (($ip_decimal & $netMaskDecimal) === ($range_decimal & $netMaskDecimal));
+        $tag = preg_quote($tag, '/');
+        $regex = '/\<('.$tag.')\b(?P<selector>[^\>]*)?>(?P<content>.*)\<\/\b\\1\>/sU';
+        preg_match_all(
+            $regex,
+            $html,
+            $match
+        );
+        array_shift($match);
+        $array = [];
+        foreach ($match['content'] as $key => $value) {
+            $selector = $match['selector'][$key];
+            preg_match_all(
+                '~
+                        (?P<selector>
+                            [a-z]+(?:(?:[a-z0-9\_\-]+)?[a-z]+)
+                        )
+                        \=
+                        [\'\"](?P<content>[^\"\']+)
+                    ~ix',
+                $selector,
+                $filtered
+            );
+            $filtered = array_filter($filtered, 'is_string', ARRAY_FILTER_USE_KEY);
+            $selector = new ArrayCollector();
+            foreach ($filtered['selector'] as $k => $val) {
+                if (strtolower($val) === 'class') {
+                    // special for class
+                    $filtered['content'][$k] = array_map('trim', explode(' ', $filtered['content'][$k]));
+                    $filtered['content'][$k] = array_unique(array_filter($filtered['content'][$k]));
+                    $filtered['content'][$k] = array_values($filtered['content'][$k]);
+                }
+
+                $selector[$val] = $filtered['content'][$k];
+            }
+            $array[$key] = new ArrayCollector([
+                'selector' => $selector,
+                'html'     => $value,
+            ]);
+        }
+
+        return new ArrayLoopAbleCallback($array);
     }
 }

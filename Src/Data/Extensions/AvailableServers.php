@@ -790,9 +790,6 @@ return [
     'chintai' => [
         'whois.nic.chintai',
     ],
-    'chloe' => [
-        'status:',
-    ],
     'christmas' => [
         'whois.uniregistry.net',
         'whois.nic.christmas',
@@ -4186,6 +4183,10 @@ return [
         'whois.nic.vg',
     ],
     'vi' => [
+        /**
+         * this is whois that follow HTTP mode and post method
+         * declare method with POST[form_param_name=value]|http://uri
+         */
         'POST[domain={{domain}}]|https://secure.nic.vi/whois-lookup/'
     ],
     'viajes' => [

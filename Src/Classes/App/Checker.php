@@ -28,6 +28,8 @@ use Pentagonal\WhoIs\Util\Sanitizer;
 /**
  * Class Checker
  * @package Pentagonal\WhoIs\App
+ *
+ * Main Application that contains main features of WhoIs Data Result Getter
  */
 class Checker
 {
@@ -145,6 +147,11 @@ FAKE;
         return $this->validatorInstance;
     }
 
+    /* --------------------------------------------------------------------------------*
+     |                                  UTILITY                                        |
+     |---------------------------------------------------------------------------------|
+     */
+
     /**
      * Normalize cache key to put on Cache storage
      *
@@ -227,6 +234,7 @@ FAKE;
         if ($domain && $this->getValidator()->isValidDomain($domain)) {
             $extension = $this->getValidator()->splitDomainName($domain)->getBaseExtension();
         }
+
         if (empty($extension)) {
             return $request;
         }
@@ -241,19 +249,29 @@ FAKE;
                 if (trim($body) === '') {
                     return $request;
                 }
-                preg_match(
-                    '~
-                      <div\b[^>]*?id\=(\[\"\'])about\-whois(?:\\1)[^>]*+>\s*
-                          <div\b[^>]*+>
-                            ((?:(?!<\/main>)[\s\S])*)
-                    ~ix',
-                    $body,
-                    $match
-                );
-                if (!empty($match[2])) {
-                    $match = trim(preg_replace('~<br[^>]*>~i', "\n", $match[2]));
-                    $match = preg_replace('~^[ ]+~m', '', strip_tags($match));
-                    $request->setBodyString(trim($match));
+                $parser = DataParser::htmlParenthesisParser('main', $body);
+                if (count($parser) === 0) {
+                    return $request;
+                }
+                /**
+                 * @var ArrayCollector $collector
+                 */
+                $collector = $parser->last();
+                if (!is_string(($body = $collector->get('html')))) {
+                    return $request;
+                }
+                $parser = DataParser::htmlParenthesisParser('pre', $body);
+                if (count($parser) === 0) {
+                    return $request;
+                }
+                $collector = $parser->last();
+                if (!is_string(($body = $collector->get('html')))) {
+                    return $request;
+                }
+                if (!empty($body)) {
+                    $body = trim(preg_replace('~<br[^>]*>~i', "\n", $body));
+                    $body = preg_replace('~^[ ]+~m', '', strip_tags($body));
+                    $request->setBodyString(trim($body));
                 }
                 break;
             case 'vi':
@@ -264,24 +282,36 @@ FAKE;
                 if (trim($body) === '') {
                     return $request;
                 }
-                preg_match(
-                    '~
-                      <pre\b[^>]*?class\=([\"\'])(?:[^\\1]+)?result\-pre(?:[^\\1]+)?(?:\\1)[^>]*+>\s*
-                       (?:((?!<\/pre[^>]*>)[\s\S]*)<\/pre[^>]*>)
-                    ~ix',
-                    $body,
-                    $match
-                );
-                if (!empty($match[2]) || strpos($match[0], '</pre>') !== false) {
-                    $match[2] = empty($match[2]) ? $match[0] : $match[2];
-                    $match = trim(preg_replace('~<\/?(?:span|font|br)([^>]+)?>~i', "", $match[2]));
-                    $match = preg_replace('~^[^\n]+~', '', $match);
-                    $request->setBodyString(trim($match));
+                $parser = DataParser::htmlParenthesisParser('pre', $body);
+                $body = '';
+                foreach ($parser as $key => $collector) {
+                    if (!($selector = $collector->get('selector')) instanceof ArrayCollector) {
+                        continue;
+                    }
+
+                    if (!is_array($class = $selector->get('class'))
+                        || ! in_array('result-pre', array_map('strtolower', $class))
+                        || !is_string(($body = $collector->get('html')))
+                    ) {
+                        continue;
+                    }
+
+                    break;
+                }
+                if (!empty($body)) {
+                    $body = trim(preg_replace('~<\/?(?:span|font|br)([^>]+)?>~i', "", $body));
+                    $body = preg_replace('~^[^\n]+~', '', $body);
+                    $request->setBodyString(trim($body));
                 }
                 break;
         }
         return $request;
     }
+
+    /* --------------------------------------------------------------------------------*
+     |                               SERVER GETTER                                     |
+     |---------------------------------------------------------------------------------|
+     */
 
     /**
      * @param string $domainName     the domain Name
@@ -335,6 +365,11 @@ FAKE;
 
         return (array) $servers;
     }
+
+    /* --------------------------------------------------------------------------------*
+     |                              DOMAIN CHECKER                                     |
+     |---------------------------------------------------------------------------------|
+     */
 
     /**
      * Get From Domain With Server
@@ -442,6 +477,8 @@ FAKE;
     }
 
     /**
+     * Create fake result for empty domain server
+     *
      * @param string $domainName
      *
      * @return string
@@ -508,7 +545,7 @@ FAKE;
     }
 
     /**
-     * Get From Domain
+     * Get detail from whois for domain name
      *
      * @param string $domainName
      * @param bool $followServer follow server if whois server exists
@@ -619,6 +656,8 @@ FAKE;
     }
 
     /**
+     * Check if Domain is registered
+     *
      * @param string $domainName the domain name to check
      *
      * @return bool|null  boolean true if registered otherwise false,
@@ -673,13 +712,105 @@ FAKE;
         $result = $result->last();
         $parser = $result->getDataParser();
         $status = $parser->getRegisteredDomainStatus($result->getOriginalResultString());
-        return $status === $parser::REGISTERED
-            || $status === $parser::RESERVED
+        return $status === $parser::STATUS_REGISTERED
+            || $status === $parser::STATUS_RESERVED
             ? true
             : (
-                $status === $parser::UNREGISTERED
+                $status === $parser::STATUS_UNREGISTERED
                     ? false
                     : null
             );
+    }
+
+    /* --------------------------------------------------------------------------------*
+     |                                 IP CHECKER                                      |
+     |---------------------------------------------------------------------------------|
+     */
+
+    /**
+     * Get IP Detail
+     *
+     * @param string $ip
+     *
+     * @return WhoIsResult
+     */
+    public function getFromIP(string $ip) : WhoIsResult
+    {
+        $validator = $this->getValidator();
+        $ipDetail = $validator->splitIP($ip);
+        $server = $ipDetail->getWhoIsServers()[0];
+        $request = $this->getRequest($ipDetail->getIPAddress(), $server);
+        return new WhoIsResult($ipDetail, $request->getBodyString(), $server);
+    }
+
+    /* --------------------------------------------------------------------------------*
+     |                                 ASN CHECKER                                     |
+     |---------------------------------------------------------------------------------|
+     */
+
+    /**
+     * Get ASN Result Detail
+     *
+     * @param string $asn
+     *
+     * @return WhoIsResult
+     */
+    public function getFromASN(string $asn) : WhoIsResult
+    {
+        $asnDetail = $this->getValidator()->splitASN($asn);
+        $server = $asnDetail->getWhoIsServers()[0];
+        $request = $this->getRequest($asnDetail->getASNumber(), $server);
+        return new WhoIsResult($asnDetail, $request->getBodyString(), $server);
+    }
+
+    /* --------------------------------------------------------------------------------*
+     |                           AUTOMATION CHECKER                                    |
+     |---------------------------------------------------------------------------------|
+     */
+
+    /**
+     * @param string $selector
+     * @param array ...$params additional parameter
+     *
+     * @return WhoIsResult
+     */
+    public function getData(string $selector, ...$params) : WhoIsResult
+    {
+        if (trim($selector) === '') {
+            throw new \InvalidArgumentException(
+                'Argument selector could not be empty',
+                E_USER_WARNING
+            );
+        }
+
+        $validator = $this->getValidator();
+
+        // ASN
+        if ($validator->isValidASN($selector)) {
+            return $this->getFromASN($selector);
+        }
+
+        // IP
+        if ($validator->isValidIP($selector)) {
+             return $this->getFromIP($selector);
+        }
+
+        // Domain
+        $followServer     = isset($params[0]) && (bool) $params[0];
+        $allowEmptyServer = isset($params[1]) && (bool) $params[1];
+        $requestFromIAna  = isset($params[2]) && (bool) $params[2];
+        if ($validator->isValidTopLevelDomain($selector)) {
+            return $this
+                ->getFromDomain($selector, $followServer, $allowEmptyServer, $requestFromIAna)
+                ->last();
+        }
+
+        throw new \RuntimeException(
+            sprintf(
+                'Selector %1$s is not valid IP, ASN or Domain',
+                $selector
+            ),
+            E_WARNING
+        );
     }
 }

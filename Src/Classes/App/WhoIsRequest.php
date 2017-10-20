@@ -296,24 +296,25 @@ final class WhoIsRequest
                 );
             } // resolve asn
             elseif (preg_match(DataParser::ASN_REGEX, trim($this->targetName), $match)
-                    && ! empty($match[2])
+                && ! empty($match[2])
             ) {
-                $domainName = "{$match[1]}{$match[2]}";
+                // $domainName = "{$match[1]}{$match[2]}";
+                $domainName = "AS{$match[2]}";
                 $this->socketMethod = DataParser::buildASNCommandServer(
                     $domainName . "\r\n",
                     $this->uri->getHost()
                 );
+            } else {
+                $target        = rtrim($this->targetName);
+                $pathExtension = pathinfo($target, PATHINFO_EXTENSION);
+
+                // add command to .JP domain
+                if ($target && $pathExtension && strtolower($pathExtension) === 'jp') {
+                    $target .= '/e';
+                }
+                $this->socketMethod = rtrim($target) . "\r\n";
             }
 
-            $target = rtrim($this->targetName);
-            $pathExtension = pathinfo($target, PATHINFO_EXTENSION);
-
-            // add command to .JP domain
-            if ($target && $pathExtension && strtolower($pathExtension) === 'jp') {
-                $target .= '/e';
-            }
-
-            $this->socketMethod = rtrim($target) . "\r\n";
             if (empty($this->options['method'])) {
                 $this->setMethod($this->socketMethod);
             }
@@ -328,7 +329,9 @@ final class WhoIsRequest
             $this->uri  = $this->uri->withQuery($query);
             $this->query = $this->uri->getQuery();
         }
-        if (isset($this->uri->postMethod)) {
+
+        /** @noinspection PhpUndefinedFieldInspection */
+        if (!empty($this->uri->postMethod)) {
             $this->uri->postMethod = str_replace('{{domain}}', $this->targetName, $this->uri->postMethod);
             $this->server = (string) $this->uri;
         }
@@ -342,6 +345,7 @@ final class WhoIsRequest
         $this->countRequest += 1;
         try {
             if ($this->isUseSocket()) {
+                serialize($this->socketMethod);
                 $this->response = TransportClient::whoIsRequest($this->socketMethod, $this->getUri());
                 $this->status = self::SUCCESS;
                 return $this->response;

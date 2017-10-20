@@ -24,6 +24,9 @@ interface RecordIPNetworkInterface extends RecordNetworkInterface
     const NAME_IS_IPV6     = 'IS_IPV_6';
     const NAME_IS_LOCAL_IP = 'IS_LOCAL_IP';
     const NAME_IP_ADDRESS  = 'IP_ADDRESS';
+    const NAME_IS_RESERVED = 'IS_RESERVED';
+    const NAME_IS_RESERVED_PRIVATE = 'IS_PRIVATE';
+    const NAME_IS_RESERVED_FUTURE = 'IS_FUTURE';
 
     /**
      * Get IP Address
@@ -50,4 +53,25 @@ interface RecordIPNetworkInterface extends RecordNetworkInterface
      * @return bool
      */
     public function IPv6() : bool;
+
+    /**
+     * Check if IP is Reserved
+     *
+     * @return bool
+     */
+    public function isReserved() : bool;
+
+    /**
+     * Check if IP is Reserved Private
+     *
+     * @return bool
+     */
+    public function isReservedPrivate() : bool;
+
+    /**
+     * Check if IP is Reserved Future Usage
+     *
+     * @return bool
+     */
+    public function isReservedFuture() : bool;
 }

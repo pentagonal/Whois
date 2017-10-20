@@ -283,6 +283,7 @@ class TransportClient
         }
 
         $stream = new Stream($stream);
+        // write data
         $stream->write($dataToWrite);
 
         return new Response(200, [], $stream);
