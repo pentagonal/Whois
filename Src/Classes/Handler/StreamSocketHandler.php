@@ -38,6 +38,11 @@ class StreamSocketHandler
     private $lastHeaders = [];
 
     /**
+     * @var bool
+     */
+    private $proxyData = false;
+
+    /**
      * Sends an HTTP request.
      *
      * @param RequestInterface $request Request to send.
@@ -179,6 +184,10 @@ class StreamSocketHandler
         }
 
         $this->invokeStats($options, $request, $startTime, $response, null);
+        if ($this->proxyData) {
+            /** @noinspection PhpUndefinedFieldInspection */
+            $response->proxyConnection = $this->proxyData;
+        }
 
         return new FulfilledPromise($response);
     }
@@ -406,10 +415,12 @@ class StreamSocketHandler
                     $method = isset($options['curl'][CURLOPT_CUSTOMREQUEST])
                         ? rtrim($options['curl'][CURLOPT_CUSTOMREQUEST])."\r\n"
                         : rtrim($request->getMethod()) . "\r\n";
+
                     /**
                      * I WAS NOT RESOLVE TO MAKE PROXY WORK WITH
                      * whois.arin.net:43 via socket
                      */
+                    $scheme = '';
                     if (stripos($server, 'arin.') === false && isset($options['proxy'])) {
                         if (is_string($options['proxy'])) {
                             $options['proxy'] = parse_url($options['proxy']);
@@ -417,12 +428,17 @@ class StreamSocketHandler
                         if (!is_array($options['proxy'])) {
                             $options['proxy'] = [];
                         }
+                        $proxy = $options['proxy'];
+                        $scheme = isset($proxy['scheme'])
+                            ? rtrim($proxy['scheme'], '/:') .'://'
+                            : '';
                     }
 
-                    $useProxy = !empty($proxy['host']) && !empty($proxy['port']);
-                    $proxy  = $useProxy ? "{$proxy['host']}:{$proxy['port']}" : null;
-                    $server = "{$server}:{$port}";
-                    $connect = $useProxy ? $proxy : $server;
+                    $useProxy        = !empty($proxy['host']) && !empty($proxy['port']);
+                    $proxy           = $useProxy ? "{$scheme}{$proxy['host']}:{$proxy['port']}" : null;
+                    $this->proxyData = $proxy;
+                    $server          = "{$server}:{$port}";
+                    $connect         = $useProxy ? $proxy : $server;
                     $notification(
                         STREAM_NOTIFY_CONNECT,
                         null,
@@ -462,6 +478,13 @@ class StreamSocketHandler
                         null,
                         ($useProxy ? "Connected via proxy: {$proxy}" : "Connected to: {$connect}")
                     );
+
+                    if (isset($options['read_timeout'])) {
+                        $readTimeout = $options['read_timeout'];
+                        $second = (int) $readTimeout;
+                        $uSecond = ($readTimeout - $second) * 100000;
+                        stream_set_timeout($resource, $second, $uSecond);
+                    }
 
                     if ($useProxy) {
                         $notification(
@@ -507,13 +530,13 @@ class StreamSocketHandler
                 } else {
                     $resource          = fopen((string)$uri, 'r', null, $context);
                     $this->lastHeaders = $http_response_header;
-                }
 
-                if (isset($options['read_timeout'])) {
-                    $readTimeout = $options['read_timeout'];
-                    $second = (int) $readTimeout;
-                    $uSecond = ($readTimeout - $second) * 100000;
-                    stream_set_timeout($resource, $second, $uSecond);
+                    if (isset($options['read_timeout'])) {
+                        $readTimeout = $options['read_timeout'];
+                        $second = (int) $readTimeout;
+                        $uSecond = ($readTimeout - $second) * 100000;
+                        stream_set_timeout($resource, $second, $uSecond);
+                    }
                 }
 
                 return $resource;

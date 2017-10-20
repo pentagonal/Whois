@@ -259,11 +259,21 @@ final class WhoIsRequest
             $string = '';
             if (!$this->isError()) {
                 $string = DataParser::convertResponseBodyToString($this->getResponse());
+                // maybe behind the proxy
+                if (strpos(ltrim($string), 'HTTP/1.') !== false || strpos(ltrim($string), 'HTTP/2') !== false) {
+                    $string = preg_replace(
+                        '~^\s*HTTP/(1\.|2)[^\n]+(\r?\n)?~',
+                        '',
+                        $string
+                    );
+                }
             }
+
             // just set if body string has not been set
             if (!is_string($this->bodyString)) {
                 $this->bodyString = $string;
             }
+
             $this->originalBodyString = $string;
         }
 
@@ -476,6 +486,23 @@ final class WhoIsRequest
     public function isTimeOut() : bool
     {
         return $this->getResponse() instanceof TimeOutException;
+    }
+
+    /**
+     * Check if response Returning Proxy
+     *
+     * @return bool
+     */
+    public function getProxyConnection()
+    {
+        $response = $this->getResponse();
+        if (!$response instanceof ResponseInterface) {
+            return false;
+        }
+        return isset($response->proxyConnection)
+            && is_string($response->proxyConnection)
+            ? $response->proxyConnection
+            : false;
     }
 
     /* --------------------------------------------------------------------------------*

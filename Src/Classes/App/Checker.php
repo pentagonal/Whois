@@ -478,6 +478,7 @@ FAKE;
                 }
                 break;
         }
+
         return $request;
     }
 
@@ -628,6 +629,11 @@ FAKE;
          * @var WhoIsResult $result
          */
         $result = new $whoIsResultClass($record, $request->getBodyString(), $request->getServer());
+        if ($request->getProxyConnection()) {
+            /** @noinspection PhpUndefinedFieldInspection */
+            $result->proxyConnection = $request->getProxyConnection();
+        }
+
         $dataParser =  $result->getDataParser();
         if ($dataParser::hasContainLimitedResultData($result->getOriginalResultString())) {
             if (!$result->getNote()) {
@@ -915,8 +921,13 @@ FAKE;
         $ipDetail = $validator->splitIP($ip);
         $server = $ipDetail->getWhoIsServers()[0];
         $request = $this->getRequest($ipDetail->getIPAddress(), $server);
-        $request->getBodyString();
-        return new WhoIsResult($ipDetail, $request->getBodyString(), $server);
+        $result = new WhoIsResult($ipDetail, $request->getBodyString(), $server);
+        // add proxy property
+        if ($request->getProxyConnection()) {
+            /** @noinspection PhpUndefinedFieldInspection */
+            $result->proxyConnection = $request->getProxyConnection();
+        }
+        return $result;
     }
 
     /* --------------------------------------------------------------------------------*
@@ -936,7 +947,14 @@ FAKE;
         $asnDetail = $this->getValidator()->splitASN($asn);
         $server = $asnDetail->getWhoIsServers()[0];
         $request = $this->getRequest($asnDetail->getASNumber(), $server);
-        return new WhoIsResult($asnDetail, $request->getBodyString(), $server);
+        $result = new WhoIsResult($asnDetail, $request->getBodyString(), $server);
+        // add proxy property
+        if ($request->getProxyConnection()) {
+            /** @noinspection PhpUndefinedFieldInspection */
+            $result->proxyConnection = $request->getProxyConnection();
+        }
+
+        return $result;
     }
 
     /* --------------------------------------------------------------------------------*
