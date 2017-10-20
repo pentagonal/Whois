@@ -22,7 +22,6 @@ use GuzzleHttp\Handler\EasyHandle;
  */
 class CurlHandlerInvoker
 {
-
     /**
      * @param EasyHandle $easy
      * @return mixed
@@ -53,6 +52,7 @@ class CurlHandlerInvoker
      */
     public static function invokeRequest(EasyHandle &$easy)
     {
+
         if ($easy->request->getUri()->getPort() !== 43) {
             return;
         }

@@ -41,6 +41,12 @@ use Pentagonal\WhoIs\App\WhoIsResult;
 $cache = new ArrayCacheCollector();
 // use extends object / create child class if you want use other validator
 $validator = new Validator();
+$options = [
+    // this is for guzzle config
+    'debug' => true,
+    // for Checker Cache expire
+    'cacheExpire' => 3600, 
+];
 $checker = new Checker($validator, $cache);
 
 /**
@@ -63,6 +69,46 @@ if (count($collector) > 0) {
 }
 
 ```
+
+### INSTANTIATING & PROXY
+
+Whois checker support connection behind the proxy.
+
+except :`whois.arin.net` if script detect `whois.arin.net` as server, proxy will be automatically disabled.
+
+***Instantiate Using Proxy***
+
+```php
+<?php
+use Pentagonal\WhoIs\App\Checker;
+
+/**
+ * Proxy can be contains as a string (host:port)
+ * or as array with:
+ * [
+ *  'host' => 'proxy.host',
+ *  'port' => 'integer proxy port'
+ * ]  
+ */
+$proxyChecker = Checker::createProxy('proxyhost:proxyport');
+// disable proxy clone
+$proxyChecker = $proxyChecker->withoutProxy();
+
+/**
+ * Or just create instant checker 
+ */
+$checker = Checker::createInstance();
+// with proxy clone
+$proxyChecker = $checker->withProxy('proxyhost:proxyport');
+
+/**
+ * checker still use wihout proxy,
+ * because cloning the object Checker
+ */
+(($checker === $proxyChecker) === false);
+
+```
+
 
 ## NOTE
 

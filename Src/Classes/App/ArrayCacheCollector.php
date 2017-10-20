@@ -41,6 +41,16 @@ class ArrayCacheCollector implements CacheInterface
     }
 
     /**
+     * Create new instance ArrayCacheCollector
+     *
+     * @return ArrayCacheCollector
+     */
+    public static function createInstance() : ArrayCacheCollector
+    {
+        return new static();
+    }
+
+    /**
      * {@inheritdoc}
      */
     public function exist(string $identifier): bool

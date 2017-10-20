@@ -103,27 +103,27 @@ class Validator
      * Validator constructor.
      *
      * @param TLDCollector|null $collector
-     * @param string|null $validator
+     * @param string|null $providerValidator
      */
-    public function __construct(TLDCollector $collector = null, string $validator = null)
+    public function __construct(TLDCollector $collector = null, string $providerValidator = null)
     {
         $this->tldCollector = $collector ?: new TLDCollector();
-        if ($validator) {
-            $this->baseMailProviderValidatorClass = $validator;
-            if (! class_exists($validator)) {
+        if ($providerValidator) {
+            $this->baseMailProviderValidatorClass = $providerValidator;
+            if (! class_exists($providerValidator)) {
                 throw new \InvalidArgumentException(
                     sprintf(
                         'Validator class of %s has not exists',
-                        $validator
+                        $providerValidator
                     ),
                     E_WARNING
                 );
             }
-            if (is_subclass_of($validator, BaseMailAddressProviderValidator::class)) {
+            if (is_subclass_of($providerValidator, BaseMailAddressProviderValidator::class)) {
                 throw new \InvalidArgumentException(
                     sprintf(
                         'Validator class of %1$s must be instance of %2$s',
-                        $validator,
+                        $providerValidator,
                         BaseMailAddressProviderValidator::class
                     ),
                     E_WARNING
@@ -134,10 +134,25 @@ class Validator
         // revert to default if object class invalid
         if (! is_string($this->baseMailProviderValidatorClass)
              || ! class_exists($this->baseMailProviderValidatorClass)
-             || is_subclass_of($validator, BaseMailAddressProviderValidator::class)
+             || is_subclass_of($providerValidator, BaseMailAddressProviderValidator::class)
         ) {
             $this->baseMailProviderValidatorClass = BaseMailAddressProviderValidator::class;
         }
+    }
+
+    /**
+     * Create new instance Validator
+     *
+     * @param TLDCollector|null $collector
+     * @param string|null $providerValidator
+     *
+     * @return Validator
+     */
+    public static function createInstance(
+        TLDCollector $collector = null,
+        string $providerValidator = null
+    ) : Validator {
+        return new static($collector, $providerValidator);
     }
 
     /**
@@ -427,7 +442,12 @@ class Validator
             ->getServersFromExtension(
                 $result[DRI::NAME_BASE_EXTENSION]
             );
-
+        $result[DRI::WHOIS_SERVER] =  array_map(function ($map) use ($result) {
+            if (strpos($map, '{{domain}}')) {
+                return str_replace('{{domain}}', $result[DRI::NAME_FULL_DOMAIN_NAME], $map);
+            }
+            return $map;
+        }, $result[DRI::WHOIS_SERVER]);
         return $this->reValidateDomainName(new DomainRecord($result), $domainName);
     }
 
@@ -1107,6 +1127,7 @@ class Validator
             $path    = $is32Bit
                 ? DataParser::PATH_AS32_DEL_BLOCKS
                 : DataParser::PATH_AS16_DEL_BLOCKS;
+
             foreach (file(
                 $path,
                 FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES
@@ -1139,10 +1160,12 @@ class Validator
                             continue;
                         }
                         if ($match >= $first && $match <= $last) {
+                            $found = $server;
                             break;
                         }
                         continue;
                     } elseif (abs(reset($explode)) === $match) {
+                        $found = $server;
                         break;
                     }
                     continue;

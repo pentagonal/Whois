@@ -113,7 +113,7 @@ final class WhoIsRequest
      * @param array $options
      * @throws \InvalidArgumentException
      */
-    public function __construct(
+    final public function __construct(
         string $domainName,
         string $server,
         array $options = []
@@ -128,6 +128,7 @@ final class WhoIsRequest
         $this->targetName = $domainName;
         $this->server     = $server;
         $this->options    = $options;
+        $this->firstInit();
         if (isset($this->options['method'])) {
             if (!is_string($this->options['method'])
                 || trim($this->options['method']) == ''
@@ -135,6 +136,29 @@ final class WhoIsRequest
                 unset($this->options['method']);
             } else {
                 $this->setMethod($this->options['method']);
+            }
+        }
+    }
+
+    /**
+     * Initialize
+     */
+    protected function firstInit()
+    {
+        if (preg_match('~https?:\/\/~i', $this->server)) {
+            $this->server = str_replace('{{domain}}', $this->targetName, $this->server);
+            $this->prepareUri();
+            $this->server = (string) $this->uri;
+            /** @noinspection PhpUndefinedFieldInspection */
+            if (!empty($this->uri->postMethod)) {
+                $this->setMethod('POST');
+                /** @noinspection PhpUndefinedFieldInspection */
+                $params = $this->uri->postMethod;
+                $options = isset($this->options['form_params'])
+                    && is_array($this->options['form_params'])
+                    ? $this->options['form_params']
+                    : [];
+                $this->options['form_params'] = array_merge($params, $options);
             }
         }
     }
@@ -284,6 +308,7 @@ final class WhoIsRequest
         if ($this->uri instanceof UriInterface) {
             return;
         }
+
         $this->uri = TransportClient::createUri($this->server);
         $this->socketMethod = $this->method;
         $this->isUseSocket = $this->uri->getPort() === TransportClient::DEFAULT_PORT;
@@ -298,8 +323,10 @@ final class WhoIsRequest
             elseif (preg_match(DataParser::ASN_REGEX, trim($this->targetName), $match)
                 && ! empty($match[2])
             ) {
-                // $domainName = "{$match[1]}{$match[2]}";
-                $domainName = "AS{$match[2]}";
+                $prefix = $this->uri->getHost() != 'whois.arin.net'
+                    ? 'AS'
+                    : '';
+                $domainName = "{$prefix}{$match[2]}";
                 $this->socketMethod = DataParser::buildASNCommandServer(
                     $domainName . "\r\n",
                     $this->uri->getHost()
@@ -329,12 +356,6 @@ final class WhoIsRequest
             $this->uri  = $this->uri->withQuery($query);
             $this->query = $this->uri->getQuery();
         }
-
-        /** @noinspection PhpUndefinedFieldInspection */
-        if (!empty($this->uri->postMethod)) {
-            $this->uri->postMethod = str_replace('{{domain}}', $this->targetName, $this->uri->postMethod);
-            $this->server = (string) $this->uri;
-        }
     }
 
     /**
@@ -345,8 +366,11 @@ final class WhoIsRequest
         $this->countRequest += 1;
         try {
             if ($this->isUseSocket()) {
-                serialize($this->socketMethod);
-                $this->response = TransportClient::whoIsRequest($this->socketMethod, $this->getUri());
+                $this->response = TransportClient::whoIsRequest(
+                    $this->socketMethod,
+                    $this->getUri(),
+                    $this->options
+                );
                 $this->status = self::SUCCESS;
                 return $this->response;
             }

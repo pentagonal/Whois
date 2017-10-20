@@ -126,15 +126,150 @@ FAKE;
     ];
 
     /**
+     * @var string|array
+     */
+    protected $proxy;
+
+    /**
+     * @var array
+     */
+    protected $defaultOptions = [];
+
+    /**
      * Checker constructor.
      *
      * @param Validator      $validator Validator instance
      * @param CacheInterface $cache     Cache object
+     * @param array          $options   array as options request
      */
-    public function __construct(Validator $validator, CacheInterface $cache = null)
+    public function __construct(
+        Validator $validator = null,
+        CacheInterface $cache = null,
+        array $options = []
+    ) {
+        /**
+         * Set Options
+         */
+        $allowedOptionsAsArray = ['disAllowMainDomainExtension',];
+        $allowedOptionsAsInt = ['cacheExpired'];
+        foreach ($options as $key => $value) {
+            if (in_array($key, $allowedOptionsAsArray) && is_array($value)) {
+                $this->{$key} = $value;
+                unset($options[$key]);
+                continue;
+            }
+            if (in_array($key, $allowedOptionsAsInt) && is_int($value)) {
+                unset($options[$key]);
+                $this->{$key} = $value;
+                continue;
+            }
+        }
+
+        $this->defaultOptions = $options;
+        $this->validatorInstance = $validator?: Validator::createInstance();
+        $this->cacheInstance = $cache?: ArrayCacheCollector::createInstance();
+    }
+
+    /**
+     * Create new instance checker
+     *
+     * @param Validator|null $validator
+     * @param CacheInterface|null $cache
+     * @param array $options
+     *
+     * @return Checker
+     */
+    public static function createInstance(
+        Validator $validator = null,
+        CacheInterface $cache = null,
+        array $options = []
+    ) : Checker {
+        return new static(
+            $validator,
+            $cache,
+            $options
+        );
+    }
+
+    /**
+     * Create new instance checker with proxy
+     *
+     * @param string $proxy
+     * @param Validator|null $validator
+     * @param CacheInterface|null $cache
+     * @param array $options
+     *
+     * @return Checker
+     */
+    public static function createProxy(
+        $proxy,
+        Validator $validator = null,
+        CacheInterface $cache = null,
+        array $options = []
+    )  : Checker {
+        if (!is_string($proxy) && is_array($proxy)) {
+            throw new \InvalidArgumentException(
+                sprintf(
+                    'Proxy must be as a string (host:port) or array [host => hostname, port => int] %s given',
+                    gettype($proxy)
+                )
+            );
+        }
+        $object = new static($validator, $cache, $options);
+        return $object->withProxy($proxy);
+    }
+
+    /**
+     * Get Default Options Request
+     *
+     * @return array
+     */
+    public function getDefaultOptions() : array
     {
-        $this->validatorInstance = $validator;
-        $this->cacheInstance = $cache?: new ArrayCacheCollector();
+        return $this->defaultOptions;
+    }
+
+    /**
+     * Use Proxy
+     *
+     * @param string|array $proxy
+     * @return  Checker
+     */
+    public function withProxy($proxy) : Checker
+    {
+        if (!is_string($proxy) && is_array($proxy)) {
+            throw new \InvalidArgumentException(
+                sprintf(
+                    'Proxy must be as a string (host:port) or array [host => hostname, port => int] %s given',
+                    gettype($proxy)
+                )
+            );
+        }
+
+        $clone = clone $this;
+        $clone->proxy = $proxy;
+        return $clone;
+    }
+
+    /**
+     * @return Checker
+     */
+    public function withoutProxy() : Checker
+    {
+        $clone = clone $this;
+        $clone->proxy = null;
+        unset($clone->defaultOptions['proxy']);
+        return $clone;
+    }
+
+    /**
+     * Get Proxy Host
+     *
+     * @return string|array
+     */
+    public function getProxy()
+    {
+          return $this->proxy;
     }
 
     /**
@@ -209,16 +344,39 @@ FAKE;
     /**
      * Get From Server
      *
-     * @param string $domain
+     * @param string $target
      * @param string $server
      * @param array $options
      *
      * @return WhoIsRequest
      */
-    public function getRequest(string $domain, string $server, array $options = []) : WhoIsRequest
+    public function getRequest(string $target, string $server, array $options = []) : WhoIsRequest
     {
-        $request = new WhoIsRequest($domain, $server, $options);
-        return $this->sanitizeAfterRequest($request->send());
+        if (!isset($options['proxy'])) {
+            $Proxy = $this->getProxy();
+            if ($Proxy) {
+                $options['proxy'] = $Proxy;
+            }
+        }
+
+        $options = array_merge($this->getDefaultOptions(), $options);
+        return $this->sanitizeAfterRequest(
+            $this->prepareForRequest($target, $server, $options)
+        );
+    }
+
+    /**
+     * Create Request
+     *
+     * @param string $target
+     * @param string $server
+     * @param array $options
+     *
+     * @return WhoIsRequest
+     */
+    protected function prepareForRequest(string $target, string $server, array $options = []) : WhoIsRequest
+    {
+        return new WhoIsRequest($target, $server, $options);
     }
 
     /**
@@ -251,8 +409,12 @@ FAKE;
                 }
                 $parser = DataParser::htmlParenthesisParser('main', $body);
                 if (count($parser) === 0) {
+                    if (stripos($body, '<html') !== false) {
+                        $request->setBodyString('');
+                    }
                     return $request;
                 }
+
                 /**
                  * @var ArrayCollector $collector
                  */
@@ -278,11 +440,21 @@ FAKE;
                 if (stripos($request->getServer(), 'https://secure.nic.vi/whois-lookup') !== 0) {
                     return $request;
                 }
+
                 $body = $request->getBodyString();
                 if (trim($body) === '') {
                     return $request;
                 }
+
                 $parser = DataParser::htmlParenthesisParser('pre', $body);
+                // if not match
+                if (count($parser) === 0) {
+                    if (stripos($body, '<html') !== false) {
+                        $request->setBodyString('');
+                    }
+                    return $request;
+                }
+
                 $body = '';
                 foreach ($parser as $key => $collector) {
                     if (!($selector = $collector->get('selector')) instanceof ArrayCollector) {
@@ -298,6 +470,7 @@ FAKE;
 
                     break;
                 }
+
                 if (!empty($body)) {
                     $body = trim(preg_replace('~<\/?(?:span|font|br)([^>]+)?>~i', "", $body));
                     $body = preg_replace('~^[^\n]+~', '', $body);
@@ -634,6 +807,8 @@ FAKE;
 
         // result
         $result = new ArrayCollector([$usedServer => $whoIsResult]);
+
+        // by pass follow server if use http server request
         if ($followServer) {
             $alternatedServer = $whoIsResult->getWhoIsServerFromResult();
             if ($alternatedServer
@@ -740,6 +915,7 @@ FAKE;
         $ipDetail = $validator->splitIP($ip);
         $server = $ipDetail->getWhoIsServers()[0];
         $request = $this->getRequest($ipDetail->getIPAddress(), $server);
+        $request->getBodyString();
         return new WhoIsResult($ipDetail, $request->getBodyString(), $server);
     }
 

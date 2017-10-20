@@ -272,7 +272,6 @@ class DataParser
             $arrayDataSplit = explode("\n\n", $data);
             foreach ($arrayDataSplit as $key => $v) {
                 $v = preg_replace('/^(?:[a-z]+\.\s?)?\[([^\]]+)\]/m', '$1:', $v);
-                print_r($v);
                 if ($v && $v[0] != '%' && preg_match('~([a-z]+[^\n]+)(\n\s{3,}[^\n]+)+~smi', $v)) {
                     $v = preg_replace_callback(
                         '~(?P<name>^[a-z]+[^\:]+)(?P<line>\:[^\n]+)(?P<val>(?:\n\s{3,}[^\n]+)+)~smi',

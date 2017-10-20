@@ -18,11 +18,7 @@ use Guzzle\Http\Exception\RequestException;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Handler\Proxy;
-use GuzzleHttp\Handler\StreamHandler;
 use GuzzleHttp\HandlerStack;
-use GuzzleHttp\Psr7\Request;
-use GuzzleHttp\Psr7\Response;
-use GuzzleHttp\Psr7\Stream;
 use GuzzleHttp\Psr7\Uri;
 use Pentagonal\WhoIs\Exceptions\ConnectionException;
 use Pentagonal\WhoIs\Exceptions\ConnectionFailException;
@@ -34,6 +30,7 @@ use Pentagonal\WhoIs\Exceptions\ResourceException;
 use Pentagonal\WhoIs\Exceptions\TimeOutException;
 use Pentagonal\WhoIs\Handler\CurlHandler;
 use Pentagonal\WhoIs\Handler\CurlMultiHandler;
+use Pentagonal\WhoIs\Handler\StreamSocketHandler;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\UriInterface;
@@ -120,27 +117,25 @@ class TransportClient
         if (!$uri instanceof UriInterface) {
             $uri = $this->createUri($uri);
         }
+
         if ($uri->getPort() === self::DEFAULT_PORT && $uri->getScheme() == '') {
-            $options['stream'] = false;
+            $optionsNew = $this->getClient()->getConfig();
+            $optionsNew = array_merge($optionsNew, $options);
+            $options['stream'] = ! empty($optionsNew['handler'])
+                 && (
+                     $optionsNew['handler'] instanceof StreamSocketHandler
+                     || $optionsNew['handler'] instanceof HandlerStack
+                 );
             $options['curl'][CURLOPT_CUSTOMREQUEST] = $method;
+            // if has custom request REQUEST METHOD GET
+            $method = 'GET';
         }
 
-        // override
-        if (!empty($uri->postMethod)) {
-            $method = 'POST';
-            $postData = [];
-            $postExplode = array_filter(explode('&', $uri->postMethod));
-            array_map(function ($query) use (&$postData) {
-                preg_match('/^([^\=]+)\=(.+)?/', ltrim($query), $match);
-                if (!empty($match[1])) {
-                    $postData[$match[1]] = $match[2];
-                }
-            }, $postExplode);
+        if (!empty($uri->postMethod) && is_array($uri->postMethod)) {
             $params = isset($options['form_params'])
-                && is_array($options['form_params'])
-                ? array_merge($options['form_params'], $postData)
-                : $postData;
-            $options['form_params'] = $params;
+                ? (array) $options['form_params']
+                : [];
+            $options['form_params'] = array_merge($uri->postMethod, $params);
         }
 
         try {
@@ -252,12 +247,16 @@ class TransportClient
      *
      * @param string $dataToWrite
      * @param string|UriInterface $server
+     * @param array $options
      *
      * @return ResponseInterface
      * @throws \Throwable
      */
-    public static function requestSocketConnectionWrite(string $dataToWrite, $server) : ResponseInterface
-    {
+    public static function requestSocketConnectionWrite(
+        string $dataToWrite,
+        $server,
+        array $options = []
+    ) : ResponseInterface {
         /**
          * Make Domain Name To Custom Request
          */
@@ -266,27 +265,27 @@ class TransportClient
         $dataToWrite = $uri->getPort() === 43 ? trim($dataToWrite) . "\r\n" : $dataToWrite;
         $args        = func_get_args();
         array_shift($args);
-        $request = new Request($dataToWrite, $uri);
-        $stream = @fsockopen(
-            $request->getUri()->getHost(),
-            $request->getUri()->getPort(),
-            $errCode,
-            $errMessage
-        );
-
-        if (!$stream) {
-            throw self::thrownExceptionResource(
-                $request,
-                new ResourceException($errMessage, $errCode),
-                false
-            );
+        // set options
+        $options = array_merge([
+            'handler' => HandlerStack::create(new StreamSocketHandler())
+        ], $options);
+        $clone      = self::createForStreamSocket($options);
+        try {
+            $response = $clone->request($dataToWrite, $uri, $options);
+        } catch (\Exception $e) {
+            if (method_exists($e, 'getRequest')
+                && $e->getRequest() instanceof RequestInterface
+            ) {
+                throw self::thrownExceptionResource(
+                    $e->getRequest(),
+                    new ResourceException($e->getMessage(), $e->getCode()),
+                    false
+                );
+            }
+            throw $e;
         }
 
-        $stream = new Stream($stream);
-        // write data
-        $stream->write($dataToWrite);
-
-        return new Response(200, [], $stream);
+        return $response;
     }
 
     /**
@@ -296,12 +295,13 @@ class TransportClient
      *
      * @param string $domainName
      * @param string|UriInterface $server
+     * @param array $options
      *
      * @return ResponseInterface
      */
-    public static function whoIsRequest(string $domainName, $server) : ResponseInterface
+    public static function whoIsRequest(string $domainName, $server, array $options = []) : ResponseInterface
     {
-        return static::requestSocketConnectionWrite($domainName, $server);
+        return static::requestSocketConnectionWrite($domainName, $server, $options);
     }
 
     /**
@@ -401,8 +401,8 @@ class TransportClient
 
         if (ini_get('allow_url_fopen')) {
             $handler = $handler
-                ? Proxy::wrapStreaming($handler, new StreamHandler())
-                : new StreamHandler();
+                ? Proxy::wrapStreaming($handler, new StreamSocketHandler())
+                : HandlerStack::create(new StreamSocketHandler());
         } elseif (!$handler) {
             throw new \RuntimeException(
                 'GuzzleHttp requires cURL, the allow_url_fopen ini setting, or a custom HTTP handler.'
@@ -458,8 +458,16 @@ class TransportClient
             && !empty($match[2])
         ) {
             $server = new Uri($match[2]);
+            $postData = [];
+            $postExplode = array_filter(explode('&', $match[1]));
+            array_map(function ($query) use (&$postData) {
+                preg_match('/^([^\=]+)\=(.+)?/', ltrim($query), $match);
+                if (!empty($match[1])) {
+                    $postData[$match[1]] = $match[2];
+                }
+            }, $postExplode);
             /** @noinspection PhpUndefinedFieldInspection */
-            $server->postMethod = $match[1];
+            $server->postMethod = $postData;
         }
 
         $uri = $server instanceof UriInterface ? $server : new Uri($server);
