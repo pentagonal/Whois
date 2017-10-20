@@ -893,6 +893,15 @@ class Validator
         ]);
     }
 
+    /**
+     * Check Whether IPv6 is On Range
+     * @access protected
+     *
+     * @param string $ip
+     * @param string $range
+     *
+     * @return bool
+     */
     protected function isIPv6OnRange(string $ip, string $range) : bool
     {
         if (strpos($range, '/') === false) {
