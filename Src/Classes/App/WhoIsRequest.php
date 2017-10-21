@@ -106,6 +106,11 @@ final class WhoIsRequest
     protected $socketMethod;
 
     /**
+     * @var null|string
+     */
+    protected $responseProxyConnection;
+
+    /**
      * WhoIsRequest constructor.
      *
      * @param string $domainName
@@ -333,7 +338,7 @@ final class WhoIsRequest
             elseif (preg_match(DataParser::ASN_REGEX, trim($this->targetName), $match)
                 && ! empty($match[2])
             ) {
-                $prefix = $this->uri->getHost() != 'whois.arin.net'
+                $prefix = $this->uri->getHost() != DataParser::ARIN_SERVER
                     ? 'AS'
                     : '';
                 $domainName = "{$prefix}{$match[2]}";
@@ -359,7 +364,6 @@ final class WhoIsRequest
             $query = $this->getUri()->getQuery();
             if (strpos(rawurldecode($query), '{{domain}}')) {
                 $query = str_replace('{{domain}}', $this->targetName, rawurldecode($query));
-                $this->server = str_replace('{{domain}}', $this->targetName, rawurldecode($this->server));
             } else {
                 $query = $this->getUri()->getQuery() . $this->targetName;
             }
@@ -491,18 +495,25 @@ final class WhoIsRequest
     /**
      * Check if response Returning Proxy
      *
-     * @return bool
+     * @return bool|string
      */
     public function getProxyConnection()
     {
+        if (isset($this->responseProxyConnection)) {
+            return $this->responseProxyConnection;
+        }
+
         $response = $this->getResponse();
         if (!$response instanceof ResponseInterface) {
-            return false;
+            return ($this->responseProxyConnection = false);
         }
-        return isset($response->proxyConnection)
+
+        return $this->responseProxyConnection = (
+            isset($response->proxyConnection)
             && is_string($response->proxyConnection)
             ? $response->proxyConnection
-            : false;
+            : false
+        );
     }
 
     /* --------------------------------------------------------------------------------*

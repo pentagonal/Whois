@@ -270,22 +270,7 @@ class TransportClient
             'handler' => HandlerStack::create(new StreamSocketHandler())
         ], $options);
         $clone      = self::createForStreamSocket($options);
-        try {
-            $response = $clone->request($dataToWrite, $uri, $options);
-        } catch (\Exception $e) {
-            if (method_exists($e, 'getRequest')
-                && $e->getRequest() instanceof RequestInterface
-            ) {
-                throw self::thrownExceptionResource(
-                    $e->getRequest(),
-                    new ResourceException($e->getMessage(), $e->getCode()),
-                    false
-                );
-            }
-            throw $e;
-        }
-
-        return $response;
+        return self::createForStreamSocket($options)->request($dataToWrite, $uri, $options);
     }
 
     /**

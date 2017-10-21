@@ -48,6 +48,7 @@ LICENSE;
 
     public static function generateDefaultExtensionServerList()
     {
+        $dataParser = new DataParser();
         $collector = new TLDCollector();
         $fileTLDExtensions = $collector->getAvailableExtensionsFile();
         $fileServers = $collector->getAvailableServersFile();
@@ -115,16 +116,16 @@ LICENSE;
         }
 
         // iana
-        $iAna = DataParser::cleanIniComment(DataParser::convertResponseBodyToString($iAnaResponse));
-        $iAna = DataParser::cleanMultipleWhiteSpaceTrim($iAna);
+        $iAna = $dataParser->cleanIniComment(DataParser::convertResponseBodyToString($iAnaResponse));
+        $iAna = $dataParser->normalizeWhiteSpace($iAna);
         $iAna = str_replace("\r\n", "\n", strtolower($iAna));
         $iAna = explode("\n", $iAna);
         $iAna = array_filter($iAna);
 
         // suffix
-        $suffix = DataParser::cleanIniComment(DataParser::convertResponseBodyToString($suffixResponse));
-        $suffix = DataParser::cleanSlashComment($suffix);
-        $suffix = DataParser::cleanMultipleWhiteSpaceTrim($suffix);
+        $suffix = $dataParser->cleanIniComment(DataParser::convertResponseBodyToString($suffixResponse));
+        $suffix = $dataParser->cleanSlashComment($suffix);
+        $suffix = $dataParser->normalizeWhiteSpace($suffix);
         $suffix = str_replace("\r\n", "\n", strtolower($suffix));
         $suffix = explode("\n", $suffix);
         $suffix = array_filter($suffix);

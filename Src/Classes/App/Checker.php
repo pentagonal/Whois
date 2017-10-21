@@ -86,9 +86,9 @@ FAKE;
      * @var int minimum length when domain name always registered,
      *          maximum set is on between 0 to 3 to use it
      *          and set to non numeric , null or les than 0 or more than
-     *          3 (4 or more) to disable it
+     *          3 (4 or more) to disable it, default is 1
      */
-    protected $minLength = 2;
+    protected $minLength = 1;
 
     /**
      * Declare base on domain name
@@ -120,7 +120,6 @@ FAKE;
      * @var array
      */
     protected $disAllowMainDomainExtension = [
-        'kr',
         'zw',
         'bd',
     ];
@@ -150,20 +149,11 @@ FAKE;
         /**
          * Set Options
          */
-        $allowedOptionsAsArray = ['disAllowMainDomainExtension',];
-        $allowedOptionsAsInt = ['cacheExpired'];
-        foreach ($options as $key => $value) {
-            if (in_array($key, $allowedOptionsAsArray) && is_array($value)) {
-                $this->{$key} = $value;
-                unset($options[$key]);
-                continue;
-            }
-            if (in_array($key, $allowedOptionsAsInt) && is_int($value)) {
-                unset($options[$key]);
-                $this->{$key} = $value;
-                continue;
-            }
-        }
+        $this->cacheExpired = isset($options['cacheExpired']) && is_numeric($options['cacheExpired'])
+            && $options['cacheExpired'] >= 0
+            ? abs($options['cacheExpired'])
+            : $this->cacheExpired;
+        unset($options['cacheExpired']);
 
         $this->defaultOptions = $options;
         $this->validatorInstance = $validator?: Validator::createInstance();
@@ -409,9 +399,7 @@ FAKE;
                 }
                 $parser = DataParser::htmlParenthesisParser('main', $body);
                 if (count($parser) === 0) {
-                    if (stripos($body, '<html') !== false) {
-                        $request->setBodyString('');
-                    }
+                    (stripos($body, '<html') !== false) && $request->setBodyString('');
                     return $request;
                 }
 
@@ -422,6 +410,7 @@ FAKE;
                 if (!is_string(($body = $collector->get('html')))) {
                     return $request;
                 }
+
                 $parser = DataParser::htmlParenthesisParser('pre', $body);
                 if (count($parser) === 0) {
                     return $request;
@@ -437,37 +426,31 @@ FAKE;
                 }
                 break;
             case 'vi':
-                if (stripos($request->getServer(), 'https://secure.nic.vi/whois-lookup') !== 0) {
-                    return $request;
-                }
-
-                $body = $request->getBodyString();
-                if (trim($body) === '') {
+                if (stripos(
+                    $request->getServer(),
+                    'https://secure.nic.vi/whois-lookup'
+                ) !== 0 || trim(($body = $request->getBodyString())) === ''
+                ) {
                     return $request;
                 }
 
                 $parser = DataParser::htmlParenthesisParser('pre', $body);
                 // if not match
                 if (count($parser) === 0) {
-                    if (stripos($body, '<html') !== false) {
-                        $request->setBodyString('');
-                    }
+                    (stripos($body, '<html') !== false) && $request->setBodyString('');
                     return $request;
                 }
 
-                $body = '';
                 foreach ($parser as $key => $collector) {
-                    if (!($selector = $collector->get('selector')) instanceof ArrayCollector) {
-                        continue;
-                    }
-
-                    if (!is_array($class = $selector->get('class'))
+                    // reset
+                    $body = '';
+                    if (!($selector = $collector->get('selector')) instanceof ArrayCollector
+                        || ! is_array($class = $selector->get('class'))
                         || ! in_array('result-pre', array_map('strtolower', $class))
-                        || !is_string(($body = $collector->get('html')))
+                        || ! is_string(($body = $collector->get('html')))
                     ) {
                         continue;
                     }
-
                     break;
                 }
 
@@ -625,6 +608,7 @@ FAKE;
         }
 
         $whoIsResultClass = static::WHOIS_RESULT_CLASS;
+
         /**
          * @var WhoIsResult $result
          */
@@ -634,8 +618,7 @@ FAKE;
             $result->proxyConnection = $request->getProxyConnection();
         }
 
-        $dataParser =  $result->getDataParser();
-        if ($dataParser::hasContainLimitedResultData($result->getOriginalResultString())) {
+        if ($result->isLimited()) {
             if (!$result->getNote()) {
                 $result->setNote('Request domain data has limit exceeded');
             }
@@ -646,6 +629,7 @@ FAKE;
                     $request->getServer()
                 )
             );
+
             /** @noinspection PhpUndefinedFieldInspection */
             $limit->result = $result;
             throw $limit;
@@ -760,7 +744,8 @@ FAKE;
                 return new ArrayCollector([$domainName => $result]);
             }
             try {
-                $result = new WhoIsResult(
+                $whoIsResultClass = static::WHOIS_RESULT_CLASS;
+                $result = new $whoIsResultClass(
                     $record,
                     $this->createFakeResultFromEmptyServerDomain($domainName)
                 );
@@ -889,7 +874,7 @@ FAKE;
         /**
          * @var WhoIsResult $result
          */
-        $result = $this->getFromDomain($record->getMainDomainName());
+        $result = $this->getFromDomain($record->getFullDomainName());
         $result = $result->last();
         $parser = $result->getDataParser();
         $status = $parser->getRegisteredDomainStatus($result->getOriginalResultString());
@@ -914,6 +899,7 @@ FAKE;
      * @param string $ip
      *
      * @return WhoIsResult
+     * @throws \Throwable
      */
     public function getFromIP(string $ip) : WhoIsResult
     {
@@ -921,7 +907,19 @@ FAKE;
         $ipDetail = $validator->splitIP($ip);
         $server = $ipDetail->getWhoIsServers()[0];
         $request = $this->getRequest($ipDetail->getIPAddress(), $server);
-        $result = new WhoIsResult($ipDetail, $request->getBodyString(), $server);
+
+        // if there was and error throw it
+        if ($request->isError()) {
+            throw $request->getResponse();
+        }
+
+        $whoIsResultClass = static::WHOIS_RESULT_CLASS;
+        $result = new $whoIsResultClass(
+            $ipDetail,
+            $request->getBodyString(),
+            $server
+        );
+
         // add proxy property
         if ($request->getProxyConnection()) {
             /** @noinspection PhpUndefinedFieldInspection */
@@ -941,13 +939,21 @@ FAKE;
      * @param string $asn
      *
      * @return WhoIsResult
+     * @throws \Throwable
      */
     public function getFromASN(string $asn) : WhoIsResult
     {
         $asnDetail = $this->getValidator()->splitASN($asn);
-        $server = $asnDetail->getWhoIsServers()[0];
-        $request = $this->getRequest($asnDetail->getASNumber(), $server);
-        $result = new WhoIsResult($asnDetail, $request->getBodyString(), $server);
+        $server    = $asnDetail->getWhoIsServers()[0];
+        $request   = $this->getRequest($asnDetail->getASNumber(), $server);
+
+        if ($request->isError()) {
+            throw $request->getResponse();
+        }
+
+        $whoIsResultClass = static::WHOIS_RESULT_CLASS;
+        $result = new $whoIsResultClass($asnDetail, $request->getBodyString(), $server);
+
         // add proxy property
         if ($request->getProxyConnection()) {
             /** @noinspection PhpUndefinedFieldInspection */
@@ -978,7 +984,6 @@ FAKE;
         }
 
         $validator = $this->getValidator();
-
         // ASN
         if ($validator->isValidASN($selector)) {
             return $this->getFromASN($selector);
@@ -995,7 +1000,12 @@ FAKE;
         $requestFromIAna  = isset($params[2]) && (bool) $params[2];
         if ($validator->isValidTopLevelDomain($selector)) {
             return $this
-                ->getFromDomain($selector, $followServer, $allowEmptyServer, $requestFromIAna)
+                ->getFromDomain(
+                    $selector,
+                    $followServer,
+                    $allowEmptyServer,
+                    $requestFromIAna
+                )
                 ->last();
         }
 

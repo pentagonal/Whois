@@ -29,6 +29,11 @@ use Pentagonal\WhoIs\Util\TransportClient;
  */
 class WhoIsResult extends WhoIsResultAbstract
 {
+    /**
+     * @var bool
+     */
+    private $isLimited;
+
     /* --------------------------------------------------------------------------------*
      |                                   UTILITY                                       |
      |---------------------------------------------------------------------------------|
@@ -408,14 +413,20 @@ class WhoIsResult extends WhoIsResultAbstract
      */
 
     /**
+     * Create Whois Result Instance
+     *
      * @param RecordNetworkInterface $network
      * @param string $originalData
+     * @param string $server
      *
      * @return WhoIsResult
      */
-    public static function create(RecordNetworkInterface $network, string $originalData) : WhoIsResult
-    {
-        return new static($network, $originalData);
+    public static function createInstance(
+        RecordNetworkInterface $network,
+        string $originalData,
+        string $server = null
+    ) : WhoIsResult {
+        return new static($network, $originalData, $server);
     }
 
     /* --------------------------------------------------------------------------------*
@@ -440,5 +451,24 @@ class WhoIsResult extends WhoIsResultAbstract
     public function isRegistered()
     {
         return $this->getDataDetail()[static::KEY_DOMAIN][static::KEY_REGISTERED];
+    }
+
+    /**
+     * Check if result is Limited
+     *
+     * @return bool
+     */
+    final public function isLimited() : bool
+    {
+        if (!isset($this->isLimited)) {
+            $original = $this->getOriginalResultString();
+            $this->isLimited = $original && $this
+                ->getDataParser()
+                ->hasContainLimitedResultData(
+                    $original
+                );
+        }
+
+        return $this->isLimited;
     }
 }

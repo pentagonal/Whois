@@ -21,6 +21,8 @@ use Pentagonal\WhoIs\Util\DataParser;
  */
 trait ResultParser
 {
+    use ResultNormalizer;
+
     /**
      * Parse Domain Detail
      *
@@ -31,7 +33,7 @@ trait ResultParser
     protected function parseDomainDetail(string $data) : ArrayCollector
     {
         // just check for first use especially for be domain
-        $data = DataParser::normalizeWhoIsDomainResultData($data);
+        $data = $this->normalizeWhoIsDomainResultData($data);
         if (preg_match('~\#\s*ENGLISH\s+~smix', $data)
             && preg_match('~\#\s*[a-z0-9\_\-]+\(UTF8\)\s+~smix', $data)
         ) {

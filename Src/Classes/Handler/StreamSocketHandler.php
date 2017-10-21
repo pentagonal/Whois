@@ -439,10 +439,14 @@ class StreamSocketHandler
                     $this->proxyData = $proxy;
                     $server          = "{$server}:{$port}";
                     $connect         = $useProxy ? $proxy : $server;
+                    $info = ($useProxy
+                        ? "Connecting to proxy   : {$proxy}"
+                        : "Connecting to socket  : {$server}"
+                    );
                     $notification(
                         STREAM_NOTIFY_CONNECT,
                         null,
-                        ($useProxy ? "Using proxy : {$proxy}" : null)
+                        $info
                     );
                     $connectTimeOut = isset($options['connect_timeout'])
                         ? $options['connect_timeout']
@@ -460,6 +464,7 @@ class StreamSocketHandler
                     );
 
                     if (!$resource && $errNumber) {
+                        // write notification
                         $notification(
                             STREAM_NOTIFY_FAILURE,
                             $errMessage,
@@ -472,11 +477,14 @@ class StreamSocketHandler
                             $errNumber
                         );
                     }
-
+                    // write notification
                     $notification(
                         STREAM_NOTIFY_RESOLVE,
                         null,
-                        ($useProxy ? "Connected via proxy: {$proxy}" : "Connected to: {$connect}")
+                        ($useProxy
+                            ? "Connected to proxy    : {$proxy}"
+                            : "Connected to          : {$connect}"
+                        )
                     );
 
                     if (isset($options['read_timeout'])) {
@@ -488,42 +496,60 @@ class StreamSocketHandler
 
                     if ($useProxy) {
                         $notification(
-                            STREAM_NOTIFY_PROGRESS,
+                            STREAM_NOTIFY_CONNECT,
                             null,
-                            "Connecting: {$server}"
+                            "Requesting connection : {$server}"
                         );
                         if (fwrite($resource, "CONNECT {$server}\r\n\r\n") === false) {
-                            $notification(STREAM_NOTIFY_FAILURE);
+                            $err = "Request failed to : {$server} using proxy {$connect}";
+                            $notification(
+                                STREAM_NOTIFY_FAILURE,
+                                CURLE_SEND_ERROR,
+                                $err
+                            );
                             throw new ResourceException(
-                                'Can not write connection into target',
+                                $err,
                                 CURLE_SEND_ERROR
                             );
                         }
 
+                        // write notification resolve
+                        $info = "Connected to          : {$server}";
                         $notification(
                             STREAM_NOTIFY_RESOLVE,
                             null,
-                            "Connected : {$server}"
+                            $info
                         );
                         $method = rtrim($method)."\r\n\r\n";
                     }
+
+                    // write notification progress
+                    $info = "Sending command      : " . rtrim($method) . " to {$server}";
                     $notification(
                         STREAM_NOTIFY_PROGRESS,
                         null,
-                        "Requesting: ". rtrim($method)
+                        $info
                     );
 
                     if (fwrite($resource, $method) === false) {
-                        $notification(STREAM_NOTIFY_FAILURE);
+                        // write notification failure
+                        $err = "Failed to send command : {$method} into {$server}";
+                        $notification(
+                            STREAM_NOTIFY_FAILURE,
+                            CURLE_SEND_ERROR,
+                            $err
+                        );
                         throw new ResourceException(
-                            'Can not write connection into target',
+                            $err,
                             CURLE_SEND_ERROR
                         );
                     }
 
                     // call notification
                     $notification(
-                        STREAM_NOTIFY_RESOLVE
+                        STREAM_NOTIFY_RESOLVE,
+                        null,
+                        "Command " . rtrim($method) . " successfully sent"
                     );
                     $notification(STREAM_NOTIFY_COMPLETED);
                     $this->lastHeaders = (array) $http_response_header;
