@@ -523,10 +523,13 @@ class DataParser
     }
 
     /**
-     * Parse The Selector Matches
+     * Parse The Selector Matches till end of tags
+     * This only for helper parser.
+     * Don't use this method if you use for common purpose.
+     * Please use another library such as: Symfony DOM Crawler or etc.
      *
-     * @param string $tag
-     * @param string $html
+     * @param string $tag  tag to be select
+     * @param string $html full html content
      *
      * @return ArrayLoopAbleCallback|ArrayCollector[]
      */
