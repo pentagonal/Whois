@@ -1079,7 +1079,7 @@ class Validator
             return false;
         }
 
-        return preg_match(DataParser::ASN_REGEX, $asn, $match) && ! empty($match[1]);
+        return preg_match(DataParser::ASN_REGEX, $asn, $match) && ! empty($match[2]);
     }
 
     /**

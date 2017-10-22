@@ -19,7 +19,6 @@ use Pentagonal\WhoIs\Interfaces\RecordASNNetworkInterface;
 use Pentagonal\WhoIs\Interfaces\RecordDomainNetworkInterface;
 use Pentagonal\WhoIs\Interfaces\RecordNetworkInterface;
 use Pentagonal\WhoIs\Util\DataParser;
-use Pentagonal\WhoIs\Util\TransportClient;
 
 /**
  * Class WhoIsResult
@@ -305,7 +304,7 @@ class WhoIsResult extends WhoIsResultAbstract
                     return trim(preg_replace('~^POST[^\|]+\|~', '', $server));
                 }
                 return is_string($server)
-                    ? str_replace('{{domain}}', $this->getDomainName(), $server)
+                    ? str_replace('{{domain}}', $this->getPointer(), $server)
                     : $server;
             }, $this->networkRecord->getWhoIsServers())
         );

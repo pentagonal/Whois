@@ -26,12 +26,10 @@ also convert it into string is become `json pretty print` result.
 
 ```php
 <?php
-use Pentagonal\WhoIs\App\ArrayCollector;
 use Pentagonal\WhoIs\App\ArrayCacheCollector;
 use Pentagonal\WhoIs\Interfaces\CacheInterface;
 use Pentagonal\WhoIs\App\Checker;
 use Pentagonal\WhoIs\App\Validator;
-use Pentagonal\WhoIs\App\WhoIsResult;
 
 /**
  * @var CacheInterface $cache
@@ -49,24 +47,33 @@ $options = [
 ];
 $checker = new Checker($validator, $cache);
 
-/**
- * @var ArrayCollector $collector
- */
-$collector = $checker->getFromDomain('domain.com', true);
-if (count($collector) > 0) {
-    /**
-     * @var WhoIsResult $lastData
-     */
-    // use last data to get last result / follow whois
-    $lastData = $collector->last();
-    // just echo or encode json to returning JSON Data
-    echo $lastData;
-    echo json_encode($lastData, JSON_PRETTY_PRINT);
-    // or get array
-    print_r($lastData->toArray());
-    // or get collector data detail
-    print_r($lastData->getDataDetail());
-}
+/* ------------------------------------------
+ * Get From Domain Name
+ * ---------------------------------------- */
+
+$result = $checker->getFromDomain('domain.com', true);
+// just echo or encode json to returning JSON Data
+echo $result;
+echo json_encode($result, JSON_PRETTY_PRINT);
+// or get array
+print_r($result->toArray());
+// or get collector data detail
+print_r($result->getDataDetail());
+
+/* ------------------------------------------
+ * Get From Auto Detect Type
+ * ---------------------------------------- */
+$target = '8.8.8.8';
+$result = $checker->getResult($target);
+
+/* ------------------------------------------
+ * Get From Multi Result
+ * Will be follow given whois server
+ * from result,
+ * if value count more than 1 it was follow whois
+ * server
+ * ---------------------------------------- */
+$result = $checker->getMultiResult($target);
 
 ```
 
@@ -121,6 +128,13 @@ does not permit their whois data for public.
 You can get `Whois Servers` list on : [Src/Data/Servers/AvailableServers.php](Src/Data/Extensions/AvailableServers.php)
 
 
+##
+
+**PLEASE DO NOT USE FOR PRODUCTION**
+
+Until the stable version has been release
+
+##
 
 ## LICENSE
 

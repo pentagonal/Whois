@@ -335,7 +335,7 @@ abstract class WhoIsResultAbstract implements WhoIsNetworkResultInterface
      *
      * @return string
      */
-    public function getDomainName() : string
+    public function getPointer() : string
     {
         return $this->networkRecord->getPointer();
     }
@@ -568,6 +568,52 @@ abstract class WhoIsResultAbstract implements WhoIsNetworkResultInterface
     public function getNote()
     {
         return $this->dataDetail[static::KEY_DATA][static::KEY_NOTE];
+    }
+
+    /**
+     * Get Server
+     *
+     * @return string
+     */
+    public function getServer()
+    {
+        if (!isset($this->dataDetail[static::KEY_URL][static::KEY_SERVER])
+            && ! $this->hasParsed
+        ) {
+            return $this->getDataDetail()[static::KEY_URL][static::KEY_SERVER];
+        }
+
+        return $this->dataDetail[static::KEY_URL][static::KEY_SERVER];
+    }
+
+    /**
+     * Check if type is IP
+     *
+     * @return bool
+     */
+    public function isIP() : bool
+    {
+        return $this->getNetworkRecord() instanceof RecordIPNetworkInterface;
+    }
+
+    /**
+     * Check if type is ASN
+     *
+     * @return bool
+     */
+    public function isASN() : bool
+    {
+        return $this->getNetworkRecord() instanceof RecordASNNetworkInterface;
+    }
+
+    /**
+     * Check if type is Domain
+     *
+     * @return bool
+     */
+    public function isDomain() : bool
+    {
+        return $this->getNetworkRecord() instanceof RecordDomainNetworkInterface;
     }
 
     /**

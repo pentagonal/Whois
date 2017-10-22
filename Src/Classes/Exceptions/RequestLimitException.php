@@ -14,10 +14,39 @@ declare(strict_types=1);
 
 namespace Pentagonal\WhoIs\Exceptions;
 
+use Pentagonal\WhoIs\App\WhoIsResult;
+use Throwable;
+
 /**
  * Class RequestLimitException
  * @package Pentagonal\WhoIs\Exceptions
  */
 class RequestLimitException extends ResultException
 {
+    /**
+     * @var null|WhoIsResult
+     */
+    protected $result;
+
+    /**
+     * RequestLimitException constructor.
+     *
+     * @param string $message
+     * @param int $code
+     * @param WhoIsResult|null $result
+     * @param Throwable|null $previous
+     */
+    public function __construct($message = "", $code = 0, WhoIsResult $result = null, Throwable $previous = null)
+    {
+        parent::__construct($message, $code, $previous);
+        $this->result = $result;
+    }
+
+    /**
+     * @return null|WhoIsResult
+     */
+    public function getResult()
+    {
+        return $this->result;
+    }
 }

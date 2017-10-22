@@ -12,6 +12,11 @@
 
 namespace Pentagonal\WhoIs\Traits;
 
+use Pentagonal\WhoIs\App\ArrayCollector;
+use Pentagonal\WhoIs\App\Validator;
+use Pentagonal\WhoIs\App\WhoIsRequest;
+use Pentagonal\WhoIs\Util\DataParser;
+
 /**
  * Trait ResultNormalizer
  * @package Pentagonal\WhoIs\Traits
@@ -332,5 +337,102 @@ trait ResultNormalizer
         $data = str_replace(["\n{$placeHolder}", $placeHolder,], " ", $data);
         $data = $this->normalizeWhiteSpace($data);
         return $data;
+    }
+
+    /**
+     * Sanitize for Request this for child class that maybe
+     *
+     * @param WhoIsRequest $request
+     * @param Validator $validator
+     *
+     * @return WhoIsRequest
+     */
+    protected function normalizeAfterRequest(WhoIsRequest $request, Validator $validator) : WhoIsRequest
+    {
+        $domain = $request->getTargetName();
+        if ($domain && $validator->isValidDomain($domain)) {
+            $extension = $validator->splitDomainName($domain)->getBaseExtension();
+        }
+
+        if (empty($extension)) {
+            return $request;
+        }
+
+        // with extensions logic
+        switch ($extension) {
+            case 'ph':
+                if (stripos($request->getServer(), 'https://whois.dot.ph/?') !== 0) {
+                    return $request;
+                }
+                $body = $request->getBodyString();
+                if (trim($body) === '') {
+                    return $request;
+                }
+                $parser = DataParser::htmlParenthesisParser('main', $body);
+                if (count($parser) === 0) {
+                    (stripos($body, '<html') !== false) && $request->setBodyString('');
+                    return $request;
+                }
+
+                /**
+                 * @var ArrayCollector $collector
+                 */
+                $collector = $parser->last();
+                if (!is_string(($body = $collector->get('html')))) {
+                    return $request;
+                }
+
+                $parser = DataParser::htmlParenthesisParser('pre', $body);
+                if (count($parser) === 0) {
+                    return $request;
+                }
+                $collector = $parser->last();
+                if (!is_string(($body = $collector->get('html')))) {
+                    return $request;
+                }
+                if (!empty($body)) {
+                    $body = trim(preg_replace('~<br[^>]*>~i', "\n", $body));
+                    $body = preg_replace('~^[ ]+~m', '', strip_tags($body));
+                    $request->setBodyString(trim($body));
+                }
+                break;
+            case 'vi':
+                if (stripos(
+                    $request->getServer(),
+                    'https://secure.nic.vi/whois-lookup'
+                ) !== 0 || trim(($body = $request->getBodyString())) === ''
+                ) {
+                    return $request;
+                }
+
+                $parser = DataParser::htmlParenthesisParser('pre', $body);
+                // if not match
+                if (count($parser) === 0) {
+                    (stripos($body, '<html') !== false) && $request->setBodyString('');
+                    return $request;
+                }
+
+                foreach ($parser as $key => $collector) {
+                    // reset
+                    $body = '';
+                    if (!($selector = $collector->get('selector')) instanceof ArrayCollector
+                        || ! is_array($class = $selector->get('class'))
+                        || ! in_array('result-pre', array_map('strtolower', $class))
+                        || ! is_string(($body = $collector->get('html')))
+                    ) {
+                        continue;
+                    }
+                    break;
+                }
+
+                if (!empty($body)) {
+                    $body = trim(preg_replace('~<\/?(?:span|font|br)([^>]+)?>~i', "", $body));
+                    $body = preg_replace('~^[^\n]+~', '', $body);
+                    $request->setBodyString(trim($body));
+                }
+                break;
+        }
+
+        return $request;
     }
 }

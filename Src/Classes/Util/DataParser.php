@@ -12,7 +12,6 @@
 
 namespace Pentagonal\WhoIs\Util;
 
-use function GuzzleHttp\Psr7\str;
 use Pentagonal\WhoIs\App\ArrayCollector;
 use Pentagonal\WhoIs\Traits\ResultNormalizer;
 use Psr\Http\Message\RequestInterface;
@@ -79,13 +78,6 @@ class DataParser
         PATH_IP6_BLOCKS  = self::DATA_PATH . '/Blocks/Ipv6Blocks.dat';
 
     const
-        ARIN_NET_PREFIX_COMMAND    = 'n +',
-        RIPE_NET_PREFIX_COMMAND    = '-V Md5.2',
-        APNIC_NET_PREFIX_COMMAND   = '-V Md5.2',
-        AFRINIC_NET_PREFIX_COMMAND = '-V Md5.2',
-        LACNIC_NET_PREFIX_COMMAND  = '';
-
-    const
         ARIN_SERVER      = 'whois.arin.net',
         RIPE_SERVER      = 'whois.ripe.net',
         APNIC_SERVER     = 'whois.apnic.net',
@@ -98,6 +90,13 @@ class DataParser
         RESERVED_MULTICAST = 'reserved_multicast',
         RESERVED_PRIVATE = 'reserved_private',
         RESERVED_SAMPLE  = 'reserved_sample';
+
+    const
+        ARIN_NET_PREFIX_COMMAND    = 'n +',
+        RIPE_NET_PREFIX_COMMAND    = '-V Md5.2',
+        APNIC_NET_PREFIX_COMMAND   = '-V Md5.2',
+        AFRINIC_NET_PREFIX_COMMAND = '-V Md5.2',
+        LACNIC_NET_PREFIX_COMMAND  = '';
 
     /**
      * Prefix List command
@@ -402,12 +401,12 @@ class DataParser
         }
 
         $currentObject = new static();
+        $data = $currentObject->cleanComment($data);
         if (!preg_match(
-            '~Whois(?:\s*Server)?\s*\[\:\]]\s*([^\n]+)~i',
-            $currentObject->cleanComment($data),
+            '~Whois(?:\s*Server)?\s*[\:\]]\s*([^\n]+)~i',
+            $data,
             $match
-        ) || empty($match[1])
-        ) {
+        ) || empty($match[1])) {
             return false;
         }
 
@@ -446,14 +445,26 @@ class DataParser
      */
     public static function convertStreamToString(StreamInterface $stream) : string
     {
-        $data = '';
-        // Rewind position
+        $currentPos = -1;
+        try {
+            $currentPos = $stream->tell();
+        } catch (\Exception $e) {
+            // pass
+        }
+
         if ($stream->isSeekable()) {
             $stream->rewind();
         }
 
-        while (!$stream->eof()) {
+        $data = '';
+        // Rewind position
+        while (! $stream->eof()) {
             $data .= $stream->read(4096);
+        }
+
+        // if seekable fallback to previous position
+        if ($currentPos > -1 && $stream->isSeekable()) {
+            $stream->seek($currentPos);
         }
 
         return $data;
@@ -483,32 +494,32 @@ class DataParser
     }
 
     /**
-     * @param string $ip
+     * @param string $asnNumber
      * @param string $server
      *
      * @return string
      */
-    public static function buildASNCommandServer(string $ip, string $server) : string
+    public static function buildASNCommandServer(string $asnNumber, string $server) : string
     {
         // if contain white space on IP ignore it
-        if (! preg_match('/\s+/', trim($ip))
+        if (! preg_match('/\s+/', trim($asnNumber))
             && ($server = strtolower(trim($server))) !== ''
             && isset(static::$serverPrefixList[$server])
             && static::$serverPrefixList[$server]
         ) {
-            $ip     = ltrim($ip);
+            $asnNumber = strtoupper($asnNumber);
+            $asnNumber = 'AS'.ltrim($asnNumber, ' AS');
             if ($server === self::ARIN_SERVER) {
-                return "a + {$ip}";
+                $asnNumber = ltrim($asnNumber, ' AS');
+                return "a + {$asnNumber}";
             }
-
-            $ip     = ltrim($ip);
-            $prefix = static::$serverPrefixList[$server];
-            if (strpos($ip, "{$prefix} ") !== 0) {
-                $ip = "{$prefix} $ip";
+            $prefix    = static::$serverPrefixList[$server];
+            if (strpos($asnNumber, "{$prefix} ") !== 0) {
+                $asnNumber = "{$prefix} $asnNumber";
             }
         }
 
-        return $ip;
+        return $asnNumber;
     }
 
     /**

@@ -22,6 +22,8 @@ use Pentagonal\WhoIs\Exceptions\ResultException;
 use Pentagonal\WhoIs\Exceptions\TimeOutException;
 use Pentagonal\WhoIs\Exceptions\WhoIsServerNotFoundException;
 use Pentagonal\WhoIs\Interfaces\CacheInterface;
+use Pentagonal\WhoIs\Interfaces\RecordNetworkInterface;
+use Pentagonal\WhoIs\Traits\ResultNormalizer;
 use Pentagonal\WhoIs\Util\DataParser;
 use Pentagonal\WhoIs\Util\Sanitizer;
 
@@ -33,6 +35,8 @@ use Pentagonal\WhoIs\Util\Sanitizer;
  */
 class Checker
 {
+    use ResultNormalizer;
+
     /**
      * Version
      */
@@ -303,9 +307,12 @@ FAKE;
      */
     protected function putCache(string $key, $value)
     {
+        if (!$this->cacheInstance instanceof ArrayCacheCollector) {
+            $value = Sanitizer::maybeSerialize($value);
+        }
         return $this->cacheInstance->put(
             $this->normalizeCacheKey($key),
-            Sanitizer::maybeSerialize($value),
+            $value,
             $this->cacheExpired
         );
     }
@@ -330,6 +337,19 @@ FAKE;
 
         return $cacheData;
     }
+    /**
+     * Create Request
+     *
+     * @param string $target
+     * @param string $server
+     * @param array $options
+     *
+     * @return WhoIsRequest
+     */
+    protected function prepareForRequest(string $target, string $server, array $options = []) : WhoIsRequest
+    {
+        return new WhoIsRequest($target, $server, $options);
+    }
 
     /**
      * Get From Server
@@ -350,119 +370,10 @@ FAKE;
         }
 
         $options = array_merge($this->getDefaultOptions(), $options);
-        return $this->sanitizeAfterRequest(
-            $this->prepareForRequest($target, $server, $options)
+        return $this->normalizeAfterRequest(
+            $this->prepareForRequest($target, $server, $options),
+            $this->getValidator()
         );
-    }
-
-    /**
-     * Create Request
-     *
-     * @param string $target
-     * @param string $server
-     * @param array $options
-     *
-     * @return WhoIsRequest
-     */
-    protected function prepareForRequest(string $target, string $server, array $options = []) : WhoIsRequest
-    {
-        return new WhoIsRequest($target, $server, $options);
-    }
-
-    /**
-     * Sanitize for Request this for child class that maybe
-     *
-     * @param WhoIsRequest $request
-     *
-     * @return WhoIsRequest
-     */
-    protected function sanitizeAfterRequest(WhoIsRequest $request) : WhoIsRequest
-    {
-        $domain = $request->getTargetName();
-        if ($domain && $this->getValidator()->isValidDomain($domain)) {
-            $extension = $this->getValidator()->splitDomainName($domain)->getBaseExtension();
-        }
-
-        if (empty($extension)) {
-            return $request;
-        }
-
-        // with extensions logic
-        switch ($extension) {
-            case 'ph':
-                if (stripos($request->getServer(), 'https://whois.dot.ph/?') !== 0) {
-                    return $request;
-                }
-                $body = $request->getBodyString();
-                if (trim($body) === '') {
-                    return $request;
-                }
-                $parser = DataParser::htmlParenthesisParser('main', $body);
-                if (count($parser) === 0) {
-                    (stripos($body, '<html') !== false) && $request->setBodyString('');
-                    return $request;
-                }
-
-                /**
-                 * @var ArrayCollector $collector
-                 */
-                $collector = $parser->last();
-                if (!is_string(($body = $collector->get('html')))) {
-                    return $request;
-                }
-
-                $parser = DataParser::htmlParenthesisParser('pre', $body);
-                if (count($parser) === 0) {
-                    return $request;
-                }
-                $collector = $parser->last();
-                if (!is_string(($body = $collector->get('html')))) {
-                    return $request;
-                }
-                if (!empty($body)) {
-                    $body = trim(preg_replace('~<br[^>]*>~i', "\n", $body));
-                    $body = preg_replace('~^[ ]+~m', '', strip_tags($body));
-                    $request->setBodyString(trim($body));
-                }
-                break;
-            case 'vi':
-                if (stripos(
-                    $request->getServer(),
-                    'https://secure.nic.vi/whois-lookup'
-                ) !== 0 || trim(($body = $request->getBodyString())) === ''
-                ) {
-                    return $request;
-                }
-
-                $parser = DataParser::htmlParenthesisParser('pre', $body);
-                // if not match
-                if (count($parser) === 0) {
-                    (stripos($body, '<html') !== false) && $request->setBodyString('');
-                    return $request;
-                }
-
-                foreach ($parser as $key => $collector) {
-                    // reset
-                    $body = '';
-                    if (!($selector = $collector->get('selector')) instanceof ArrayCollector
-                        || ! is_array($class = $selector->get('class'))
-                        || ! in_array('result-pre', array_map('strtolower', $class))
-                        || ! is_string(($body = $collector->get('html')))
-                    ) {
-                        continue;
-                    }
-                    break;
-                }
-
-                if (!empty($body)) {
-                    $body = trim(preg_replace('~<\/?(?:span|font|br)([^>]+)?>~i', "", $body));
-                    $body = preg_replace('~^[^\n]+~', '', $body);
-                    $request->setBodyString(trim($body));
-                }
-                break;
-        }
-
-        return $request;
     }
 
     /* --------------------------------------------------------------------------------*
@@ -471,16 +382,16 @@ FAKE;
      */
 
     /**
-     * @param string $domainName     the domain Name
+     * @param string $target     the domain Name
      * @param bool $requestFromIAna  try to get whois server from IANA
      *
      * @return array
      * @throws \Throwable
      */
-    public function getWhoIsServerFor(string $domainName, bool $requestFromIAna = false) : array
+    public function getWhoIsServerFor(string $target, bool $requestFromIAna = false) : array
     {
-        $domainName = trim($domainName);
-        if ($domainName === '') {
+        $target = trim($target);
+        if ($target === '') {
             throw new EmptyDomainException(
                 'Domain name could not be empty or white space only'
             );
@@ -488,17 +399,17 @@ FAKE;
 
         $validator  = $this->getValidator();
         // if invalid thrown error
-        $domainRecord = $validator->splitDomainName($domainName);
+        $domainRecord = $validator->splitDomainName($target);
         $extension  = $domainRecord->getBaseExtension();
         $servers = $validator->getTldCollector()->getServersFromExtension($extension);
         if (empty($servers)) {
-            $domainKey = strtolower($domainName);
+            $domainKey = strtolower($target);
             $keyWhoIs = "{$domainKey}_whs";
             $whoIsServer = $this->getCache($keyWhoIs);
             if ($requestFromIAna && (empty($whoIsServer) || !is_array($whoIsServer))) {
-                $iAnaRequest = $this->getRequest($domainName, DataParser::URI_IANA_WHOIS);
+                $iAnaRequest = $this->getRequest($target, DataParser::URI_IANA_WHOIS);
                 if ($iAnaRequest->isTimeOut()) {
-                    $iAnaRequest = $this->getRequest($domainName, DataParser::URI_IANA_WHOIS);
+                    $iAnaRequest = $this->getRequest($target, DataParser::URI_IANA_WHOIS);
                 }
                 if ($iAnaRequest->isError()) {
                     throw $iAnaRequest->getResponse();
@@ -512,7 +423,7 @@ FAKE;
                     throw new WhoIsServerNotFoundException(
                         sprintf(
                             'Could not get whois server for: %s',
-                            $domainName
+                            $target
                         ),
                         E_NOTICE
                     );
@@ -521,122 +432,6 @@ FAKE;
         }
 
         return (array) $servers;
-    }
-
-    /* --------------------------------------------------------------------------------*
-     |                              DOMAIN CHECKER                                     |
-     |---------------------------------------------------------------------------------|
-     */
-
-    /**
-     * Get From Domain With Server
-     *
-     * @param string $domainName
-     * @param string $server
-     * @param int $retry
-     *
-     * @return WhoIsResult
-     * @throws \Throwable
-     */
-    public function getFromDomainWithServer(
-        string $domainName,
-        string $server,
-        int $retry = 2
-    ) : WhoIsResult {
-        if ($retry > static::MAX_RETRY) {
-            $retry = static::MAX_RETRY;
-        }
-
-        $domainName = trim($domainName);
-        if ($domainName === '') {
-            throw new EmptyDomainException(
-                'Domain name could not be empty or white space only'
-            );
-        }
-
-        $keyCache = "{$domainName}_{$server}";
-        $result = $this->getCache($keyCache);
-        if ($result instanceof WhoIsResult) {
-            return $result;
-        }
-
-        $record = $this->getValidator()->splitDomainName($domainName);
-        if (! $record->isTopLevelDomain()) {
-            throw new InvalidDomainException(
-                sprintf(
-                    'Domain name %s is not a valid top domain',
-                    $record->getFullDomainName()
-                ),
-                E_NOTICE
-            );
-        }
-
-        if ($record->isGTLD()
-            && in_array($record->getBaseExtension(), $this->disAllowMainDomainExtension)
-        ) {
-            throw new InvalidDomainException(
-                sprintf(
-                    'Domain name Extension: (.%s) GTLD is not for public registration',
-                    $record->getBaseExtension()
-                ),
-                E_NOTICE
-            );
-        }
-
-        if ($record->isSTLD() && $record->isMaybeDisAllowToRegistered()) {
-            throw new InvalidDomainException(
-                sprintf(
-                    'Domain name : %s has invalid as top level domain as STLD',
-                    $domainName
-                ),
-                E_NOTICE
-            );
-        }
-
-        $request = $this->getRequest(
-            $record->getDomainName(),
-            $server
-        );
-
-        while ($request->isTimeOut() && $retry > 0) {
-            $retry -= 1;
-            $request = $this->getRequest($domainName, $server);
-        }
-
-        if ($request->isError()) {
-            throw $request->getResponse();
-        }
-
-        $whoIsResultClass = static::WHOIS_RESULT_CLASS;
-
-        /**
-         * @var WhoIsResult $result
-         */
-        $result = new $whoIsResultClass($record, $request->getBodyString(), $request->getServer());
-        if ($request->getProxyConnection()) {
-            /** @noinspection PhpUndefinedFieldInspection */
-            $result->proxyConnection = $request->getProxyConnection();
-        }
-
-        if ($result->isLimited()) {
-            if (!$result->getNote()) {
-                $result->setNote('Request domain data has limit exceeded');
-            }
-            $limit = new RequestLimitException(
-                sprintf(
-                    'Request for %1$s on %2$s has limit exceeded',
-                    $domainName,
-                    $request->getServer()
-                )
-            );
-
-            /** @noinspection PhpUndefinedFieldInspection */
-            $limit->result = $result;
-            throw $limit;
-        }
-
-        $this->putCache($keyCache, $result);
-        return $result;
     }
 
     /**
@@ -684,9 +479,10 @@ FAKE;
         } else {
             $record .= "Domain Status: Available\n";
         }
+
         try {
             $string = $this
-                ->getFromDomainWithServer($domainName, DataParser::URI_IANA_WHOIS)
+                ->getFromDomain($domainName, DataParser::URI_IANA_WHOIS)
                 ->getOriginalResultString();
             preg_match(
                 '~
@@ -708,22 +504,149 @@ FAKE;
     }
 
     /**
-     * Get detail from whois for domain name
+     * Try Request Result
      *
-     * @param string $domainName
-     * @param bool $followServer follow server if whois server exists
-     * @param bool $allowEmptyServer use *Name Server (DNS)* if Server has empty default is true
-     * @param bool $requestFromIAna  try to get whois server from IANA
+     * @param string $target string domain name, IP or ASN
+     * @param string $server
+     * @param int $retry
      *
-     * @return ArrayCollector|WhoIsResult[]
+     * @return WhoIsRequest
      * @throws \Throwable
      */
-    public function getFromDomain(
-        string $domainName,
-        bool $followServer = false,
-        bool $allowEmptyServer = true,
-        bool $requestFromIAna = false
-    ) : ArrayCollector {
+    protected function tryRequestResult(
+        string $target,
+        string $server,
+        int $retry = 2
+    ) : WhoIsRequest {
+
+        if (trim($target) === '') {
+            throw new \InvalidArgumentException(
+                'Argument selector could not be empty',
+                E_USER_WARNING
+            );
+        }
+
+        if (trim($target) === '') {
+            throw new \InvalidArgumentException(
+                'Target could not be empty',
+                E_USER_WARNING
+            );
+        }
+
+        if (trim($server) === '') {
+            throw new \InvalidArgumentException(
+                'Server could not be empty',
+                E_USER_WARNING
+            );
+        }
+
+        if ($retry > static::MAX_RETRY) {
+            $retry = static::MAX_RETRY;
+        }
+
+        $request = $this->getRequest($target, $server);
+        while ($request->isTimeOut() && $retry > 0) {
+            $retry -= 1;
+            $request = $this->getRequest($target, $server);
+        }
+
+        if ($request->isError()) {
+            throw $request->getResponse();
+        }
+
+        return $request;
+    }
+
+    /**
+     * Prepare fallback for result
+     *
+     * @param RecordNetworkInterface $network
+     * @param WhoIsRequest $request
+     *
+     * @return WhoIsResult
+     * @throws \Throwable
+     */
+    protected function prepareForWhoIsResult(
+        RecordNetworkInterface $network,
+        WhoIsRequest $request
+    ) : WhoIsResult {
+
+        $whoIsResultClass = static::WHOIS_RESULT_CLASS;
+        $keyCache = md5($whoIsResultClass)."_{$request->getTargetName()}_{$request->getServer()}";
+        $result = $this->getCache($keyCache);
+        if ($result instanceof WhoIsResult) {
+            $result->useCache = true;
+            return $result;
+        }
+
+        if ($request->isError()) {
+            throw $request->getResponse();
+        }
+
+        $body = $request->getBodyString();
+        if (!$body) {
+            throw new ResultException(
+                'Result data is empty',
+                E_NOTICE
+            );
+        }
+
+        /**
+         * @var WhoIsResult $result
+         */
+        $result =  new $whoIsResultClass(
+            $network,
+            $body,
+            $request->getServer()
+        );
+
+        if ($request->getProxyConnection()) {
+            /** @noinspection PhpUndefinedFieldInspection */
+            $result->proxyConnection = $request->getProxyConnection();
+        }
+
+        if ($result->isLimited()) {
+            if (!$result->getNote()) {
+                $result->setNote('Request data has limit exceeded');
+            }
+            $limit = new RequestLimitException(
+                sprintf(
+                    'Request for %1$s on %2$s has limit exceeded',
+                    $result->getPointer(),
+                    $request->getServer()
+                ),
+                E_WARNING,
+                $result
+            );
+            throw $limit;
+        }
+
+        $this->putCache($keyCache, $result);
+        return $result;
+    }
+
+    /* --------------------------------------------------------------------------------*
+     |                              DOMAIN CHECKER                                     |
+     |---------------------------------------------------------------------------------|
+     */
+
+    /**
+     * Get From Domain Name
+     *
+     * @param string $domainName The domain Name to check
+     * @param string|null $server
+     *
+     * @return WhoIsResult
+     * @throws \Throwable
+     */
+    public function getFromDomain(string $domainName, string $server = null) : WhoIsResult
+    {
+        $domainName = trim($domainName);
+        if ($domainName === '') {
+            throw new EmptyDomainException(
+                'Domain name could not be empty or white space only'
+            );
+        }
 
         $record = $this->getValidator()->splitDomainName($domainName);
         if (! $record->isTopLevelDomain()) {
@@ -736,42 +659,39 @@ FAKE;
             );
         }
 
-        $domainName = strtolower($record->getDomainName());
-        if ($allowEmptyServer && !$record->getWhoIsServers()) {
-            $keyCache = "{$domainName}_fake_record";
-            if (($result = $this->getCache($keyCache)) instanceof WhoIsResult) {
-                $result->useCacheNameServer = true;
-                return new ArrayCollector([$domainName => $result]);
-            }
-            try {
-                $whoIsResultClass = static::WHOIS_RESULT_CLASS;
-                $result = new $whoIsResultClass(
-                    $record,
-                    $this->createFakeResultFromEmptyServerDomain($domainName)
-                );
-            } catch (HttpException $e) {
-                throw new ResultException(
-                    sprintf(
-                        'Could not get data for : %1$s, with error: %2$s',
-                        $domainName,
-                        $e->getMessage()
-                    )
-                );
-            }
-
-            $this->putCache($keyCache, $result);
-            /** @noinspection PhpUndefinedFieldInspection */
-            $result->useNameServerDNS = true;
-            return new ArrayCollector([$domainName => $result]);
+        if ($record->isGTLD()
+            && in_array($record->getBaseExtension(), $this->disAllowMainDomainExtension)
+        ) {
+            throw new InvalidDomainException(
+                sprintf(
+                    'Domain name Extension: (.%s) GTLD is not for public registration',
+                    $record->getBaseExtension()
+                ),
+                E_NOTICE
+            );
+        }
+        if ($record->isSTLD() && $record->isMaybeDisAllowToRegistered()) {
+            throw new InvalidDomainException(
+                sprintf(
+                    'Domain name : %s has invalid as top level domain as STLD',
+                    $domainName
+                ),
+                E_NOTICE
+            );
         }
 
-        $servers = $this->getWhoIsServerFor($record->getDomainName(), $requestFromIAna);
+        $servers = $server && trim($server)
+            ? [$server]
+            : $this->getWhoIsServerFor($record->getPointer());
         $isLimit = false;
         $usedServer = null;
         foreach ($servers as $server) {
             try {
-                $usedServer = $server;
-                $whoIsResult = $this->getFromDomainWithServer($domainName, $server);
+                $request = $this->tryRequestResult(
+                    $record->getPointer(),
+                    $server,
+                    2
+                );
                 break;
             } catch (TimeOutException $e) {
                 continue;
@@ -780,10 +700,10 @@ FAKE;
             } catch (\Throwable $e) {
                 throw $e;
             }
-            unset($whoIsResult);
+            unset($request);
         }
 
-        if (!isset($whoIsResult)) {
+        if (!isset($request)) {
             if ($isLimit) {
                 throw $isLimit;
             }
@@ -796,29 +716,10 @@ FAKE;
             );
         }
 
-        // result
-        $result = new ArrayCollector([$usedServer => $whoIsResult]);
-
-        // by pass follow server if use http server request
-        if ($followServer) {
-            $alternatedServer = $whoIsResult->getWhoIsServerFromResult();
-            if ($alternatedServer
-                && ! in_array(
-                    strtolower($alternatedServer),
-                    // whois.iana.org is not allowed here
-                    [strtolower($usedServer), DataParser::URI_IANA_WHOIS]
-                )
-            ) {
-                try {
-                    $whoIsResult = $this->getFromDomainWithServer($domainName, $alternatedServer);
-                    $result[$alternatedServer] = $whoIsResult;
-                } catch (\Throwable $e) {
-                    // pass
-                }
-            }
-        }
-
-        return $result;
+        return $this->prepareForWhoIsResult(
+            $record,
+            $request
+        );
     }
 
     /**
@@ -855,8 +756,9 @@ FAKE;
             return true;
         }
 
+        // if has not whois servers
         if (!$record->getWhoIsServers()) {
-            $keyCache = $record->getDomainName() .'_availability';
+            $keyCache = $record->getDomainName() .'_dns_availability';
             if (($result = $this->getCache($keyCache)) instanceof \stdClass
                 && !empty($result->registered)
                 && is_array($result->registered)
@@ -875,7 +777,6 @@ FAKE;
          * @var WhoIsResult $result
          */
         $result = $this->getFromDomain($record->getFullDomainName());
-        $result = $result->last();
         $parser = $result->getDataParser();
         $status = $parser->getRegisteredDomainStatus($result->getOriginalResultString());
         return $status === $parser::STATUS_REGISTERED
@@ -897,35 +798,31 @@ FAKE;
      * Get IP Detail
      *
      * @param string $ip
+     * @param string $server
      *
      * @return WhoIsResult
      * @throws \Throwable
      */
-    public function getFromIP(string $ip) : WhoIsResult
+    public function getFromIP(string $ip, string $server = null) : WhoIsResult
     {
-        $validator = $this->getValidator();
-        $ipDetail = $validator->splitIP($ip);
-        $server = $ipDetail->getWhoIsServers()[0];
-        $request = $this->getRequest($ipDetail->getIPAddress(), $server);
+        $ipDetail =  $this->getValidator()->splitIP($ip);
+        $server   = $server && trim($server)
+            ? $server
+            : $ipDetail->getWhoIsServers()[0];
+        $request = $this->tryRequestResult(
+            $ipDetail->getPointer(),
+            $server,
+            2
+        );
 
         // if there was and error throw it
         if ($request->isError()) {
             throw $request->getResponse();
         }
-
-        $whoIsResultClass = static::WHOIS_RESULT_CLASS;
-        $result = new $whoIsResultClass(
+        return $this->prepareForWhoIsResult(
             $ipDetail,
-            $request->getBodyString(),
-            $server
+            $request
         );
-
-        // add proxy property
-        if ($request->getProxyConnection()) {
-            /** @noinspection PhpUndefinedFieldInspection */
-            $result->proxyConnection = $request->getProxyConnection();
-        }
-        return $result;
     }
 
     /* --------------------------------------------------------------------------------*
@@ -937,30 +834,32 @@ FAKE;
      * Get ASN Result Detail
      *
      * @param string $asn
+     * @param string $server
      *
      * @return WhoIsResult
      * @throws \Throwable
      */
-    public function getFromASN(string $asn) : WhoIsResult
+    public function getFromASN(string $asn, string $server = null) : WhoIsResult
     {
         $asnDetail = $this->getValidator()->splitASN($asn);
-        $server    = $asnDetail->getWhoIsServers()[0];
-        $request   = $this->getRequest($asnDetail->getASNumber(), $server);
+        $server    = $server && trim($server)
+            ? $server
+            : $asnDetail->getWhoIsServers()[0];
+        $request = $this->tryRequestResult(
+            $asnDetail->getPointer(),
+            $server,
+            2
+        );
 
+        // if there was and error throw it
         if ($request->isError()) {
             throw $request->getResponse();
         }
 
-        $whoIsResultClass = static::WHOIS_RESULT_CLASS;
-        $result = new $whoIsResultClass($asnDetail, $request->getBodyString(), $server);
-
-        // add proxy property
-        if ($request->getProxyConnection()) {
-            /** @noinspection PhpUndefinedFieldInspection */
-            $result->proxyConnection = $request->getProxyConnection();
-        }
-
-        return $result;
+        return $this->prepareForWhoIsResult(
+            $asnDetail,
+            $request
+        );
     }
 
     /* --------------------------------------------------------------------------------*
@@ -969,12 +868,52 @@ FAKE;
      */
 
     /**
-     * @param string $selector
-     * @param array ...$params additional parameter
+     * Get Multi Result if possible follow given whois server from result
+     *
+     * @param string $selector selector target IP, Domain or AS Number
+     *
+     * @return WhoIsMultiResult
+     */
+    public function getMultiResult(string $selector) : WhoIsMultiResult
+    {
+        $result = $this->getResult($selector);
+        $multiResult = new WhoIsMultiResult([
+            $result->getServer() => $result
+        ]);
+
+        $alternatedServer = $result
+            ->getDataParser()
+            ->getWhoIsServerFromResultData($result->getOriginalResultString());
+
+        if (! is_string($alternatedServer)
+            || trim($alternatedServer) == ''
+            || ! is_string($result->getServer())
+            || trim($result->getServer()) == ''
+            || strtolower(trim($alternatedServer)) == strtolower($result->getServer())
+        ) {
+            return $multiResult;
+        }
+
+        // try to get Other Result
+        try {
+            $result = $this->getResult($selector, $alternatedServer);
+            $multiResult[$alternatedServer] = $result;
+        } catch (\Throwable $e) {
+            // pass
+        }
+
+        return $multiResult;
+    }
+
+    /**
+     * Get Result automation
+     *
+     * @param string $selector    selector target IP, Domain or AS Number
+     * @param string|null $server target whois server
      *
      * @return WhoIsResult
      */
-    public function getData(string $selector, ...$params) : WhoIsResult
+    public function getResult(string $selector, string $server = null) : WhoIsResult
     {
         if (trim($selector) === '') {
             throw new \InvalidArgumentException(
@@ -986,27 +925,17 @@ FAKE;
         $validator = $this->getValidator();
         // ASN
         if ($validator->isValidASN($selector)) {
-            return $this->getFromASN($selector);
+            return $this->getFromASN($selector, $server);
         }
 
         // IP
         if ($validator->isValidIP($selector)) {
-             return $this->getFromIP($selector);
+             return $this->getFromIP($selector, $server);
         }
 
         // Domain
-        $followServer     = isset($params[0]) && (bool) $params[0];
-        $allowEmptyServer = isset($params[1]) && (bool) $params[1];
-        $requestFromIAna  = isset($params[2]) && (bool) $params[2];
-        if ($validator->isValidTopLevelDomain($selector)) {
-            return $this
-                ->getFromDomain(
-                    $selector,
-                    $followServer,
-                    $allowEmptyServer,
-                    $requestFromIAna
-                )
-                ->last();
+        if ($validator->isValidDomain($selector)) {
+            return $this->getFromDomain($selector, $server);
         }
 
         throw new \RuntimeException(
