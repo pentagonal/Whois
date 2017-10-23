@@ -172,7 +172,7 @@ class WhoIsResult extends WhoIsResultAbstract
         $registrar[static::KEY_EMAIL]        = $this->getFirstOr($match, 'registrar_email');
         $registrar[static::KEY_COUNTRY]      = $this->getFirstOr($match, 'registrar_country');
         $registrar[static::KEY_CITY]         = $this->getFirstOr($match, 'registrar_city');
-        $registrar[static::KEY_STREET]       = (array) $match['registrar_street'];
+        $registrar[static::KEY_ADDRESS]       = (array) $match['registrar_street'];
         $registrar[static::KEY_POSTAL_CODE]  = $this->getFirstOr($match, 'registrar_postal');
         $registrar[static::KEY_STATE]        = $this->getFirstOr($match, 'registrar_state');
         $registrar[static::KEY_PHONE]        = (array) $match['registrar_phone'];
@@ -198,6 +198,9 @@ class WhoIsResult extends WhoIsResultAbstract
                 : $email;
         }, $registrarAbuseEmail);
         $registrarAbuseEmail = array_filter($registrarAbuseEmail);
+        $dataDomain[static::KEY_ABUSE] = $registrarAbuseEmail;
+        // add abuse mail to domain
+        $collector[static::KEY_DOMAIN] = $dataDomain;
 
         if (empty($registrarAbuseEmail) && !empty($registrar[static::KEY_EMAIL])) {
             $registrarAbuseEmail = [$registrar[static::KEY_EMAIL]];
@@ -219,13 +222,13 @@ class WhoIsResult extends WhoIsResultAbstract
             ? null
             : $email;
         $registrant[static::KEY_DATA] = [
-            static::KEY_ID => $this->getFirstOr($match, 'registrant_id'),
-            static::KEY_NAME => $this->getFirstOr($match, 'registrant_name'),
+            static::KEY_ID           => $this->getFirstOr($match, 'registrant_id'),
+            static::KEY_NAME         => $this->getFirstOr($match, 'registrant_name'),
             static::KEY_ORGANIZATION => $this->getFirstOr($match, 'registrant_org'),
             static::KEY_EMAIL        => $email,
             static::KEY_COUNTRY      => $this->getFirstOr($match, 'registrant_country'),
             static::KEY_CITY         => $this->getFirstOr($match, 'registrant_city'),
-            static::KEY_STREET       => (array) $match['registrant_street'],
+            static::KEY_ADDRESS      => (array) $match['registrant_street'],
             static::KEY_POSTAL_CODE  => $this->getFirstOr($match, 'registrant_postal'),
             static::KEY_STATE        => $this->getFirstOr($match, 'registrant_state'),
             static::KEY_PHONE        => (array) $match['registrant_phone'],
@@ -244,7 +247,7 @@ class WhoIsResult extends WhoIsResultAbstract
             static::KEY_EMAIL        => $email,
             static::KEY_COUNTRY      => $this->getFirstOr($match, 'billing_country'),
             static::KEY_CITY         => $this->getFirstOr($match, 'billing_city'),
-            static::KEY_STREET       => (array) $match['billing_street'],
+            static::KEY_ADDRESS      => (array) $match['billing_street'],
             static::KEY_POSTAL_CODE  => $this->getFirstOr($match, 'billing_postal'),
             static::KEY_STATE        => $this->getFirstOr($match, 'billing_state'),
             static::KEY_PHONE        => (array) $match['billing_phone'],
@@ -263,7 +266,7 @@ class WhoIsResult extends WhoIsResultAbstract
             static::KEY_EMAIL        => $email,
             static::KEY_COUNTRY      => $this->getFirstOr($match, 'tech_country'),
             static::KEY_CITY         => $this->getFirstOr($match, 'tech_city'),
-            static::KEY_STREET       => (array) $match['tech_street'],
+            static::KEY_ADDRESS      => (array) $match['tech_street'],
             static::KEY_POSTAL_CODE  => $this->getFirstOr($match, 'tech_postal'),
             static::KEY_STATE        => $this->getFirstOr($match, 'tech_state'),
             static::KEY_PHONE        => (array) $match['tech_phone'],
@@ -282,7 +285,7 @@ class WhoIsResult extends WhoIsResultAbstract
             static::KEY_EMAIL        => $email,
             static::KEY_COUNTRY      => $this->getFirstOr($match, 'admin_country'),
             static::KEY_CITY         => $this->getFirstOr($match, 'admin_city'),
-            static::KEY_STREET       => (array) $match['admin_street'],
+            static::KEY_ADDRESS      => (array) $match['admin_street'],
             static::KEY_POSTAL_CODE  => $this->getFirstOr($match, 'admin_postal'),
             static::KEY_STATE        => $this->getFirstOr($match, 'admin_state'),
             static::KEY_PHONE        => (array) $match['admin_phone'],
@@ -320,7 +323,7 @@ class WhoIsResult extends WhoIsResultAbstract
                 && !empty($dataDate[static::KEY_CREATE])
             )
             || (
-                ! empty($registrant[static::KEY_DATA][static::KEY_STREET])
+                ! empty($registrant[static::KEY_DATA][static::KEY_ADDRESS])
                 && ! empty($registrant[static::KEY_DATA][static::KEY_PHONE])
             )
             || (
@@ -359,7 +362,8 @@ class WhoIsResult extends WhoIsResultAbstract
      */
     protected function parseDetailDataForASN(string $data, ArrayCollector $collector) : ArrayCollector
     {
-        return $collector;
+        // just check for first use especially for be domain
+        return $this->parseASNDetail($this->getOriginalResultString());
     }
 
     /**
@@ -387,7 +391,8 @@ class WhoIsResult extends WhoIsResultAbstract
 
         $this->dataDetail[static::KEY_DATA][static::KEY_RESULT][static::KEY_CLEAN] = $dataParser
             ->cleanUnwantedWhoIsResult(
-                $this->getOriginalResultString()
+                $this->getOriginalResultString(),
+                !($this->networkRecord instanceof RecordDomainNetworkInterface)
             );
 
         if ($this->networkRecord instanceof RecordDomainNetworkInterface) {
@@ -396,6 +401,7 @@ class WhoIsResult extends WhoIsResultAbstract
                 $this->dataDetail
             );
         }
+
         if ($this->networkRecord instanceof RecordASNNetworkInterface) {
             return $this->dataDetail = $this->parseDetailDataForASN(
                 $this->getOriginalResultString(),

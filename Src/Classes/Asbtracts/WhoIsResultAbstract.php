@@ -17,6 +17,7 @@ namespace Pentagonal\WhoIs\Abstracts;
 use Pentagonal\WhoIs\App\ArrayCollector;
 use Pentagonal\WhoIs\Interfaces\RecordASNNetworkInterface;
 use Pentagonal\WhoIs\Interfaces\RecordDomainNetworkInterface;
+use Pentagonal\WhoIs\Interfaces\RecordHandleNetworkInterface;
 use Pentagonal\WhoIs\Interfaces\RecordIPNetworkInterface;
 use Pentagonal\WhoIs\Interfaces\RecordNetworkInterface;
 use Pentagonal\WhoIs\Interfaces\WhoIsNetworkResultInterface;
@@ -84,7 +85,7 @@ abstract class WhoIsResultAbstract implements WhoIsNetworkResultInterface
     const KEY_FAX      = 'fax';
     const KEY_COUNTRY  = 'country';
     const KEY_CITY     = 'city';
-    const KEY_STREET   = 'street';
+    const KEY_ADDRESS  = 'address';
     const KEY_POSTAL_CODE = 'postal_code';
     const KEY_STATE    = 'state';
     // const KEY_POSTAL_PROVINCE = 'province';
@@ -95,6 +96,22 @@ abstract class WhoIsResultAbstract implements WhoIsNetworkResultInterface
     const KEY_ICANN_COMPLIANCE = 'icann_compliance';
     const KEY_ICANN_EPP        = 'icann_epp';
     const KEY_REPORT           = 'report';
+
+    /**
+     * Constant For ASN
+     */
+    const KEY_ASN           = 'asn';
+    const KEY_ASN_CODE      = 'asn_code';
+    const KEY_RESPONSIBLE   = 'responsible';
+    const KEY_CODE          = 'code';
+    const KEY_COUNTRY_CODE  = 'country_code';
+
+    /**
+     * Constant For IP
+     */
+    const KEY_IP            = 'ip';
+    const KEY_RANGE         = 'range';
+    const KEY_CIDR          = 'cidr';
 
     // extends trait
     use ResultParser;
@@ -143,13 +160,15 @@ abstract class WhoIsResultAbstract implements WhoIsNetworkResultInterface
         if (! $network instanceof RecordDomainNetworkInterface
             && ! $network instanceof RecordIPNetworkInterface
             && ! $network instanceof RecordASNNetworkInterface
+            && ! $network instanceof RecordHandleNetworkInterface
         ) {
             throw new \InvalidArgumentException(
                 sprintf(
-                    'Network Must be instance of : %1$s, %2$s or %3$s',
+                    'Network Must be instance of : %1$s, %2$s, %3$s or %4$s',
                     RecordDomainNetworkInterface::class,
                     RecordIPNetworkInterface::class,
-                    RecordASNNetworkInterface::class
+                    RecordASNNetworkInterface::class,
+                    RecordHandleNetworkInterface::class
                 )
             );
         }
@@ -272,13 +291,15 @@ abstract class WhoIsResultAbstract implements WhoIsNetworkResultInterface
         if (! $this->networkRecord instanceof RecordDomainNetworkInterface
             && ! $this->networkRecord instanceof RecordIPNetworkInterface
             && ! $this->networkRecord instanceof RecordASNNetworkInterface
+            && ! $this->networkRecord instanceof RecordHandleNetworkInterface
         ) {
             throw new \InvalidArgumentException(
                 sprintf(
-                    'Invalid serialized value. Network Must be instance of : %1$s, %2$s or %3$s',
+                    'Invalid serialized value. Network Must be instance of : %1$s, %2$s, %3$s or %4$s',
                     RecordDomainNetworkInterface::class,
                     RecordIPNetworkInterface::class,
-                    RecordASNNetworkInterface::class
+                    RecordASNNetworkInterface::class,
+                    RecordHandleNetworkInterface::class
                 )
             );
         }
@@ -458,8 +479,14 @@ abstract class WhoIsResultAbstract implements WhoIsNetworkResultInterface
         }
 
         $servers = $this->networkRecord->getWhoIsServers();
-        $whoIsServer = array_merge($whoIsServer, $servers);
+        $whoIsServer = array_values(
+            array_unique(array_merge($whoIsServer, $servers))
+        );
         $collection = [
+            static::KEY_URL  => [
+                static::KEY_SERVER => null,
+                static::KEY_WHOIS  => $whoIsServer,
+            ],
             static::KEY_DATA => [
                 static::KEY_NOTE     => null,
                 static::KEY_REFERRAL => null,
@@ -469,39 +496,45 @@ abstract class WhoIsResultAbstract implements WhoIsNetworkResultInterface
                     static::KEY_CLEAN    => null,
                 ]
             ],
-            static::KEY_URL  => [
-                static::KEY_SERVER => null,
-                static::KEY_WHOIS  => $whoIsServer,
-            ]
+        ];
+        // registrant data default
+        $registrationDefault = [
+            static::KEY_ID           => null,
+            static::KEY_NAME         => null,
+            static::KEY_ORGANIZATION => null,
+            static::KEY_EMAIL        => null,
+            static::KEY_COUNTRY      => null,
+            static::KEY_COUNTRY_CODE => null,
+            static::KEY_CITY         => null,
+            static::KEY_ADDRESS      => null,
+            static::KEY_POSTAL_CODE  => null,
+            static::KEY_STATE        => null,
+            static::KEY_PHONE        => [],
+            static::KEY_FAX          => [],
         ];
 
-        if ($this->networkRecord instanceof RecordDomainNetworkInterface) {
-            // registrant data default
-            $registrationDefault = [
-                static::KEY_ID           => null,
-                static::KEY_NAME         => null,
-                static::KEY_ORGANIZATION => null,
-                static::KEY_EMAIL        => null,
-                static::KEY_COUNTRY      => null,
-                static::KEY_CITY         => null,
-                static::KEY_STREET       => null,
-                static::KEY_POSTAL_CODE  => null,
-                static::KEY_STATE        => null,
-                static::KEY_PHONE        => [],
-                static::KEY_FAX          => [],
+        if ($this->networkRecord instanceof RecordHandleNetworkInterface) {
+            $collection = [
+                static::KEY_RESULT => $registrationDefault,
+                static::KEY_URL  => $collection[static::KEY_URL],
+                static::KEY_DATA => $collection[static::KEY_DATA],
             ];
-
+        } elseif ($this->networkRecord instanceof RecordDomainNetworkInterface) {
+            unset($registrationDefault[static::KEY_COUNTRY_CODE]);
             $collection = [
                 static::KEY_DOMAIN     => [
                     static::KEY_ID          => null,
                     static::KEY_REGISTERED  => null,
-                    static::KEY_NAME        => $this->networkRecord->getDomainName(),
+                    static::KEY_NAME        => $this->networkRecord->getPointer(),
                     static::KEY_STATUS      => [],
                     static::KEY_NAME_SERVER => [],
                     static::KEY_DNSSEC      => [
                         static::KEY_STATUS => null,
                         static::KEY_DATA   => [],
                     ],
+                    // email abuse
+                    static::KEY_ABUSE      => [
+                    ]
                 ],
                 static::KEY_DATE       => [
                     static::KEY_CREATE    => null,
@@ -538,6 +571,29 @@ abstract class WhoIsResultAbstract implements WhoIsNetworkResultInterface
                     static::KEY_ICANN_EPP        => static::ICANN_EPP_URI,
                 ],
                 static::KEY_DATA => $collection[static::KEY_DATA],
+            ];
+        } elseif ($this->networkRecord instanceof RecordASNNetworkInterface) {
+            $collection = [
+                static::KEY_ASN   => [
+                    static::KEY_ID           => null,
+                    static::KEY_REGISTERED   => null,
+                    static::KEY_NAME         => null,
+                    static::KEY_ASN_CODE     => 'AS'.ltrim(strtoupper($this->networkRecord->getPointer()), 'AS'),
+                    static::KEY_CODE         => $this->networkRecord->getPointer(),
+                    static::KEY_STATUS       => [],
+                ],
+                static::KEY_DATE       => [
+                    static::KEY_CREATE    => null,
+                    static::KEY_UPDATE    => null,
+                    static::KEY_EXPIRE    => null,
+                    static::KEY_UPDATE_DB => null,
+                ],
+                static::KEY_REGISTRANT   => $registrationDefault,
+                static::KEY_ADMIN        => $registrationDefault,
+                static::KEY_TECH         => $registrationDefault,
+                static::KEY_ORGANIZATION => $registrationDefault,
+                static::KEY_URL          => $collection[static::KEY_URL],
+                static::KEY_DATA         => $collection[static::KEY_DATA],
             ];
         }
 

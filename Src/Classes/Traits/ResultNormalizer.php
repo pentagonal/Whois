@@ -34,7 +34,7 @@ trait ResultNormalizer
     public function cleanComment(string $data) : string
     {
         return trim(preg_replace(
-            '/^(\#|\%)[^\n]+\n?/m',
+            '/^([ ]+)?(?:\#|\%)(?:[^\n]+)?\n?/m',
             '',
             str_replace("\r", "", $data)
         ));
@@ -56,7 +56,7 @@ trait ResultNormalizer
         }
 
         return preg_replace(
-            '/^(?:\;|\#)[^\n]+\n?/m',
+            '/^(?:\;|\#)[^\n]+\n?/mu',
             '',
             $data
         );
@@ -77,7 +77,7 @@ trait ResultNormalizer
         }
 
         return preg_replace(
-            '/^(?:\/\/)[^\n]+\n?/sm',
+            '/^(?:\/\/)[^\n]+\n?/smu',
             '',
             $data
         );
@@ -100,7 +100,7 @@ trait ResultNormalizer
         );
 
         if (!$allowEmptyNewLine) {
-            return trim(preg_replace(['/^[\s]+/m', '/(\n)[ ]+/'], ['', '$1'], $data));
+            return trim(preg_replace(['/^[\s]+/m', '~(\n)[ ]+~'], ['', '$1'], $data));
         }
 
         return trim(preg_replace(
@@ -133,7 +133,7 @@ trait ResultNormalizer
                 | NOTICE\s+AND\s+TERMS\s+OF\s+USE\s*: # dot ph comment
                 | (\#\s*KOREAN\s*\(UTF8\)\s*)?상기\s*도메인이름은 
             ).*
-            ~isxu',
+            ~isx',
             '',
             preg_replace('/query[^\:]+[^\n]+/mi', '', $data)
         ));
@@ -224,7 +224,7 @@ trait ResultNormalizer
                 $v = preg_replace('/^(?:[a-z]+\.\s?)?\[([^\]]+)\]/m', '$1:', $v);
                 if ($v && $v[0] != '%' && preg_match('~([a-z]+[^\n]+)(\n\s{3,}[^\n]+)+~smi', $v)) {
                     $v = preg_replace_callback(
-                        '~(?P<name>^[a-z]+[^\:]+)(?P<line>\:[^\n]+)(?P<val>(?:\n\s{3,}[^\n]+)+)~smi',
+                        '~(?P<name>^[a-z]+[^\:]+)(?P<line>\:[^\n]+)(?P<val>(?:\n\s{3,}[^\n]+)+)~smiu',
                         function ($match) {
                             $match = array_filter($match, 'is_string', ARRAY_FILTER_USE_KEY);
                             $match['name'] = rtrim($match['name']);
@@ -274,7 +274,7 @@ trait ResultNormalizer
                             function ($match) use ($matchCountry) {
                                 $match = rtrim($match[0]);
                                 // get space
-                                preg_match('/^Registrant\s+Address\:(\s*)/', $match, $space);
+                                preg_match('~^Registrant\s+Address\:(\s*)~i', $match, $space);
                                 $space = !empty($space[1]) ? $space[1] : '    ';
                                 $explodeArrayAddress = array_map('trim', explode(',', $match));
                                 $state  = array_pop($explodeArrayAddress);

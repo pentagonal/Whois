@@ -24,6 +24,7 @@ use Pentagonal\WhoIs\Interfaces\RecordDomainNetworkInterface as DRI;
 use Pentagonal\WhoIs\Interfaces\RecordIPNetworkInterface as RNI;
 use Pentagonal\WhoIs\Record\ASNRecord;
 use Pentagonal\WhoIs\Record\DomainRecord;
+use Pentagonal\WhoIs\Record\HandleRecord;
 use Pentagonal\WhoIs\Record\IPRecord;
 use Pentagonal\WhoIs\Util\BaseMailAddressProviderValidator;
 use Pentagonal\WhoIs\Util\DataParser;
@@ -194,7 +195,7 @@ class Validator
         $domainName = strtolower(trim($domainName));
         if ($domainName == '') {
             throw new EmptyDomainException(
-                'Domain name could not be empty or whitespace only.',
+                'Domain name could not be empty or whitespace only',
                 E_WARNING
             );
         }
@@ -832,7 +833,7 @@ class Validator
         $ipAddress = strtolower(trim($ip));
         if ($ipAddress == '') {
             throw new \InvalidArgumentException(
-                'IP Address could not be empty or whitespace only.',
+                'IP Address could not be empty or whitespace only',
                 E_WARNING
             );
         }
@@ -1094,7 +1095,7 @@ class Validator
         $asn = strtolower(trim($asn));
         if ($asn == '') {
             throw new \InvalidArgumentException(
-                'ASN could not be empty or whitespace only.',
+                'ASN could not be empty or whitespace only',
                 E_WARNING
             );
         }
@@ -1195,6 +1196,69 @@ class Validator
             RAN::NAME_IS_RESERVED_SAMPLE  => $isReserved && $sample,
             RAN::NAME_IS_RESERVED_PRIVATE => $isReserved && $private,
             RAN::WHOIS_SERVER             => $servers
+        ]);
+    }
+
+    /* --------------------------------------------------------------------------------*
+     |                         ORG & DETAIL VALIDATOR                                  |
+     |---------------------------------------------------------------------------------|
+     */
+
+    /**
+     * Check if is valid Hanlder of network
+     *
+     * @param string $id
+     *
+     * @return bool
+     */
+    public function isValidHandler(string $id) : bool
+    {
+        try {
+            $this->splitHandler($id);
+
+            return true;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Split Handler
+     *
+     * @param string $id
+     *
+     * @return HandleRecord
+     */
+    public function splitHandler(string $id) : HandleRecord
+    {
+        if (trim($id) === '') {
+            throw new \InvalidArgumentException(
+                'Argument could not be empty or whitespace only',
+                E_WARNING
+            );
+        }
+
+        $id = strtoupper(trim($id));
+        if (! preg_match('~(.+)-(ARIN|AFRINIC|APNIC|LACNIC|RIPE)$~', $id, $match)
+            || empty($match[2])
+        ) {
+            throw new \InvalidArgumentException(
+                'Invalid handler code',
+                E_WARNING
+            );
+        }
+
+        $servers = [
+            'ARIN' => DataParser::ARIN_SERVER,
+            'AFRINIC' => DataParser::AFRINIC_SERVER,
+            'APNIC'=> DataParser::APNIC_SERVER,
+            'LACNIC' => DataParser::LACNIC_SERVER,
+            'RIPE' => DataParser::RIPE_SERVER,
+        ];
+
+        return new HandleRecord([
+            HandleRecord::NAME_HANDLE_ID => $id,
+            HandleRecord::WHOIS_SERVER => [$servers[$match[2]]],
         ]);
     }
 }

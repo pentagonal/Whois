@@ -23,12 +23,41 @@ class Sanitizer
     /**
      * @var bool
      */
-    private static $iconvEnabled;
+    private static $iconVEnabled;
+
+    /**
+     * @var bool
+     */
+    private static $mbStringEnabled;
 
     /**
      * @var int
      */
     private static $regexLimit;
+
+    /**
+     * Sanitize Result to UTF-8
+     *
+     * @param string $string
+     *
+     * @return string
+     */
+    public static function sanitizeTotUTF8(string $string) : string
+    {
+        !isset(self::$iconVEnabled) &&
+        self::$iconVEnabled = function_exists('iconv');
+        !isset(self::$mbStringEnabled) &&
+            self::$mbStringEnabled = function_exists('mb_strlen');
+
+        $mustBeConvert = self::$iconVEnabled && self::$mbStringEnabled
+                && mb_strlen($string, 'UTF-8') !== strlen($string);
+
+        if ($mustBeConvert) {
+            return iconv('windows-1250', 'UTF-8', $string);
+        }
+
+        return $string;
+    }
 
     /**
      * Entities the Multi bytes deep string
@@ -41,10 +70,10 @@ class Sanitizer
     public static function entityMultiByteString(string $string, $entity = false)
     {
         // safe resource check
-        !isset(self::$iconvEnabled) &&
-            self::$iconvEnabled = function_exists('iconv');
+        !isset(self::$iconVEnabled) &&
+        self::$iconVEnabled = function_exists('iconv');
 
-        if (! self::$iconvEnabled && ! $entity) {
+        if (! self::$iconVEnabled && ! $entity) {
             return $string;
         }
 
@@ -85,7 +114,8 @@ class Sanitizer
             $string = htmlentities(html_entity_decode($string));
         }
 
-        return self::$iconvEnabled
+        $string = self::sanitizeTotUTF8($string);
+        return self::$iconVEnabled
             ? (
                 preg_replace_callback(
                     '/[\x{80}-\x{10FFFF}]/u',

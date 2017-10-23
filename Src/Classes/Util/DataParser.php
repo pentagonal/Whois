@@ -66,16 +66,26 @@ class DataParser
 
     // Path
     const
-        DATA_PATH          = __DIR__ . '/../../Data',
-        PATH_WHOIS_SERVERS = self::DATA_PATH . '/Extensions/AvailableServers.php',
+        DATA_PATH                 = __DIR__ . '/../../Data',
+
+        // WHOIS EXTENSIONS & SERVER
+        PATH_WHOIS_SERVERS        = self::DATA_PATH . '/Extensions/AvailableServers.php',
         PATH_EXTENSIONS_AVAILABLE = self::DATA_PATH . '/Extensions/AvailableExtensions.php',
-        PATH_CACERT     = self::DATA_PATH . '/Certs/cacert.pem',
+        PATH_CACERT               = self::DATA_PATH . '/Certs/cacert.pem',
+
         // ASN
-        PATH_AS16_DEL_BLOCKS  = self::DATA_PATH . '/Blocks/ASN16Blocks.dat',
-        PATH_AS32_DEL_BLOCKS  = self::DATA_PATH . '/Blocks/ASN32Blocks.dat',
+        PATH_AS16_DEL_BLOCKS      = self::DATA_PATH . '/Blocks/ASN16Blocks.dat',
+        PATH_AS32_DEL_BLOCKS      = self::DATA_PATH . '/Blocks/ASN32Blocks.dat',
+
         // IPv(6|4)
-        PATH_IP4_BLOCKS  = self::DATA_PATH . '/Blocks/IPv4Blocks.dat',
-        PATH_IP6_BLOCKS  = self::DATA_PATH . '/Blocks/Ipv6Blocks.dat';
+        PATH_IP4_BLOCKS           = self::DATA_PATH . '/Blocks/IPv4Blocks.dat',
+        PATH_IP6_BLOCKS           = self::DATA_PATH . '/Blocks/Ipv6Blocks.dat',
+
+        // COUNTRIES
+        PATH_COUNTRY_ISO3_AS_KEY  = self::DATA_PATH . '/Countries/ISO_3166_alpha-iso3-key.php',
+        PATH_COUNTRY_ISO2_AS_KEY  = self::DATA_PATH . '/Countries/ISO_3166_alpha-iso2-key.php',
+        PATH_COUNTRY_ISO2         = self::DATA_PATH . '/Countries/ISO_3166_alpha-2.php',
+        PATH_COUNTRY_ISO3         = self::DATA_PATH . '/Countries/ISO_3166_alpha-3.php';
 
     const
         ARIN_SERVER      = 'whois.arin.net',
@@ -137,7 +147,7 @@ class DataParser
                 (?:\>\>\>?)?\s*
                 (Last\s*Update\s*(?:[a-z0-9\s]+)?Whois\s*Database)\s*
                 \:\s*((?:[0-9]+[0-9\-\:\s\+TZGMU\.]+)?)
-            /ix',
+            /ixU',
             $data,
             $match
         );
@@ -165,7 +175,7 @@ class DataParser
             '/
                 URL\s+of(?:\s+the)?\s+ICANN[^\:]+\:\s*
                 (https?\:\/\/[^\n]+)
-            /ix',
+            /ixU',
             $data,
             $match
         );
@@ -187,10 +197,11 @@ class DataParser
      * @uses getWhoIsLastUpdateDatabase
      *
      * @param string $data
+     * @param bool  $allowNewLine
      *
      * @return mixed|string
      */
-    public static function cleanUnwantedWhoIsResult(string $data)
+    public static function cleanUnwantedWhoIsResult(string $data, $allowNewLine = false)
     {
         if (trim($data) === '') {
             return '';
@@ -202,7 +213,7 @@ class DataParser
                 $currentObj->normalizeWhoIsDomainResultData($data)
             )
         );
-        $cleanData = $currentObj->normalizeWhiteSpace($cleanData);
+        $cleanData = $currentObj->normalizeWhiteSpace($cleanData, $allowNewLine);
         if ($cleanData && ($dateUpdated = $currentObj->getWhoIsLastUpdateDatabase($data))) {
             $cleanData .= "\n{$dateUpdated}";
         }
@@ -231,7 +242,7 @@ class DataParser
             return static::STATUS_UNKNOWN;
         }
 
-        if (preg_match('~Failure\s+to\+locate\+a\+record in\s+~xi', $cleanData)) {
+        if (preg_match('~Failure\s+to\+locate\+a\+record in\s+~xiU', $cleanData)) {
             return self::STATUS_UNKNOWN;
         }
 
@@ -246,7 +257,7 @@ class DataParser
                 (^\s*Reserved\s*By)
                 | (?:Th(?:is|e))?\s*domain\s*(?:(?:can|could)(?:not|n\'t))\s*be\s*register(?:ed)?
                 | The(?:\s+requested)?\s+domain(?:\s+name)?(?:is)?\s+restricted
-                /ix',
+                /ixU',
             $cleanData
         )) {
             return static::STATUS_RESERVED;
@@ -286,7 +297,7 @@ class DataParser
                     | AC
                     | Tech(?:nical)?
                     )(?:[^\:]+)?\:
-                )~mi',
+                )~miU',
             $cleanData,
             $match
         ) && !empty($match);
@@ -300,7 +311,7 @@ class DataParser
         }
 
         preg_match(
-            '~\n?(query_status|(?:Domain\s+)?Status)(?:[^\:]+)?\:\s*([^\:\n]{2,})~xi',
+            '~\n?(query_status|(?:Domain\s+)?Status)(?:[^\:]+)?\:\s*([^\:\n]{2,})~xiU',
             $cleanData,
             $match
         );
@@ -322,7 +333,7 @@ class DataParser
                 | (?:th(?:is|e)\s+)?domain\s+name\s+(?:has\+not\+been|(?:is)?not)\s+register
                 | (?:the\s+)?queried\s+object(?:\s+does|(?:ha|i)s)?\s+not\s+exist
                 | (?:.+)\s*(?:No\s+match|not\s+exist\s+[io]n\s+database(?:[\!]+)?)
-            )~xi',
+            )~xiU',
             trim($cleanData, '. ')
         )) {
             return self::STATUS_UNREGISTERED;
@@ -403,7 +414,11 @@ class DataParser
         $currentObject = new static();
         $data = $currentObject->cleanComment($data);
         if (!preg_match(
-            '~Whois(?:\s*Server)?\s*[\:\]]\s*([^\n]+)~i',
+            '~(
+                Whois(?:\s*Server)?\s*[\:\]]\s*(?:whois\:\/\/)? # Domain
+                | ReferralServer\s*[\:]\s+whois\:\/\/   # ASN
+            )
+            ([^\n]+)~ixU',
             $data,
             $match
         ) || empty($match[1])) {
@@ -459,7 +474,8 @@ class DataParser
         $data = '';
         // Rewind position
         while (! $stream->eof()) {
-            $data .= $stream->read(4096);
+            // sanitize for safe utf8
+            $data .= Sanitizer::sanitizeTotUTF8($stream->read(4096));
         }
 
         // if seekable fallback to previous position
@@ -545,7 +561,7 @@ class DataParser
         }
 
         $tag = preg_quote($tag, '/');
-        $regex = '/\<('.$tag.')\b(?P<selector>[^\>]*)?>(?P<content>.*)\<\/\b\\1\>/sU';
+        $regex = '/\<('.$tag.')\b(?P<selector>[^\>]*)?>(?P<content>.*)\<\/\b\\1\>/s';
         preg_match_all(
             $regex,
             $html,
@@ -585,5 +601,84 @@ class DataParser
         }
 
         return new ArrayLoopAbleCallback($array);
+    }
+
+    /**
+     * Get Country From code
+     *
+     * @param string $code
+     *
+     * @return array|null
+     */
+    public static function getCountryFromCode(string $code)
+    {
+        $code = strtoupper(trim($code));
+        if (!$code) {
+            return null;
+        }
+
+        /** @noinspection PhpIncludeInspection */
+        $data = strlen($code) === 2
+            ? require self::PATH_COUNTRY_ISO2_AS_KEY
+            : (
+                strlen($code) === 3
+                ? require self::PATH_COUNTRY_ISO3_AS_KEY
+                : []
+            );
+
+        if (empty($data)) {
+            return null;
+        }
+
+        return isset($data[$code])
+            ? $data[$code]
+            : null;
+    }
+
+    /**
+     * Get Search By Country Name
+     * Will be search of similarity if nothing found on start offset
+     *
+     * @param string $code
+     *
+     * @return array[]|null
+     */
+    public static function getSearchCountryISO2(string $code)
+    {
+        if (trim($code) === '') {
+            return null;
+        }
+        $code = trim($code);
+        /** @noinspection PhpIncludeInspection */
+        $data = require self::PATH_COUNTRY_ISO2;
+        $regexQuote = preg_quote($code, '~');
+        $grep = preg_grep('~\s*^' . $regexQuote . '~i', $data)
+            ?:preg_grep('~\s*' . $regexQuote . '~i', $data);
+        if (empty($grep)) {
+            return null;
+        }
+        // sort by similarity
+        uasort($grep, function ($a, $b) use ($code) {
+            if (($posA = (stripos($a, $code) === 0)) || ($posB = (stripos($b, $code) === 0))) {
+                !isset($posB)
+                    && $posB = (stripos($b, $code) === 0);
+                return $posA
+                    ? (
+                        strpos($b, $code) === 0
+                        ? 0
+                        : -1
+                    ) : ($posB ? -1 : 0);
+            }
+
+            similar_text($code, $a, $percent_a);
+            similar_text($code, $b, $percent_b);
+            return $percent_a === $percent_b ? 0 : ($percent_a > $percent_b ? -1 : 1);
+        });
+
+        foreach ($grep as $key => $value) {
+            $grep[$key] = static::getCountryFromCode($key);
+        }
+
+        return $grep;
     }
 }

@@ -382,34 +382,54 @@ FAKE;
      */
 
     /**
-     * @param string $target     the domain Name
+     * Get Whois Servers
+     *
+     * @param string $selector       the domain Name
      * @param bool $requestFromIAna  try to get whois server from IANA
      *
      * @return array
      * @throws \Throwable
      */
-    public function getWhoIsServerFor(string $target, bool $requestFromIAna = false) : array
+    public function getWhoIsServerFor(string $selector, bool $requestFromIAna = false) : array
     {
-        $target = trim($target);
-        if ($target === '') {
-            throw new EmptyDomainException(
-                'Domain name could not be empty or white space only'
+        if (trim($selector) === '') {
+            throw new \InvalidArgumentException(
+                'Argument selector could not be empty',
+                E_USER_WARNING
             );
         }
 
-        $validator  = $this->getValidator();
-        // if invalid thrown error
-        $domainRecord = $validator->splitDomainName($target);
-        $extension  = $domainRecord->getBaseExtension();
-        $servers = $validator->getTldCollector()->getServersFromExtension($extension);
+        $validator = $this->getValidator();
+        if ($validator->isValidASN($selector)) {
+            // ASN
+            $servers = $validator->splitASN($selector)->getWhoIsServers();
+        } elseif ($validator->isValidIP($selector)) {
+            // IP
+            $servers = $validator->splitIP($selector)->getWhoIsServers();
+        } elseif ($validator->isValidDomain($selector)) {
+            // Domain
+            $servers = $validator->splitDomainName($selector)->getWhoIsServers();
+        } else {
+            throw new \RuntimeException(
+                sprintf(
+                    'Selector %1$s is not valid IP, ASN or Domain',
+                    $selector
+                ),
+                E_WARNING
+            );
+        }
+        if (!empty($servers)) {
+            return $servers;
+        }
+
         if (empty($servers)) {
-            $domainKey = strtolower($target);
+            $domainKey = strtolower($selector);
             $keyWhoIs = "{$domainKey}_whs";
             $whoIsServer = $this->getCache($keyWhoIs);
             if ($requestFromIAna && (empty($whoIsServer) || !is_array($whoIsServer))) {
-                $iAnaRequest = $this->getRequest($target, DataParser::URI_IANA_WHOIS);
+                $iAnaRequest = $this->getRequest($selector, DataParser::URI_IANA_WHOIS);
                 if ($iAnaRequest->isTimeOut()) {
-                    $iAnaRequest = $this->getRequest($target, DataParser::URI_IANA_WHOIS);
+                    $iAnaRequest = $this->getRequest($selector, DataParser::URI_IANA_WHOIS);
                 }
                 if ($iAnaRequest->isError()) {
                     throw $iAnaRequest->getResponse();
@@ -419,19 +439,18 @@ FAKE;
                 if ($whoIsServer) {
                     $servers = [$whoIsServer];
                     $this->putCache($keyWhoIs, $servers);
-                } else {
-                    throw new WhoIsServerNotFoundException(
-                        sprintf(
-                            'Could not get whois server for: %s',
-                            $target
-                        ),
-                        E_NOTICE
-                    );
+                    return $servers;
                 }
             }
         }
 
-        return (array) $servers;
+        throw new WhoIsServerNotFoundException(
+            sprintf(
+                'Could not get whois server for: %s',
+                $selector
+            ),
+            E_NOTICE
+        );
     }
 
     /**
@@ -488,7 +507,7 @@ FAKE;
                 '~
                     Registra(?:tion|ant|ar)s?\s+information(?:[^\:]+)?\:(?:\s*remarks:[\s]*)?
                     ((?>https?\:\/\/)[^\n\r]+)
-                ~xi',
+                ~xiu',
                 $string,
                 $match
             );
@@ -862,6 +881,28 @@ FAKE;
         );
     }
 
+    public function getFromHandler(string $id, string $server = null)
+    {
+        $handler = $this->getValidator()->splitHandler($id);
+        $server    = $server && trim($server)
+            ? $server
+            : $handler->getWhoIsServers()[0];
+        $request = $this->tryRequestResult(
+            $handler->getPointer(),
+            $server,
+            2
+        );
+        // if there was and error throw it
+        if ($request->isError()) {
+            throw $request->getResponse();
+        }
+
+        return $this->prepareForWhoIsResult(
+            $handler,
+            $request
+        );
+    }
+
     /* --------------------------------------------------------------------------------*
      |                           AUTOMATION CHECKER                                    |
      |---------------------------------------------------------------------------------|
@@ -936,6 +977,10 @@ FAKE;
         // Domain
         if ($validator->isValidDomain($selector)) {
             return $this->getFromDomain($selector, $server);
+        }
+
+        if ($validator->isValidHandler($selector)) {
+            return $this->getFromHandler($selector);
         }
 
         throw new \RuntimeException(
