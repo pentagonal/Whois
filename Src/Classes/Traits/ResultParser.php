@@ -350,7 +350,8 @@ trait ResultParser
             'first'  => $firstInfo,
             'offset' => $offset,
             'data' => implode("\n\n", $dataArray)
-        ]);exit;
+        ]);
+        exit;
     }
 
     /**
