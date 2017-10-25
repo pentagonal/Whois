@@ -14,7 +14,6 @@
   "require": {
     "php": "^7.0",
     "ext-curl": "*",
-    "ext-iconv": "*",
     "guzzlehttp/guzzle": "^6",
     "true/punycode": "^2.0"
   },
@@ -25,6 +24,7 @@
   },
   "suggest" : {
     "ext-intl": "To get function idn_to_utf8 or idn_to_ascii faster and not use puny external library",
+    "ext-iconv": "For sanitation usage for invalid UTF-8 characters",
     "ext-mbstring": "To check length of unicode string length for sanitation"
   },
   "license": "GPL-3.0",

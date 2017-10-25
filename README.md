@@ -25,7 +25,11 @@ also convert it into string is become `json pretty print` result.
 ```txt
 PHP 7.0 or later
 cURL Php Extension
-iconv Php Extension
+
+Suggest:
+
+- ext-iconv 
+- ext-mbstring
 ```
 ## EXAMPLE
 
@@ -163,4 +167,3 @@ You can get `Whois Servers` list on : [Src/Data/Servers/AvailableServers.php](Sr
 ## LICENSE
 
 `GPL-3.0` see [LICENSE](LICENSE)
-
