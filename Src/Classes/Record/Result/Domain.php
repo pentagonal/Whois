@@ -10,30 +10,47 @@
  * @author pentagonal <org@pentagonal.org>
  */
 
-namespace Pentagonal\WhoIs\Traits;
+declare(strict_types=1);
 
+namespace Pentagonal\WhoIs\Record\Result;
+
+use Pentagonal\WhoIs\Abstracts\RecordResultAbstract;
+use Pentagonal\WhoIs\Abstracts\WhoIsResultAbstract;
 use Pentagonal\WhoIs\App\ArrayCollector;
 use Pentagonal\WhoIs\Util\DataParser;
 
 /**
- * Trait ResultParser
- * @package Pentagonal\WhoIs\Traits
+ * Class Domain
+ * @package Pentagonal\WhoIs\Record\Result
+ * @todo Parsing Process
  */
-trait ResultParser
+class Domain extends RecordResultAbstract
 {
-    use ResultNormalizer;
+    /**
+     * {@inheritdoc}
+     */
+    protected function initGenerateRecord(WhoIsResultAbstract $result) : ArrayCollector
+    {
+        return $this->parseDomainDetail($result);
+    }
+
+    /* --------------------------------------------------------------------------------*
+     |                                   UTILITY                                       |
+     |---------------------------------------------------------------------------------|
+     */
 
     /**
-     * Parse Domain Detail
+     * Parse domain data for result
      *
-     * @param string $data
+     * @param WhoIsResultAbstract $result
      *
      * @return ArrayCollector|ArrayCollector[]
      */
-    protected function parseDomainDetail(string $data) : ArrayCollector
+    protected function parseDomainDetail(WhoIsResultAbstract $result) : ArrayCollector
     {
+        $dataParser = new DataParser();
         // just check for first use especially for be domain
-        $data = $this->normalizeWhoIsDomainResultData($data);
+        $data = $dataParser->normalizeWhoIsDomainResultData($result->getOriginalResultString());
         if (preg_match('~\#\s*ENGLISH\s+~smix', $data)
             && preg_match('~\#\s*[a-z0-9\_\-]+\(UTF8\)\s+~smix', $data)
         ) {
@@ -194,229 +211,5 @@ trait ResultParser
                 return new ArrayCollector(array_map('trim', $v));
             }, $match)
         );
-    }
-
-    /**
-     * @param string $data
-     *
-     * @return ArrayCollector
-     * @todo completion
-     */
-    public function parseASNDetail(string $data) : ArrayCollector
-    {
-        /**
-         * Normalize White space and allow double new line
-         */
-        preg_match(
-            '~
-              (?P<RIPE>
-                \s*\%(?:.+)?This\s*is\s*the\s*RIPE\s*Database\s*query\s*service
-                | \s*\%\s*To\+receive\s+output\s+for\s+a\s+database\s+update\,\s+use\s+the[^\n]+
-              )
-              | (?P<APNIC>
-                ^\s*\%\s*\[\s*whois\.apnic\.net\s*\]
-              )
-              | (?P<AFRINIC>
-                ^\s*%\s*This\s*is\s+the\s+AfriNIC\s+Whois\s+server
-              )
-              | (?P<LACNIC>
-                ^\s*%\s*Joint\s*Whois\s*\-\s*?\s+whois\.lacnic\.net
-                | \s%\s*LACNIC\s+resource\s*\:\s*whois\.lacnic\.net
-              )
-              | (?P<ARIN>
-                \s*\#\s*ARIN\s*WHOIS\s*data\s*and\s*services
-                | \s*\#\s*https?\:\/\/www\.arin\.net\/public\/whoisinaccuracy
-              )
-            ~mxi',
-            $data,
-            $match
-        );
-
-        $match = array_filter($match, 'is_string', ARRAY_FILTER_USE_KEY);
-        $match = array_filter(array_map('trim', $match));
-        $match = key($match);
-        switch ($match) {
-            case 'RIPE':
-                return $this->parseRIPEASNData($data);
-            case 'APNIC':
-                return $this->parseAPNICASNData($data);
-            case 'AFRINIC':
-                return $this->parseAFRINICASNData($data);
-            case 'LACNIC':
-                return $this->parseLACNICASNData($data);
-            case 'ARIN':
-                return $this->parseARINASNData($data);
-        }
-
-        return $this->parseCommonASNData($data);
-    }
-
-    /**
-     * @param string $data
-     * @param string|null $server
-     *
-     * @return array
-     * @tod completion
-     */
-    protected function parseHandlerFromData(string $data, string $server = null)
-    {
-        $data = $this->normalizeWhiteSpace($data, true);
-        preg_match(
-            '~
-                \%\s*Abuse\s*contact\s*for(?:.+)\s*is\s*\'(?P<abuse_contact>[^\']+)\'[\n]?
-            ~xi',
-            $data,
-            $abuseContact
-        );
-        $abuseContact = !empty($abuseContact['abuse_contact'])
-            ? (trim($abuseContact['abuse_contact']) ?: null)
-            : null;
-        $data = rtrim($this->cleanComment($data));
-        $dataArray = array_filter(
-            array_map('trim', explode("\n\n", $data))
-        );
-
-        /*
-            aut-num: AS2764
-            as-name: AAPT
-            descr: AAPT Limited
-            descr: 180-188 Burnley St
-            descr: Richmond VIC 3121
-            country: AU
-            org: ORG-AL1-AP
-            admin-c: ANO2-AP
-            tech-c: ANO2-AP
-            remarks: Send email about security incidents to security@connect.com.au
-            remarks: Send email about UBE to abuse@connect.com.au
-            notify: peering@connect.com.au
-            mnt-by: CONNECT
-            mnt-irt: IRT-AAPT-AU
-            last-modified: 2017-10-16T00:15:09Z
-            source: APNIC
-         */
-        $offset = 0;
-        foreach ($dataArray as $key => $value) {
-            if (strpos(trim($value), 'aut-num') === 0) {
-                $firstInfo = $value;
-                unset($dataArray[$key]);
-                $offset = $key;
-                break;
-            }
-        }
-        $firstInfo = !isset($firstInfo) ? array_shift($dataArray) : $firstInfo;
-        preg_match_all(
-            '~
-              aut\-num([^\:]+)?\:(?:[ ]+)?(?P<number>[^\n]+)
-              | as\-name([^\:]+)?\:(?:[ ]+)?(?P<name>[^\n]+)
-              | owner\-([^\:]+)?\:(?:[ ]+)?(?P<owner>[^\n]+)
-              | admin([^\:]+)?\:(?:[ ]+)?(?P<admin>[^\n]+)
-              | tech([^\:]+)?\:(?:[ ]+)?(?P<tech>[^\n]+)
-              | org([^\:]+)?\:(?:[ ]+)?(?P<org>[^\n]+)
-              | abuse([^\:]+)?\:(?:[ ]+)?(?P<abuse>[^\n]+)
-              | routing([^\:]+)?\:(?:[ ]+)?(?P<routing>[^\n]+)
-              | \-irt([^\:]+)?\:(?:[ ]+)?(?P<irt>[^\n]+)
-              | responsible([^\:]+)?\:(?:[ ]+)?(?P<responsible>[^\n]+)
-              | owners\s*\:(?:[ ]+)?(?P<owner_name>[^\n]+)
-              | country([^\:]+)?\:(?:[ ]+)?(?P<country>[^\n]+)
-              | desc([^\:]+)?\:(?:[ ]+)?(?P<description>[^\n]+)
-              | remarks([^\:]+)?\:(?:[ ]+)?(?P<remarks>[^\n]+)
-              | last\-mo([^\:]+)\:(?:[ ]+)?(?P<last_mod>[^\n]+)
-              | notify([^\:]+)?\:(?:[ ]+)?(?P<notify>[^\n]+)
-              | created([^\:]+)?\:(?:[ ]+)?(?P<created>[^\n]+)
-              | change([^\:]+)?\:(?:[ ]+)?(?P<change>[^\n]+)
-            ~xmi',
-            $firstInfo,
-            $matchFirstInfo
-        );
-        $matchFirstInfo = array_filter($matchFirstInfo, 'is_string', ARRAY_FILTER_USE_KEY);
-        // make 2D array as sorted integer start with 0 if not empty
-        $matchFirstInfo = array_map(
-            'array_values',
-            // filter empty value
-            array_map(
-                function ($v) {
-                    return array_filter(array_map('trim', $v));
-                },
-                $matchFirstInfo
-            )
-        );
-        $matchFirstInfo = array_merge(
-            ['abuse_contact' => $abuseContact],
-            $matchFirstInfo
-        );
-
-        print_r([
-            'info'   => $matchFirstInfo,
-            'first'  => $firstInfo,
-            'offset' => $offset,
-            'data' => implode("\n\n", $dataArray)
-        ]);
-        exit;
-    }
-
-    /**
-     * @param string $data
-     *
-     * @return ArrayCollector
-     * @todo completion
-     */
-    protected function parseCommonASNData(string $data) : ArrayCollector
-    {
-        $this->parseHandlerFromData($data);
-        return new ArrayCollector();
-    }
-
-    /**
-     * @param string $data
-     *
-     * @return ArrayCollector
-     * @todo completion
-     */
-    protected function parseRIPEASNData(string $data) : ArrayCollector
-    {
-        $this->parseHandlerFromData($data, DataParser::RIPE_SERVER);
-        return new ArrayCollector();
-    }
-
-    protected function parseAPNICASNData(string $data) : ArrayCollector
-    {
-        $this->parseHandlerFromData($data, DataParser::APNIC_SERVER);
-        $collector = new ArrayCollector();
-        return $collector;
-    }
-
-    /**
-     * @param string $data
-     *
-     * @return ArrayCollector
-     */
-    protected function parseAFRINICASNData(string $data) : ArrayCollector
-    {
-        // afrinic & apnic has same whois result data
-        return $this->parseAPNICASNData($data);
-    }
-
-    /**
-     * @param string $data
-     *
-     * @return ArrayCollector
-     * @todo completion
-     */
-    protected function parseLACNICASNData(string $data) : ArrayCollector
-    {
-        $this->parseHandlerFromData($data, DataParser::LACNIC_SERVER);
-        return new ArrayCollector();
-    }
-
-    /**
-     * @param string $data
-     *
-     * @return ArrayCollector
-     * @todo completion
-     */
-    protected function parseARINASNData(string $data) : ArrayCollector
-    {
-        $this->parseHandlerFromData($data, DataParser::ARIN_SERVER);
-        return new ArrayCollector();
     }
 }

@@ -21,39 +21,49 @@ namespace Pentagonal\WhoIs\Util;
 class Sanitizer
 {
     /**
-     * @var bool
-     */
-    private static $iconVEnabled;
-
-    /**
-     * @var bool
-     */
-    private static $mbStringEnabled;
-
-    /**
-     * @var int
-     */
-    private static $regexLimit;
-
-    /**
      * Sanitize Result to UTF-8
      *
      * @param string $string
      *
      * @return string
      */
-    public static function sanitizeTotUTF8(string $string) : string
+    public static function normalizeInvalidUTF8(string $string) : string
     {
-        !isset(self::$iconVEnabled) &&
-        self::$iconVEnabled = function_exists('iconv');
-        !isset(self::$mbStringEnabled) &&
-            self::$mbStringEnabled = function_exists('mb_strlen');
+        static $iconVEnabled;
+        static $mbString;
 
-        $mustBeConvert = self::$iconVEnabled && self::$mbStringEnabled
-                && mb_strlen($string, 'UTF-8') !== strlen($string);
+        // safe resource check
+        !isset($iconVEnabled) && $iconVEnabled = function_exists('iconv');
+        !isset($mbString) && $mbString = function_exists('mb_strlen');
 
-        if ($mustBeConvert) {
-            return iconv('windows-1250', 'UTF-8', $string);
+        if (!$iconVEnabled) {
+            return $string;
+        }
+
+        if (! $mbString || mb_strlen($string, 'UTF-8') !== strlen($string)) {
+            // add temporary error handler
+            set_error_handler(function ($errNo, $errStr) {
+                throw new \Exception(
+                    $errStr,
+                    $errNo
+                );
+            });
+            $result = false;
+            // try to un-serial
+            try {
+                /**
+                 * use trim if possible
+                 * Serialized value could not start & end with white space
+                 */
+                $result = iconv('windows-1250', 'UTF-8//IGNORE', $string);
+            } catch (\Exception $e) {
+                // pass
+            }
+
+            restore_error_handler();
+            if ($result !== false) {
+                return $result;
+            }
         }
 
         return $string;
@@ -69,31 +79,36 @@ class Sanitizer
      */
     public static function entityMultiByteString(string $string, $entity = false)
     {
-        // safe resource check
-        !isset(self::$iconVEnabled) &&
-        self::$iconVEnabled = function_exists('iconv');
+        static $backTrackLimit;
+        static $iconVEnabled;
 
-        if (! self::$iconVEnabled && ! $entity) {
+        // safe resource check
+        !isset($iconVEnabled) &&
+            $iconVEnabled = function_exists('iconv');
+
+        if ($entity) {
+            // double entities
+            $string = htmlentities(html_entity_decode($string));
+        }
+
+        if (! $iconVEnabled && ! $entity) {
             return $string;
         }
 
-        if (!isset(self::$regexLimit)) {
-            self::$regexLimit = @ini_get('pcre.backtrack_limit');
-            self::$regexLimit = ! is_numeric(self::$regexLimit)
+        if (!isset($backTrackLimit)) {
+            $backTrackLimit = @ini_get('pcre.backtrack_limit');
+            $backTrackLimit = ! is_numeric($backTrackLimit)
                 ? 4096
-
-                : (abs(self::$regexLimit) < 512
+                : (abs($backTrackLimit) < 512
                     ? 512
                     : (
-                        abs(self::$regexLimit) > 40960
+                        abs($backTrackLimit) > 40960
                         ? 40960
-                        : abs(self::$regexLimit)
+                        : abs($backTrackLimit)
                     )
                 );
-            // minimum regex is 512 byte
-            self::$regexLimit = self::$regexLimit < 512 ? 512 : self::$regexLimit;
-            // limit into 40 KB
-            self::$regexLimit = self::$regexLimit > 40960 ? 40960 : self::$regexLimit;
+            // minimum backtrack is 512 byte
+            $backTrackLimit = $backTrackLimit < 512 ? 512 : $backTrackLimit;
         }
 
         /**
@@ -101,12 +116,11 @@ class Sanitizer
          * | 4KB data split for regex callback & safe memory usage
          * that maybe fail on very long string
          */
-        if (strlen($string) > self::$regexLimit) {
+        if (strlen($string) > $backTrackLimit) {
             $data = '';
-            foreach (str_split($string, self::$regexLimit) as $stringSplit) {
+            foreach (str_split($string, $backTrackLimit) as $stringSplit) {
                 $data .= self::entityMultiByteString($stringSplit, $entity);
             }
-
             return $data;
         }
 
@@ -114,26 +128,24 @@ class Sanitizer
             $string = htmlentities(html_entity_decode($string));
         }
 
-        $string = self::sanitizeTotUTF8($string);
-        return self::$iconVEnabled
-            ? (
-                preg_replace_callback(
-                    '/[\x{80}-\x{10FFFF}]/u',
-                    function ($match) {
-                        if (!($char = current($match))) {
-                            return "&#x0;";
-                        }
-                        $utf = iconv('UTF-8', 'UCS-4//IGNORE', $char);
-                        $utf = $utf ? bin2hex($utf) : null;
-                        if (!is_string($utf) || ($utf == trim($utf)) == '') {
-                            return "&#x0;";
-                        }
-                        $utf = strtolower($utf);
-                        return "&#x{$utf};";
-                    },
-                    $string
-                ) ?: $string
-            ) : $string;
+        $string = self::normalizeInvalidUTF8($string);
+
+        return preg_replace_callback(
+            '/[\x{80}-\x{10FFFF}]/u',
+            function ($match) {
+                if (!($char = current($match))) {
+                    return "&#x0;";
+                }
+                $utf = iconv('UTF-8', 'UCS-4//IGNORE', $char);
+                $utf = $utf ? bin2hex($utf) : null;
+                if (!is_string($utf) || ($utf == trim($utf)) == '') {
+                    return "&#x0;";
+                }
+                $utf = strtolower($utf);
+                return "&#x{$utf};";
+            },
+            $string
+        ) ?: $string;
     }
 
     /* --------------------------------------------------------------------------------*
@@ -200,9 +212,9 @@ class Sanitizer
                     return false;
                 }
             // or else fall through
-            case 'a':
-            case 'O':
-            case 'C':
+            case 'a': # for array
+            case 'O': # for object
+            case 'C': # for class
                 return (bool) preg_match("/^{$token}:[0-9]+:/s", $data);
             case 'i':
             case 'd':
@@ -230,11 +242,25 @@ class Sanitizer
          * check with trim
          */
         if (self::isSerialized($original)) {
-            /**
-             * use trim if possible
-             * Serialized value could not start & end with white space
-             */
-            return @unserialize(trim($original));
+            // add temporary error handler
+            set_error_handler(function ($errNo, $errStr) {
+                throw new \Exception(
+                    $errStr,
+                    $errNo
+                );
+            });
+            // try to un-serial
+            try {
+                /**
+                 * use trim if possible
+                 * Serialized value could not start & end with white space
+                 */
+                $original = @unserialize(trim($original));
+            } catch (\Exception $e) {
+                // pass
+            }
+
+            restore_error_handler();
         }
 
         return $original;
@@ -247,16 +273,19 @@ class Sanitizer
      *
      *
      * @param  mixed $data Data that might be serialized.
+     * @param  bool  $doubleSerialize Double Serialize if want to use returning real value of serialized
+     *                                for database result default is true
+     *
      * @return mixed A scalar data
      */
-    public static function maybeSerialize($data)
+    public static function maybeSerialize($data, $doubleSerialize = true)
     {
         if (is_array($data) || is_object($data)) {
             return @serialize($data);
         }
 
         // Double serialization is required for backward compatibility.
-        if (self::isSerialized($data, false)) {
+        if ($doubleSerialize && self::isSerialized($data, false)) {
             return serialize($data);
         }
 

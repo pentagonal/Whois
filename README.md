@@ -20,6 +20,13 @@ This Package contains email validator, domain & network checker that `API READY`
 Whois Result is returning Object base and Detail Result as array collection
 also convert it into string is become `json pretty print` result.
 
+## REQUIREMENTS
+
+```txt
+PHP 7.0 or later
+cURL Php Extension
+iconv Php Extension
+```
 ## EXAMPLE
 
 **Example using Whois Checker**
@@ -31,10 +38,6 @@ use Pentagonal\WhoIs\Interfaces\CacheInterface;
 use Pentagonal\WhoIs\App\Checker;
 use Pentagonal\WhoIs\App\Validator;
 
-/**
- * @var CacheInterface $cache
- * @var Validator      $validator
- */
 // use your own cache Class that must be implements CacheInterface
 $cache = new ArrayCacheCollector();
 // use extends object / create child class if you want use other validator
@@ -45,7 +48,23 @@ $options = [
     // for Checker Cache expire
     'cacheExpire' => 3600, 
 ];
-$checker = new Checker($validator, $cache);
+/**
+ * Create new instance object Checker
+ * or just with empty params with 
+ * $checker = new Checker()
+ *
+ * @param Validator $validator is nullable
+ * @param CacheInterface $cache is nullable
+ * eg : 
+ * $checker = new Checker(null, null, ['options'=> 'value'])
+ */
+$checker = new Checker($validator, $cache, $options);
+
+/**
+ * Or just Create from static
+ * or empty param with @uses Checker::createInstance()
+ */
+$checker = Checker::createInstance($validator, $cache, $options);
 
 /* ------------------------------------------
  * Get From Domain Name
@@ -57,8 +76,11 @@ echo $result;
 echo json_encode($result, JSON_PRETTY_PRINT);
 // or get array
 print_r($result->toArray());
-// or get collector data detail
-print_r($result->getDataDetail());
+/**
+ * or get collector data detail
+ * @var \Pentagonal\WhoIs\Abstracts\WhoIsResultAbstract
+ */
+print_r($result->getResultData());
 
 /* ------------------------------------------
  * Get From Auto Detect Type
@@ -132,7 +154,9 @@ You can get `Whois Servers` list on : [Src/Data/Servers/AvailableServers.php](Sr
 
 **PLEASE DO NOT USE FOR PRODUCTION**
 
-Until the stable version has been release
+*Until the stable version has been release.
+
+***All of methods or data will be change without prior notice.***
 
 ##
 

@@ -263,7 +263,7 @@ FAKE;
      */
     public function getProxy()
     {
-          return $this->proxy;
+        return $this->proxy;
     }
 
     /**
@@ -625,9 +625,6 @@ FAKE;
         }
 
         if ($result->isLimited()) {
-            if (!$result->getNote()) {
-                $result->setNote('Request data has limit exceeded');
-            }
             $limit = new RequestLimitException(
                 sprintf(
                     'Request for %1$s on %2$s has limit exceeded',
@@ -792,19 +789,15 @@ FAKE;
             return ! empty($result->registered);
         }
 
-        /**
-         * @var WhoIsResult $result
-         */
-        $result = $this->getFromDomain($record->getFullDomainName());
-        $parser = $result->getDataParser();
-        $status = $parser->getRegisteredDomainStatus($result->getOriginalResultString());
-        return $status === $parser::STATUS_REGISTERED
-            || $status === $parser::STATUS_RESERVED
-            ? true
-            : (
-                $status === $parser::STATUS_UNREGISTERED
-                    ? false
-                    : null
+        $status = $this
+            ->getFromDomain($record->getFullDomainName())
+            ->getRegisteredStatus();
+
+        return
+            $status === DataParser::STATUS_REGISTERED
+            || $status === DataParser::STATUS_RESERVED
+            ?: (
+                $status === DataParser::STATUS_UNREGISTERED ? false: null
             );
     }
 
@@ -922,9 +915,7 @@ FAKE;
             $result->getServer() => $result
         ]);
 
-        $alternatedServer = $result
-            ->getDataParser()
-            ->getWhoIsServerFromResultData($result->getOriginalResultString());
+        $alternatedServer = DataParser::getWhoIsServerFromResultData($result->getOriginalResultString());
 
         if (! is_string($alternatedServer)
             || trim($alternatedServer) == ''

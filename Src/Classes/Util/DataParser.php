@@ -236,10 +236,10 @@ class DataParser
         if (($cleanData = static::cleanUnwantedWhoIsResult($data)) === '') {
             // if cleanData is empty & data is not empty check entries
             if ($data && preg_match('/No\s+entries(?:\s+found)?|Not(?:hing)?\s+found/i', $data)) {
-                return static::STATUS_UNREGISTERED;
+                return self::STATUS_UNREGISTERED;
             }
 
-            return static::STATUS_UNKNOWN;
+            return self::STATUS_UNKNOWN;
         }
 
         if (preg_match('~Failure\s+to\+locate\+a\+record in\s+~xiU', $cleanData)) {
@@ -260,7 +260,7 @@ class DataParser
                 /ixU',
             $cleanData
         )) {
-            return static::STATUS_RESERVED;
+            return self::STATUS_RESERVED;
         }
 
         $nameServer = [];
@@ -347,7 +347,7 @@ class DataParser
             ) || stripos($domainStatus, 'Not Registered') !== false
                  && preg_match('/[\n]+Query\s*\:[^\n]+/', $cleanData)
             ) {
-                return static::STATUS_UNREGISTERED;
+                return self::STATUS_UNREGISTERED;
             }
 
             return stripos($domainStatus, 'Reserv') !== false
@@ -357,7 +357,7 @@ class DataParser
 
         // check if on limit whois check
         if (!$nameServer && static::hasContainLimitedResultData($data)) {
-            return static::STATUS_LIMIT;
+            return self::STATUS_LIMIT;
         }
 
         return $nameServer
@@ -475,7 +475,7 @@ class DataParser
         // Rewind position
         while (! $stream->eof()) {
             // sanitize for safe utf8
-            $data .= Sanitizer::sanitizeTotUTF8($stream->read(4096));
+            $data .= Sanitizer::normalizeInvalidUTF8($stream->read(4096));
         }
 
         // if seekable fallback to previous position
@@ -561,7 +561,7 @@ class DataParser
         }
 
         $tag = preg_quote($tag, '/');
-        $regex = '/\<('.$tag.')\b(?P<selector>[^\>]*)?>(?P<content>.*)\<\/\b\\1\>/s';
+        $regex = '#<('.$tag.')\b(?P<selector>[^>]*)?>(?P<content>.*?)</\b\1>#s';
         preg_match_all(
             $regex,
             $html,
@@ -636,12 +636,36 @@ class DataParser
     }
 
     /**
+     * Get From Country Match
+     *
+     * @param string $countryName
+     *
+     * @return array[]|null country code ISO2 will be used as key arrays
+     */
+    public static function getFromCountryName(string $countryName)
+    {
+        if (($countryName = trim($countryName)) === '') {
+            return null;
+        }
+
+        $quoted = preg_quote($countryName, '~');
+        /** @noinspection PhpIncludeInspection */
+        $grep = preg_grep('~^'.$quoted.'$~i', require self::PATH_COUNTRY_ISO2);
+        $key = !empty($grep)
+            ? key($grep)
+            : null;
+        return $key
+            ? static::getCountryFromCode($key)
+            : null;
+    }
+
+    /**
      * Get Search By Country Name
      * Will be search of similarity if nothing found on start offset
      *
      * @param string $code
      *
-     * @return array[]|null
+     * @return array[]|null country code ISO2 will be used as key arrays
      */
     public static function getSearchCountryISO2(string $code)
     {

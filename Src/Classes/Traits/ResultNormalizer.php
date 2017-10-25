@@ -146,7 +146,7 @@ trait ResultNormalizer
      *
      * @return string
      */
-    protected function normalizeWhoIsDomainResultData(string $data) : string
+    public function normalizeWhoIsDomainResultData(string $data) : string
     {
         $data = str_replace("\r", "", $data);
         // sanitize for .BE domain

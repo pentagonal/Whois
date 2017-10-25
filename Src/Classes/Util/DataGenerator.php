@@ -833,7 +833,7 @@ COMMENT;
         $completed = 0;
 
         // use XML Element to make it faster
-        if (!$isXML) {
+        if ($isXML) {
             $simpleXMLIPv4 = new \SimpleXMLElement($ipv4TableURL, 0, true);
             $simpleXMLIPv6 = new \SimpleXMLElement($ipv6TableURL, 0, true);
             /**

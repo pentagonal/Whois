@@ -1,9 +1,18 @@
 {
   "name": "pentagonal/whois",
   "description": "Domain & Network Whois checker & info",
-  "type": "project",
+  "type": "library",
+  "keywords": [
+    "whois",
+    "domain",
+    "asn",
+    "ipv6",
+    "ipv4",
+    "network",
+    "iana"
+  ],
   "require": {
-    "php": ">= 7",
+    "php": "^7.0",
     "ext-curl": "*",
     "ext-iconv": "*",
     "guzzlehttp/guzzle": "^6",
@@ -15,7 +24,8 @@
     "satooshi/php-coveralls": "^1"
   },
   "suggest" : {
-    "ext-intl": "To get function idn_to_utf8 or idn_to_ascii more dast and not use puny external library"
+    "ext-intl": "To get function idn_to_utf8 or idn_to_ascii more dast and not use puny external library",
+    "ext-mbstring": "To check length of unicode string length for sanitation"
   },
   "license": "GPL-3.0",
   "authors": [
@@ -31,5 +41,10 @@
     "classmap": [
       "Src/Classes"
     ]
-  }
+  },
+  "bin": [
+    "bin/pwg_asn",
+    "bin/pwg_extensions",
+    "bin/pwg_ip"
+  ]
 }

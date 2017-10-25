@@ -15,7 +15,7 @@ if (php_sapi_name() != 'cli') {
     exit('Script must be run as CLI');
 }
 
-require __DIR__ .'/../../vendor/autoload.php';
+require __DIR__ .'/../vendor/autoload.php';
 
 use Pentagonal\WhoIs\Util\DataGenerator;
 

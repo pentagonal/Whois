@@ -12,39 +12,41 @@
 
 declare(strict_types=1);
 
-namespace Pentagonal\WhoIs\App;
+namespace Pentagonal\WhoIs\Record\Result;
 
+use Pentagonal\WhoIs\Abstracts\RecordResultAbstract;
 use Pentagonal\WhoIs\Abstracts\WhoIsResultAbstract;
-use Pentagonal\WhoIs\Interfaces\RecordNetworkInterface;
+use Pentagonal\WhoIs\App\ArrayCollector;
 
 /**
- * Class WhoIsResult
- * @package Pentagonal\WhoIs\App
- * By default on string result is parse on JSON
- * @todo Completion Detail & Methods
+ * Class IP
+ * @package Pentagonal\WhoIs\Record\Result
+ * @todo Parsing Process
  */
-class WhoIsResult extends WhoIsResultAbstract
+class IP extends RecordResultAbstract
 {
+    /**
+     * {@inheritdoc}
+     */
+    protected function initGenerateRecord(WhoIsResultAbstract $result) : ArrayCollector
+    {
+        return $this->parseIPDetail($result);
+    }
 
     /* --------------------------------------------------------------------------------*
-     |                                  INSTANCE                                       |
+     |                                   UTILITY                                       |
      |---------------------------------------------------------------------------------|
      */
 
     /**
-     * Create Whois Result Instance
+     * Parse data for result
      *
-     * @param RecordNetworkInterface $network
-     * @param string $originalData
-     * @param string $server
+     * @param WhoIsResultAbstract $result
      *
-     * @return WhoIsResult
+     * @return ArrayCollector
      */
-    public static function createInstance(
-        RecordNetworkInterface $network,
-        string $originalData,
-        string $server = null
-    ) : WhoIsResult {
-        return new static($network, $originalData, $server);
+    protected function parseIPDetail(WhoIsResultAbstract $result) : ArrayCollector
+    {
+        return new ArrayCollector();
     }
 }

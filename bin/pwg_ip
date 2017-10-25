@@ -15,33 +15,26 @@ if (php_sapi_name() != 'cli') {
     exit('Script must be run as CLI');
 }
 
-require __DIR__ .'/../../vendor/autoload.php';
+require __DIR__ .'/../vendor/autoload.php';
 
 use Pentagonal\WhoIs\Util\DataGenerator;
 
 echo "==============================================\n";
-echo "  Starting Generate Whois & Server List data\n";
+echo "    Starting Generate IP Range List data\n";
 echo "==============================================\n";
 
 try {
-    $array          = DataGenerator::generateDefaultExtensionServerList();
-    $count          = count($array);
-    $totalSubDomain = 0;
-    array_filter($array, function ($m) use (&$totalSubDomain) {
-        if (count($m) > 0) {
-            $totalSubDomain += count($m);
-
-            return true;
-        }
-
-        return false;
-    });
+    $countArray = DataGenerator::generateIPv64FileData();
+    if ( ! is_array($countArray)) {
+        echo "There was an error\n";
+        exit(255);
+    }
 
     echo <<<BLOCK
-Successfully Generate [{$count}] TLD Extensions.
+Successfully Generate total [{$countArray['total']}] IP Data.
 
-TLD Extensions : {$count} Extensions List
-STLD Extensions: {$totalSubDomain} Extensions List
+IPv4 : {$countArray['ipv4']} IP Range
+IPv6 : {$countArray['ipv6']} IP Range
 \n
 BLOCK;
 } catch (\Exception $e) {
