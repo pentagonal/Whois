@@ -454,12 +454,16 @@ class DataParser
      * Convert the given stream to string result
      * Behaviour to make sure the content size is *not a huge size*
      *
-     * @param StreamInterface $stream   the stream resource
+     * @param StreamInterface $stream             the stream resource
+     * @param int             $bufferLengthAsRead buffer length read max 8192 and min 128
+     *                                            default 1024
      *
      * @return string
      */
-    public static function convertStreamToString(StreamInterface $stream) : string
-    {
+    public static function convertStreamToString(
+        StreamInterface $stream,
+        int $bufferLengthAsRead = 1024
+    ) : string {
         $currentPos = -1;
         try {
             $currentPos = $stream->tell();
@@ -470,14 +474,20 @@ class DataParser
         if ($stream->isSeekable()) {
             $stream->rewind();
         }
-
-        $data = '';
+        /**
+         * Set normalize buffer length
+         */
+        $bufferLengthAsRead = $bufferLengthAsRead < 128
+            ? 128
+            : ($bufferLengthAsRead > 8192 ? 8192 : $bufferLengthAsRead);
+        $data               = '';
         // Rewind position
         while (! $stream->eof()) {
             // sanitize for safe utf8
-            $data .= Sanitizer::normalizeInvalidUTF8($stream->read(4096));
+            $data .= $stream->read($bufferLengthAsRead);
         }
 
+        $data = Sanitizer::normalizeInvalidUTF8($data);
         // if seekable fallback to previous position
         if ($currentPos > -1 && $stream->isSeekable()) {
             $stream->seek($currentPos);
