@@ -1,7 +1,7 @@
 # WHOIS CHECKER
 
-[![Build Status](https://travis-ci.org/pentagonal/Whois.svg?branch=dev)](https://travis-ci.org/pentagonal/Whois)
-[![Coverage Status](https://coveralls.io/repos/github/pentagonal/Whois/badge.svg?branch=dev)](https://coveralls.io/github/pentagonal/Whois?branch=dev)
+[![Build Status](https://travis-ci.org/pentagonal/Whois.svg?branch=master)](https://travis-ci.org/pentagonal/Whois?branch=master)
+[![Coverage Status](https://coveralls.io/repos/github/pentagonal/Whois/badge.svg?branch=master)](https://coveralls.io/github/pentagonal/Whois?branch=master)
 
 **VERSION 2.0.0**
 
