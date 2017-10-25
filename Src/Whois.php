@@ -36,7 +36,7 @@ class WhoIs
     /**
      * Version Release
      */
-    const VERSION = '1.0.3';
+    const VERSION = '1.0.4';
 
     const REGEX_GET_SERVER  = '/(Whois(\s+Server)?):\s*(?P<server>[^\s]+)/i';
     const SERVER_PORT = 43;
