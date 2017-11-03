@@ -16,9 +16,11 @@ namespace Pentagonal\WhoIs\Util;
 
 use Guzzle\Http\Exception\RequestException;
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\BadResponseException;
 use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Handler\Proxy;
 use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Promise;
 use GuzzleHttp\Psr7\Uri;
 use Pentagonal\WhoIs\Exceptions\ConnectionException;
 use Pentagonal\WhoIs\Exceptions\ConnectionFailException;
@@ -41,14 +43,14 @@ use Psr\Http\Message\UriInterface;
  * Class TransportClient
  * @package Pentagonal\WhoIs\Util
  *
- * @method static ResponseInterface get($uri, array $options = [])
- * @method static ResponseInterface post($uri, array $options = [])
- * @method static ResponseInterface put($uri, array $options = [])
- * @method static ResponseInterface delete($uri, array $options = [])
- * @method static ResponseInterface trace($uri, array $options = [])
- * @method static ResponseInterface view($uri, array $options = [])
- * @method static ResponseInterface patch($uri, array $options = [])
- * @method static ResponseInterface head($uri, array $options = [])
+ * @method static TransportClient get($uri, array $options = [])
+ * @method static TransportClient post($uri, array $options = [])
+ * @method static TransportClient put($uri, array $options = [])
+ * @method static TransportClient delete($uri, array $options = [])
+ * @method static TransportClient trace($uri, array $options = [])
+ * @method static TransportClient view($uri, array $options = [])
+ * @method static TransportClient patch($uri, array $options = [])
+ * @method static TransportClient head($uri, array $options = [])
  */
 class TransportClient
 {
@@ -69,6 +71,16 @@ class TransportClient
      * @var array
      */
     protected $defaultOptions = [];
+
+    /**
+     * @var Promise\PromiseInterface[]
+     */
+    protected $promiseRequests;
+
+    /**
+     * @var string
+     */
+    protected $parallelKey;
 
     /**
      * TransportClient constructor.
@@ -102,22 +114,161 @@ class TransportClient
     }
 
     /**
+     * Get Current set Request Promise
+     *
+     * @return Promise\PromiseInterface|mixed
+     */
+    public function getCurrentPromiseRequest()
+    {
+        $request = current($this->promiseRequests);
+        return $request;
+    }
+
+    /**
+     * Is End of Request Parallel
+     *
+     * @return bool
+     */
+    public function isEndOfRequest() : bool
+    {
+        return ! $this->getCurrentPromiseRequest();
+    }
+
+    /**
+     * Send Parallel, send for queue
+     * consider & must be @uses isEndOfRequest() when using iteration loop
+     *
+     * @return ResponseInterface
+     * @throws \Throwable
+     */
+    public function sendParallel()
+    {
+        if (empty($this->promiseRequests)) {
+            throw new \RuntimeException(
+                'Requests is empty',
+                E_USER_NOTICE
+            );
+        }
+
+        if ($this->isEndOfRequest()) {
+            throw new \RuntimeException(
+                'Current Request is empty',
+                E_NOTICE
+            );
+        }
+
+        $currentRequest = $this->getCurrentPromiseRequest();
+        next($this->promiseRequests);
+
+        $response = $currentRequest->wait();
+        if ($response instanceof \Throwable) {
+            /**
+             * @var BadResponseException $e
+             */
+            $e = $response;
+            $request = $e->getRequest();
+            $response = $e->getResponse();
+            throw self::thrownExceptionResource($request, $e, $response, false);
+        }
+
+        return $response;
+    }
+
+    /**
+     * Sending Async request and convert it into Array Result
+     * @see sendAsync()
+     *
+     * @return array
+     */
+    public function send() : array
+    {
+        $result = [];
+        foreach ($this->sendAsync() as $key => $arrayPromise) {
+            if ($arrayPromise['state'] === Promise\Promise::REJECTED) {
+                /**
+                 * @var BadResponseException $e
+                 */
+                $e = $arrayPromise['reason'];
+                $result[$key] = $e;
+                $request = $e->getRequest();
+                $response = $e->getResponse();
+                if ($response instanceof ResponseInterface && $request instanceof RequestInterface) {
+                    $result[$key] = self::thrownExceptionResource($request, $e, $response, false);
+                }
+
+                continue;
+            }
+
+            $result[$key] = $arrayPromise['value'];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Send all request and returning original promise wait response
+     *
+     * @return array
+     */
+    public function sendAsync() : array
+    {
+        if (empty($this->promiseRequests)) {
+            throw new \RuntimeException(
+                'Requests is empty',
+                E_USER_NOTICE
+            );
+        }
+
+        return Promise\settle($this->promiseRequests)->wait();
+    }
+
+    /**
+     * Get All promise Requests
+     *
+     * @return array
+     */
+    public function getPromiseRequests() : array
+    {
+        return $this->promiseRequests;
+    }
+
+    /**
+     * @param string $name
+     *
+     * @return TransportClient
+     */
+    public function setCurrentRequestName(string $name) : TransportClient
+    {
+        $keys = array_keys($this->promiseRequests);
+        if (empty($keys)) {
+            return $this;
+        }
+        $key  = end($keys);
+        $keys[array_search($key, $keys)] = $name;
+        $this->promiseRequests = array_combine($keys, array_values($this->promiseRequests));
+
+        return $this;
+    }
+
+    /**
      * Make a Request
      *
      * @param string $method
      * @param string $uri
      * @param array $options
      *
-     * @return mixed|ResponseInterface
+     * @return TransportClient
      * @throws \Throwable
      * @throws ConnectException
      */
-    public function request(string $method = 'GET', $uri = '', array $options = [])
+    public function addRequest($uri, string $method = 'GET', array $options = [])
     {
         if (!$uri instanceof UriInterface) {
             $uri = $this->createUri($uri);
         }
 
+        $stringUri = (string) $uri;
+        $customRequest = null;
         if ($uri->getPort() === self::DEFAULT_PORT && $uri->getScheme() == '') {
             $optionsNew = $this->getClient()->getConfig();
             $optionsNew = array_merge($optionsNew, $options);
@@ -126,9 +277,11 @@ class TransportClient
                      $optionsNew['handler'] instanceof StreamSocketHandler
                      || $optionsNew['handler'] instanceof HandlerStack
                  );
+            $customRequest = $method;
             $options['curl'][CURLOPT_CUSTOMREQUEST] = $method;
             // if has custom request REQUEST METHOD GET
             $method = 'GET';
+            $stringUri = 'socket://'.ltrim($stringUri, '/');
         }
 
         if (!empty($uri->postMethod) && is_array($uri->postMethod)) {
@@ -138,22 +291,16 @@ class TransportClient
             $options['form_params'] = array_merge($uri->postMethod, $params);
         }
 
-        try {
-            return $this->getClient()->request($method, $uri, $options);
-        } catch (ConnectException $e) {
-            /**
-             * @var ResponseInterface $response
-             * @var RequestInterface $request
-             */
-            $request = $e->getRequest();
-            $response = $e->getResponse();
-            if (!$response instanceof ResponseInterface
-                || !$request instanceof RequestInterface
-            ) {
-                throw $e;
-            }
-            throw self::thrownExceptionResource($request, $e, $response, false);
-        }
+        $key = [
+            'uri'    => $stringUri,
+            'port'   => $uri->getPort(),
+            'method' => $method,
+            'custom_request' => $customRequest,
+            'microtime'   => microtime(true)
+        ];
+
+        $this->promiseRequests[json_encode($key)] = $this->getClient()->requestAsync($method, $uri, $options);
+        return $this;
     }
 
     /**
@@ -180,7 +327,9 @@ class TransportClient
         return $object;
     }
 
-
+    /**
+     * @return TransportClient
+     */
     public function withoutUserAgent() : TransportClient
     {
         $object = clone $this;
@@ -249,28 +398,30 @@ class TransportClient
      * @param string|UriInterface $server
      * @param array $options
      *
-     * @return ResponseInterface
-     * @throws \Throwable
+     * @return TransportClient
      */
     public static function requestSocketConnectionWrite(
         string $dataToWrite,
         $server,
         array $options = []
-    ) : ResponseInterface {
+    ) : TransportClient {
         /**
          * Make Domain Name To Custom Request
          */
         // create uri
         $uri         = self::createUri($server);
-        $dataToWrite = $uri->getPort() === 43 ? trim($dataToWrite) . "\r\n" : $dataToWrite;
-        $args        = func_get_args();
-        array_shift($args);
-        // set options
-        $options = array_merge([
-            'handler' => HandlerStack::create(new StreamSocketHandler())
-        ], $options);
-        $clone      = self::createForStreamSocket($options);
-        return self::createForStreamSocket($options)->request($dataToWrite, $uri, $options);
+        if ($uri->getPort() === 43) {
+            $dataToWrite = trim($dataToWrite) . "\r\n";
+            if (in_array($uri->getHost(), [
+                DataParser::ARIN_SERVER,
+                DataParser::RIPE_SERVER,
+            ])) {
+                // set options
+                $options['handler'] = HandlerStack::create(new StreamSocketHandler());
+            }
+        }
+
+        return self::createForStreamSocket($options)->addRequest($uri, $dataToWrite, $options);
     }
 
     /**
@@ -282,9 +433,9 @@ class TransportClient
      * @param string|UriInterface $server
      * @param array $options
      *
-     * @return ResponseInterface
+     * @return TransportClient
      */
-    public static function whoIsRequest(string $domainName, $server, array $options = []) : ResponseInterface
+    public static function whoIsRequest(string $domainName, $server, array $options = []) : TransportClient
     {
         return static::requestSocketConnectionWrite($domainName, $server, $options);
     }
@@ -296,13 +447,13 @@ class TransportClient
      * @param string $server
      * @param int    $port        determine port request
      *
-     * @return ResponseInterface
+     * @return TransportClient
      */
     public static function requestDomainConnection(
         string $domainName,
         string $server,
         int $port = null
-    ) : ResponseInterface {
+    ) : TransportClient {
         /**
          * Make Domain Name To Custom Request
          */
@@ -322,24 +473,22 @@ class TransportClient
      * @param string|UriInterface $uri
      * @param array $options
      *
-     * @return ResponseInterface
+     * @return TransportClient
      */
-    public static function requestConnection(string $method, $uri, array $options = []) : ResponseInterface
+    public static function requestConnection($uri, string $method = 'GET', array $options = []) : TransportClient
     {
         // create uri
-        $args = func_get_args();
-        array_shift($args);
         $clone = self::createForStreamSocket();
         $headers = $clone->getClient()->getConfig('headers');
-        if (($method === 'GET' || $method === 'POST')
-            && (
-                empty($headers['User-Agent'])
-                || is_string($headers['User-Agent'])
-                && strpos($headers['User-Agent'], 'GuzzleHttp') === 0
-            )
-            && is_string($clone->userAgent)
-        ) {
-            $clone = $clone->withUserAgent($clone->userAgent);
+        if (strpos($method, "\n") === false) {
+            $method = strtoupper($method);
+            if ((empty($headers['User-Agent'])
+                    || is_string($headers['User-Agent'])
+                    && strpos($headers['User-Agent'], 'GuzzleHttp') === 0
+                ) && is_string($clone->userAgent)
+            ) {
+                $clone = $clone->withUserAgent($clone->userAgent);
+            }
         }
 
         if (! $uri instanceof UriInterface) {
@@ -351,13 +500,13 @@ class TransportClient
                     )
                 );
             }
-            $uri = call_user_func_array([$clone, 'createUri'], $args);
+            $uri = static::createUri($uri);
         }
 
         return $clone
-            ->request(
-                $method,
+            ->addRequest(
                 $uri,
+                $method,
                 $options
             );
     }
@@ -566,10 +715,10 @@ class TransportClient
      *
      * @return mixed
      */
-    public function __call(string $name, array $arguments)
+    public function __call(string $name, array $arguments) : TransportClient
     {
-        array_unshift($arguments, $name);
-        return call_user_func_array([$this, 'request'], $arguments);
+        array_unshift($arguments, array_shift($arguments), strtoupper($name));
+        return call_user_func_array([$this, 'addRequest'], $arguments);
     }
 
     /**
@@ -578,11 +727,11 @@ class TransportClient
      * @param string $name
      * @param array $arguments
      *
-     * @return ResponseInterface
+     * @return TransportClient
      */
-    public static function __callStatic(string $name, array $arguments) : ResponseInterface
+    public static function __callStatic(string $name, array $arguments) : TransportClient
     {
-        array_unshift($arguments, $name);
+        array_unshift($arguments, array_shift($arguments), strtoupper($name));
         return call_user_func_array(
             [
                 static::class,

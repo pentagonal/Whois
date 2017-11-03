@@ -14,12 +14,14 @@ declare(strict_types=1);
 
 namespace Pentagonal\WhoIs\Util;
 
+use function GuzzleHttp\Promise\settle;
 use GuzzleHttp\Psr7\Stream;
 use Pentagonal\WhoIs\App\ArrayCollector;
 use Pentagonal\WhoIs\App\TLDCollector;
 use Pentagonal\WhoIs\Exceptions\ResourceException;
 use Pentagonal\WhoIs\Exceptions\TimeOutException;
 use Pentagonal\WhoIs\Util\TransportClient as Transport;
+use Psr\Http\Message\ResponseInterface;
 
 /**
  * Class DataGenerator
@@ -99,18 +101,31 @@ LICENSE;
             );
         }
 
+        $promise  = Transport::get(DataParser::URI_IANA_IDN)
+            ->setCurrentRequestName('iana')
+            ->get(DataParser::URI_PUBLIC_SUFFIX)
+            ->setCurrentRequestName('suffix')
+            ->send();
+
         try {
-            $iAnaResponse = Transport::get(DataParser::URI_IANA_IDN);
+            if (!$promise['iana'] instanceof ResponseInterface) {
+                throw new $promise['iana'];
+            }
+            $iAnaResponse = $promise['iana'];
         } catch (TimeOutException $e) {
-            $iAnaResponse = Transport::get(DataParser::URI_IANA_IDN);
+            $iAnaResponse = Transport::get(DataParser::URI_IANA_IDN)->sendParallel();
         } catch (\Exception $e) {
             throw $e;
         }
 
         try {
-            $suffixResponse = Transport::get(DataParser::URI_PUBLIC_SUFFIX);
+            if (!$promise['suffix'] instanceof ResponseInterface) {
+                throw new $promise['suffix'];
+            }
+
+            $suffixResponse = $promise['suffix'];
         } catch (TimeOutException $e) {
-            $suffixResponse = Transport::get(DataParser::URI_PUBLIC_SUFFIX);
+            $suffixResponse = Transport::get(DataParser::URI_PUBLIC_SUFFIX)->sendParallel();
         } catch (\Exception $e) {
             throw $e;
         }
@@ -277,9 +292,9 @@ LICENSE;
         }
 
         try {
-            $response = Transport::get(DataParser::URI_CACERT);
+            $response = Transport::get(DataParser::URI_CACERT)->sendParallel();
         } catch (TimeOutException $e) {
-            $response = Transport::get(DataParser::URI_CACERT);
+            $response = Transport::get(DataParser::URI_CACERT)->sendParallel();
         } catch (\Exception $e) {
             throw $e;
         }
@@ -517,8 +532,8 @@ LICENSE;
 
         // backward compat
         if (empty($asNumber16) || empty($asNumber32)) {
-            $stream = TransportClient::requestConnection('GET', DataParser::URI_IANA_ASN_TABLE);
-            $body   = (string)$stream->getBody();
+            $stream = TransportClient::requestConnection(DataParser::URI_IANA_ASN_TABLE)->sendParallel();
+            $body   = DataParser::convertResponseBodyToString($stream);
             foreach (DataParser::htmlParenthesisParser('table', $body) as $arrayCollector) {
                 $selector = $arrayCollector->get('selector');
                 $html     = $arrayCollector->get('html', '');
@@ -941,9 +956,16 @@ COMMENT;
 
         // backward compat
         if (empty($ipv4PrefixLists) || empty($ipv6PrefixLists)) {
-            $streamIPv4 = TransportClient::requestConnection('GET', DataParser::URI_IANA_IPV4_TABLE);
-            $streamIPv6 = TransportClient::requestConnection('GET', DataParser::URI_IANA_IPV6_TABLE);
-            $bodyIPv4   = (string)$streamIPv4->getBody();
+            $client    = TransportClient::createClient()
+                ->addRequest(DataParser::URI_IANA_IPV4_TABLE)
+                ->setCurrentRequestName('ipv4')
+                ->addRequest(DataParser::URI_IANA_IPV6_TABLE)
+                ->setCurrentRequestName('ipv6');
+            /**
+             * @var ResponseInterface[] $result
+             */
+            $result = settle($client->getPromiseRequests())->wait();
+            $bodyIPv4   = DataParser::convertResponseBodyToString($result['ipv4']);
             foreach (DataParser::htmlParenthesisParser('table', $bodyIPv4) as $arrayCollector) {
                 $selector = $arrayCollector->get('selector');
                 $html     = $arrayCollector->get('html', '');
@@ -1000,7 +1022,8 @@ COMMENT;
                     }
                 );
             }
-            $bodyIPv6   = (string)$streamIPv6->getBody();
+
+            $bodyIPv6    = DataParser::convertResponseBodyToString($result['ipv6']);
             foreach (DataParser::htmlParenthesisParser('table', $bodyIPv6) as $arrayCollector) {
                 $selector = $arrayCollector->get('selector');
                 $html     = $arrayCollector->get('html', '');

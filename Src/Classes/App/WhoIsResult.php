@@ -25,7 +25,6 @@ use Pentagonal\WhoIs\Interfaces\RecordNetworkInterface;
  */
 class WhoIsResult extends WhoIsResultAbstract
 {
-
     /* --------------------------------------------------------------------------------*
      |                                  INSTANCE                                       |
      |---------------------------------------------------------------------------------|

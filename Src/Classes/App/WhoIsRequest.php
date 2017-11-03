@@ -14,9 +14,11 @@ declare(strict_types=1);
 
 namespace Pentagonal\WhoIs\App;
 
+use Pentagonal\WhoIs\Abstracts\WhoIsRequestAbstract;
 use Pentagonal\WhoIs\Exceptions\TimeOutException;
 use Pentagonal\WhoIs\Util\DataParser;
 use Pentagonal\WhoIs\Util\TransportClient;
+use GuzzleHttp\Promise\PromiseInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\UriInterface;
 
@@ -26,13 +28,8 @@ use Psr\Http\Message\UriInterface;
  * @final
  * @access protected
  */
-final class WhoIsRequest
+final class WhoIsRequest extends WhoIsRequestAbstract
 {
-    const PENDING  = 'pending';
-    const PROGRESS = 'progress';
-    const SUCCESS  = 'success';
-    const FAILED   = 'failed';
-
     /**
      * @var string
      */
@@ -52,16 +49,6 @@ final class WhoIsRequest
      * @var string
      */
     protected $method = "GET";
-
-    /**
-     * @var bool
-     */
-    protected $hasSend = false;
-
-    /**
-     * @var string
-     */
-    protected $status = self::PENDING;
 
     /**
      * @var UriInterface
@@ -109,6 +96,11 @@ final class WhoIsRequest
      * @var null|string
      */
     protected $responseProxyConnection;
+
+    /**
+     * @var PromiseInterface
+     */
+    protected $promiseRequest;
 
     /**
      * WhoIsRequest constructor.
@@ -201,22 +193,6 @@ final class WhoIsRequest
     }
 
     /**
-     * @return bool
-     */
-    public function isHasSend(): bool
-    {
-        return $this->hasSend;
-    }
-
-    /**
-     * @return string
-     */
-    public function getStatus(): string
-    {
-        return $this->status;
-    }
-
-    /**
      * @return UriInterface
      */
     public function getUri(): UriInterface
@@ -233,6 +209,34 @@ final class WhoIsRequest
     public function getQuery(): string
     {
         return $this->query;
+    }
+
+    /**
+     * Set Response
+     *
+     * @param ResponseInterface|\Throwable $response
+     * @return WhoIsRequest
+     * @access internal use for set From multi Request Only
+     */
+    public function setResponseFromMultiRequest($response) : WhoIsRequest
+    {
+        $backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 1);
+        if (empty($backtrace)
+            || $backtrace['class'] !== WhoIsMultiRequest::class
+        ) {
+            throw new \RuntimeException(
+                sprintf(
+                    '%1$s::%2$s only allow set by object class %3$s',
+                    __CLASS__,
+                    __FUNCTION__,
+                    WhoIsMultiRequest::class
+                ),
+                E_WARNING
+            );
+        }
+
+        $this->response = $response;
+        return $this;
     }
 
     /**
@@ -373,21 +377,22 @@ final class WhoIsRequest
     }
 
     /**
-     * @return \Exception|ResponseInterface|\Throwable
+     * @return WhoIsRequest
      */
-    private function sendRequest()
+    protected function prepareRequest() : WhoIsRequest
     {
-        $this->countRequest += 1;
-        try {
-            if ($this->isUseSocket()) {
-                $this->response = TransportClient::whoIsRequest(
-                    $this->socketMethod,
-                    $this->getUri(),
-                    $this->options
-                );
-                $this->status = self::SUCCESS;
-                return $this->response;
-            }
+        if ($this->promiseRequest instanceof PromiseInterface) {
+            return $this;
+        }
+
+        $this->status = self::PROGRESS;
+        if ($this->isUseSocket()) {
+            $this->promiseRequest = TransportClient::whoIsRequest(
+                $this->socketMethod,
+                $this->getUri(),
+                $this->options
+            )->getCurrentPromiseRequest();
+        } else {
             $options = $this->options;
             if (!isset($options['headers'])) {
                 $options['headers'] = [];
@@ -396,12 +401,33 @@ final class WhoIsRequest
             if (!isset($options['headers']['referer'])) {
                 $options['headers']['referer'] = (string) $this->getUri()->withQuery('');
             }
-            $this->response = TransportClient::requestConnection(
-                $this->getMethod(),
-                $this->getUri(),
-                $options
-            );
 
+            $this->promiseRequest = TransportClient::requestConnection(
+                $this->getUri(),
+                $this->getMethod(),
+                $options
+            )->getCurrentPromiseRequest();
+        }
+
+        return $this;
+    }
+
+    /**
+     * @return PromiseInterface
+     */
+    public function getPromiseRequest() : PromiseInterface
+    {
+        return $this->prepareRequest()->promiseRequest;
+    }
+
+    /**
+     * @return \Exception|ResponseInterface|\Throwable
+     */
+    private function sendRequest()
+    {
+        $this->countRequest += 1;
+        try {
+            $this->response = $this->getPromiseRequest()->wait();
             $this->status = self::SUCCESS;
         } catch (\Throwable $e) {
             $this->status = self::FAILED;
@@ -420,13 +446,13 @@ final class WhoIsRequest
     }
 
     /**
-     * @return WhoIsRequest
+     * @return WhoIsRequestAbstract
      */
-    public function send() : WhoIsRequest
+    public function send() : WhoIsRequestAbstract
     {
         if ($this->isPendingRequest()) {
             $this->hasSend = true;
-            $this->status = self::PROGRESS;
+            $this->status  = self::PROGRESS;
             $this->bodyString = null;
             $this->sendRequest();
         }
@@ -435,9 +461,9 @@ final class WhoIsRequest
     }
 
     /**
-     * @return WhoIsRequest
+     * @return WhoIsRequestAbstract
      */
-    public function retry() : WhoIsRequest
+    public function retry() : WhoIsRequestAbstract
     {
         if (!isset($this->response) || $this->isError()) {
             $this->status = self::PENDING;
@@ -445,35 +471,6 @@ final class WhoIsRequest
         }
 
         return $this;
-    }
-
-    /* --------------------------------------------------------------------------------*
-     |                                   STATUS                                        |
-     |---------------------------------------------------------------------------------|
-     */
-
-    /**
-     * @return bool
-     */
-    public function isPendingRequest() : bool
-    {
-        return $this->getStatus() === self::PENDING;
-    }
-
-    /**
-     * @return bool
-     */
-    public function isFail() : bool
-    {
-        return $this->getStatus() === self::FAILED;
-    }
-
-    /**
-     * @return bool
-     */
-    public function isSuccess() : bool
-    {
-        return $this->getStatus() === self::SUCCESS;
     }
 
     /**

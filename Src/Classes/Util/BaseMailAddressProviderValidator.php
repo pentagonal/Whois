@@ -126,6 +126,7 @@ class BaseMailAddressProviderValidator
     {
         if (!isset($this->isMustBeInvalid)) {
             $baseMail              = $this->getBaseMailAddress();
+
             $this->isMustBeInvalid = (bool) (
                 // email must be 1 or more
                 strlen(trim($baseMail)) < 1
