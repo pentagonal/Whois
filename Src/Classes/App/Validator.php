@@ -101,6 +101,16 @@ class Validator
     protected $baseMailProviderValidatorClass = BaseMailAddressProviderValidator::class;
 
     /**
+     * @var Validator
+     */
+    protected static $validator;
+
+    /**
+     * @var TLDCollector original
+     */
+    protected static $tldCollectorStatic;
+
+    /**
      * Validator constructor.
      *
      * @param TLDCollector|null $collector
@@ -108,7 +118,18 @@ class Validator
      */
     public function __construct(TLDCollector $collector = null, string $providerValidator = null)
     {
-        $this->tldCollector = $collector ?: new TLDCollector();
+        // for reason performance
+        if (!isset(self::$tldCollectorStatic)) {
+            self::$tldCollectorStatic = new TLDCollector();
+        }
+
+        $defaultMailProviderValidator = BaseMailAddressProviderValidator::class;
+        if (!isset(self::$validator)) {
+            self::$validator = clone $this;
+            self::$validator->baseMailProviderValidatorClass = $defaultMailProviderValidator;
+        }
+
+        $this->tldCollector = $collector ?: self::$tldCollectorStatic;
         if ($providerValidator) {
             $this->baseMailProviderValidatorClass = $providerValidator;
             if (! class_exists($providerValidator)) {
@@ -120,12 +141,13 @@ class Validator
                     E_WARNING
                 );
             }
-            if (is_subclass_of($providerValidator, BaseMailAddressProviderValidator::class)) {
+
+            if (is_subclass_of($providerValidator, $defaultMailProviderValidator)) {
                 throw new \InvalidArgumentException(
                     sprintf(
                         'Validator class of %1$s must be instance of %2$s',
                         $providerValidator,
-                        BaseMailAddressProviderValidator::class
+                        $defaultMailProviderValidator
                     ),
                     E_WARNING
                 );
@@ -135,9 +157,9 @@ class Validator
         // revert to default if object class invalid
         if (! is_string($this->baseMailProviderValidatorClass)
              || ! class_exists($this->baseMailProviderValidatorClass)
-             || is_subclass_of($providerValidator, BaseMailAddressProviderValidator::class)
+             || is_subclass_of($providerValidator, $defaultMailProviderValidator)
         ) {
-            $this->baseMailProviderValidatorClass = BaseMailAddressProviderValidator::class;
+            $this->baseMailProviderValidatorClass = $defaultMailProviderValidator;
         }
     }
 
@@ -154,6 +176,20 @@ class Validator
         string $providerValidator = null
     ) : Validator {
         return new static($collector, $providerValidator);
+    }
+
+    /**
+     * Get Original Validator
+     *
+     * @return Validator
+     */
+    public static function validatorDefaultInstance() : Validator
+    {
+        if (!isset(self::$validator)) {
+            self::$validator = self::createInstance();
+        }
+
+        return self::$validator;
     }
 
     /**

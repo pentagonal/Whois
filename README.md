@@ -99,10 +99,83 @@ $result = $checker->getResult($target);
  * if value count more than 1 it was follow whois
  * server
  * ---------------------------------------- */
-$result = $checker->getMultiResult($target);
-
+$result = $checker->getFollowServerResult($target);
 ```
 
+**Check Multiple Data**
+
+The checker support `multi_curl_init` to used for async request
+
+```php
+<?php
+use Pentagonal\WhoIs\App\Checker;
+use Pentagonal\WhoIs\App\WhoIsMultiResult;
+use Pentagonal\WhoIs\App\WhoIsResult;
+
+$checker = Checker::createInstance();
+$dataToCheck = [
+    'google.com' => 'whois.google.com',
+    '192.168.0.1',
+    'AS123',
+    'example.com'
+];
+
+/**
+ * Requesting single result per data 
+ * @var \Throwable[]|WhoIsResult[]|WhoIsMultiResult
+ *
+   WhoIsMultiResult Object (
+       [storage:ArrayObject:private] => array(
+         [google.com] => WhoIsResult object|\Throwable,
+         // of (192.168.0.1)
+         [0] => WhoIsResult object|\Throwable,
+         // of (AS123)
+         [1] => WhoIsResult object|\Throwable,
+         // of (example.com)
+         [2] => WhoIsResult object|\Throwable,
+      )
+  )
+ *
+ */
+$result = $checker->getFromMultiple($dataToCheck);
+
+/**
+ * Requesting follow server per data 
+ * @var WhoIsMultiResult|WhoIsMultiResult[]
+ *
+   WhoIsMultiResult Object (
+       [storage:ArrayObject:private] => array(
+         [google.com] => WhoIsMultiResult Object ( 
+            // of (google.com)
+            [storage:ArrayObject:private] => array(
+                WhoIsResult object|\Throwable, ....
+            )
+         )
+         [0] => WhoIsMultiResult Object (
+            // of (192.168.0.1)
+            [storage:ArrayObject:private] => array(
+                WhoIsResult object|\Throwable, ....
+            )
+         ),
+         [1] => WhoIsMultiResult Object (
+            // of (AS123)
+            [storage:ArrayObject:private] => array(
+                (WhoIsResult(object)|\Throwable),
+            )
+         )
+         [2] => WhoIsMultiResult Object (
+            // of (example.com)
+            [storage:ArrayObject:private] => array(
+                (WhoIsResult(object)|\Throwable),
+            )
+         )
+      )
+  )
+ *
+ */
+$result = $checker->getFromMultipleFollowResultServer($dataToCheck);
+
+```
 ### INSTANTIATING & PROXY
 
 Whois checker support connection behind the proxy.

@@ -89,7 +89,6 @@ class CurlMultiHandler
     {
         $easy = $this->factory->create($request, $options);
         $id = (int) $easy->handle;
-
         $promise = new Promise(
             [$this, 'execute'],
             function () use ($id) {
@@ -164,12 +163,12 @@ class CurlMultiHandler
          * @var EasyHandle $easy
          */
         $easy = $entry['easy'];
+
         $id = (int) $easy->handle;
         $this->handles[$id] = $entry;
 
         // invoke Request
         CurlHandlerInvoker::invokeRequest($easy);
-
         if (empty($easy->options['delay'])) {
             curl_multi_add_handle($this->_mh, $easy->handle);
         } else {
@@ -222,7 +221,10 @@ class CurlMultiHandler
             $easy->errno = $done['result'];
 
             // invoke process
-            CurlHandlerInvoker::invokeProcess($easy);
+            if (CurlHandlerInvoker::invokeProcess($easy) === true) {
+                // create response if succeed
+                $easy->createResponse();
+            }
             $entry['deferred']->resolve(
                 CurlFactory::finish(
                     $this,

@@ -21,6 +21,7 @@ use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Handler\Proxy;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Promise;
+use function GuzzleHttp\Psr7\str;
 use GuzzleHttp\Psr7\Uri;
 use Pentagonal\WhoIs\Exceptions\ConnectionException;
 use Pentagonal\WhoIs\Exceptions\ConnectionFailException;
@@ -70,7 +71,11 @@ class TransportClient
     /**
      * @var array
      */
-    protected $defaultOptions = [];
+    protected $defaultOptions = [
+        'ssl'    => [
+            'certificate_authority' => DataParser::PATH_CACERT,
+        ]
+    ];
 
     /**
      * @var Promise\PromiseInterface[]
@@ -83,6 +88,11 @@ class TransportClient
     protected $parallelKey;
 
     /**
+     * @var array
+     */
+    protected $configs = [];
+
+    /**
      * TransportClient constructor.
      *
      * @param Client $client
@@ -90,12 +100,8 @@ class TransportClient
     public function __construct(Client $client)
     {
         $this->client = $client;
-        $this->defaultOptions = [
-            'handler' => $this->createStackHandler(),
-            'ssl'    => [
-                'certificate_authority' => DataParser::PATH_CACERT,
-            ],
-        ];
+        $this->configs = $client->getConfig();
+        $this->defaultOptions['handler'] = $this->createStackHandler();
         if (is_string($this->userAgent)) {
             $this->defaultOptions['headers'] = [
                 'User-Agent' => $this->userAgent
@@ -120,8 +126,7 @@ class TransportClient
      */
     public function getCurrentPromiseRequest()
     {
-        $request = current($this->promiseRequests);
-        return $request;
+        return current($this->promiseRequests);
     }
 
     /**
@@ -251,6 +256,25 @@ class TransportClient
     }
 
     /**
+     * @param array $options
+     *
+     * @return array
+     */
+    public function mergeOptions(array $options) : array
+    {
+        if (empty($options)) {
+            return $this->configs;
+        }
+
+        $original = $this->configs;
+        foreach ($options as $key => $value) {
+            $original[$key] = $value;
+        }
+
+        return $original;
+    }
+
+    /**
      * Make a Request
      *
      * @param string $method
@@ -269,19 +293,26 @@ class TransportClient
 
         $stringUri = (string) $uri;
         $customRequest = null;
-        if ($uri->getPort() === self::DEFAULT_PORT && $uri->getScheme() == '') {
-            $optionsNew = $this->getClient()->getConfig();
-            $optionsNew = array_merge($optionsNew, $options);
-            $options['stream'] = ! empty($optionsNew['handler'])
-                 && (
-                     $optionsNew['handler'] instanceof StreamSocketHandler
-                     || $optionsNew['handler'] instanceof HandlerStack
-                 );
-            $customRequest = $method;
-            $options['curl'][CURLOPT_CUSTOMREQUEST] = $method;
+        $scheme = $uri->getScheme();
+        if ($uri->getPort() === self::DEFAULT_PORT && $scheme == '') {
+            if (!isset($options['stream']) && ! empty($options['handler'])) {
+                $options['stream'] = $options['handler'] instanceof StreamSocketHandler
+                     || $options['handler'] instanceof HandlerStack;
+            }
+
+            $customRequest = $options['curl'][CURLOPT_CUSTOMREQUEST] = $method;
+            $options['curl'][CURLOPT_PROTOCOLS] = CURLPROTO_ALL;
             // if has custom request REQUEST METHOD GET
-            $method = 'GET';
-            $stringUri = 'socket://'.ltrim($stringUri, '/');
+            $stringUri = ($scheme?: 'socket') . '://'.ltrim($stringUri, '/');
+        }
+
+        if ($uri->getPort() === 43) {
+            if (empty($options['headers']) || !is_array($options['headers'])) {
+                $options['headers'] = [];
+            }
+
+            $options['headers']['User-Agent'] = '';
+            $options['headers']['Host'] = $uri->getHost();
         }
 
         if (!empty($uri->postMethod) && is_array($uri->postMethod)) {
@@ -311,19 +342,18 @@ class TransportClient
     public function withUserAgent(string $userAgent) : TransportClient
     {
         $object = clone $this;
-        $configs = $object->client->getConfig();
-        if (!isset($configs['headers']) || !is_array($configs['headers'])) {
-            $configs['headers'] = [];
+        if (!isset($object->configs['headers']) || !is_array($object->configs['headers'])) {
+            $object->configs['headers'] = [];
         }
 
-        foreach ($configs['headers'] as $key => $v) {
+        foreach ($object->configs['headers'] as $key => $v) {
             if (is_string($key) && strtolower($key) === 'user-agent') {
-                unset($configs['headers'][$key]);
+                unset($object->configs['headers'][$key]);
             }
         }
 
-        $configs['headers']['User-Agent'] = $userAgent;
-        $object->client = new Client($configs);
+        $object->configs['headers']['User-Agent'] = $userAgent;
+        $object->client = new Client($object->configs);
         return $object;
     }
 
@@ -333,18 +363,17 @@ class TransportClient
     public function withoutUserAgent() : TransportClient
     {
         $object = clone $this;
-        $configs = $object->client->getConfig();
-        if (!isset($configs['headers']) || !is_array($configs['headers'])) {
-            $configs['headers'] = [];
+        if (!isset($object->configs['headers']) || !is_array($object->configs['headers'])) {
+            $object->configs['headers'] = [];
         }
-        foreach ($configs['headers'] as $key => $v) {
+        foreach ($object->configs['headers'] as $key => $v) {
             if (is_string($key) && strtolower($key) === 'user-agent') {
-                unset($configs['headers'][$key]);
+                unset($object->configs['headers'][$key]);
             }
         }
 
-        $configs['headers']['User-Agent'] = null;
-        $object->client = new Client($configs);
+        $object->configs['headers']['User-Agent'] = null;
+        $object->client = new Client($object->configs);
         return $object;
     }
 
@@ -354,18 +383,17 @@ class TransportClient
     public function withNoSSLVerify() : TransportClient
     {
         $object = clone $this;
-        $config = $object->getClient()->getConfig();
-        $config['verify'] = false;
-        if (isset($config['curl'])) {
-            if (!is_array($config['curl'])) {
-                unset($config['curl']);
+        $object->configs['verify'] = false;
+        if (isset($object->configs['curl'])) {
+            if (!is_array($object->configs['curl'])) {
+                unset($object->configs['curl']);
             }
-            if (isset($config['curl'])) {
-                $config['curl'][CURLOPT_SSL_VERIFYHOST] = false;
-                $config['curl'][CURLOPT_SSL_VERIFYPEER] = false;
+            if (isset($object->configs['curl'])) {
+                $object->configs['curl'][CURLOPT_SSL_VERIFYHOST] = false;
+                $object->configs['curl'][CURLOPT_SSL_VERIFYPEER] = false;
             }
         }
-        $object->client = new Client($config);
+        $object->client = new Client($object->configs);
         return $object;
     }
 
@@ -375,19 +403,18 @@ class TransportClient
     public function withSSLVerify() : TransportClient
     {
         $object = clone $this;
-        $config = $object->getClient()->getConfig();
-        $config['verify'] = true;
-        if (isset($config['curl'])) {
-            if (!is_array($config['curl'])) {
-                unset($config['curl']);
+        $object->configs['verify'] = true;
+        if (isset($object->configs['curl'])) {
+            if (!is_array($object->configs['curl'])) {
+                unset($object->configs['curl']);
             }
-            if (isset($config['curl'])) {
-                $config['curl'][CURLOPT_SSL_VERIFYHOST] = true;
-                $config['curl'][CURLOPT_SSL_VERIFYPEER] = true;
+            if (isset($object->configs['curl'])) {
+                $object->configs['curl'][CURLOPT_SSL_VERIFYHOST] = true;
+                $object->configs['curl'][CURLOPT_SSL_VERIFYPEER] = true;
             }
         }
 
-        $object->client = new Client($config);
+        $object->client = new Client($object->configs);
         return $object;
     }
 
@@ -395,21 +422,21 @@ class TransportClient
      * Request Socket for domain
      *
      * @param string $dataToWrite
-     * @param string|UriInterface $server
+     * @param string|UriInterface $uri
      * @param array $options
      *
      * @return TransportClient
      */
     public static function requestSocketConnectionWrite(
         string $dataToWrite,
-        $server,
+        $uri,
         array $options = []
     ) : TransportClient {
         /**
          * Make Domain Name To Custom Request
          */
         // create uri
-        $uri         = self::createUri($server);
+        $uri         = $uri instanceof UriInterface ? $uri : self::createUri($uri);
         if ($uri->getPort() === 43) {
             $dataToWrite = trim($dataToWrite) . "\r\n";
             if (in_array($uri->getHost(), [
@@ -512,11 +539,25 @@ class TransportClient
     }
 
     /**
+     * @var HandlerStack
+     */
+    protected static $stackHandler;
+
+    /**
+     * @var callable
+     */
+    protected static $chosenHandler;
+
+    /**
      * @return HandlerStack
      */
     public static function createStackHandler() : HandlerStack
     {
-        return HandlerStack::create(static::chooseHandler());
+        if (self::$stackHandler && self::$stackHandler instanceof HandlerStack) {
+            return clone self::$stackHandler;
+        }
+
+        return self::$stackHandler = HandlerStack::create(static::chooseHandler());
     }
 
     /**
@@ -524,6 +565,10 @@ class TransportClient
      */
     public static function chooseHandler()
     {
+        if (self::$chosenHandler && is_callable(self::$chosenHandler)) {
+            return clone self::$chosenHandler;
+        }
+
         $handler = null;
         if (function_exists('curl_multi_exec') && function_exists('curl_exec')) {
             $handler = Proxy::wrapSync(new CurlMultiHandler(), new CurlHandler());
@@ -543,7 +588,7 @@ class TransportClient
             );
         }
 
-        return $handler;
+        return self::$chosenHandler = $handler;
     }
 
     /**
@@ -555,11 +600,9 @@ class TransportClient
      */
     public static function createForStreamSocket(array $options = []) : TransportClient
     {
-        $defaultOptions = [
-            'handler' => static::createStackHandler(),
-        ];
-
-        $options =  array_merge($defaultOptions, $options);
+        $options =  array_merge([
+            'handler' => static::createStackHandler()
+        ], $options);
         $transport = new static(new Client($options));
         return $transport;
     }
@@ -571,9 +614,6 @@ class TransportClient
      */
     public static function createClient(array $options = []) : TransportClient
     {
-        // with no headers
-        $defaultOptions = ['handler' => static::createStackHandler()];
-        $options =  array_merge($defaultOptions, $options);
         return static::createForStreamSocket($options);
     }
 
@@ -604,19 +644,28 @@ class TransportClient
             $server->postMethod = $postData;
         }
 
-        $uri = $server instanceof UriInterface ? $server : new Uri($server);
-        if ($uri->getScheme() === null) {
-            $uri = $uri->withScheme('');
+        if (is_string($server) && strpos($server, '//') !== 0) {
+            $serverArray = parse_url($server);
+            if (empty($serverArray['scheme'])) {
+                $server = "//{$server}";
+            }
         }
 
+        $uri = $server instanceof UriInterface ? $server : new Uri($server);
+        $uriScheme = $uri->getScheme();
+        $uriPort   = $uri->getPort();
+        if ($uriScheme === null) {
+            $uriScheme = '';
+            $uri = $uri->withScheme($uriScheme);
+        }
         if ($port !== null) {
             $uri = $uri->withPort($port);
-        } elseif ($uri->getPort() === null && $uri->getScheme() == '') {
+        } elseif ($uriPort === null && $uri->getScheme() === '') {
             $uri = $uri->withPort(static::DEFAULT_PORT);
         }
 
         if ($uri->getHost() == '' && $uri->getPath()) {
-            $path = '';
+            $path = '/';
             $host = $server;
             $parseUrlServer = parse_url($server);
             if (empty($parseUrlServer['host']) && !empty($parseUrlServer['path'])) {

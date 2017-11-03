@@ -347,7 +347,7 @@ trait ResultNormalizer
      *
      * @return WhoIsRequest
      */
-    protected function normalizeAfterRequest(WhoIsRequest $request, Validator $validator) : WhoIsRequest
+    protected function normalizeAfterRequestSend(WhoIsRequest $request, Validator $validator) : WhoIsRequest
     {
         $domain = $request->getTargetName();
         if ($domain && $validator->isValidDomain($domain)) {

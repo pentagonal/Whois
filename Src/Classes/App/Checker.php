@@ -22,6 +22,7 @@ use Pentagonal\WhoIs\Exceptions\ResultException;
 use Pentagonal\WhoIs\Exceptions\TimeOutException;
 use Pentagonal\WhoIs\Exceptions\WhoIsServerNotFoundException;
 use Pentagonal\WhoIs\Interfaces\CacheInterface;
+use Pentagonal\WhoIs\Interfaces\RecordDomainNetworkInterface;
 use Pentagonal\WhoIs\Interfaces\RecordNetworkInterface;
 use Pentagonal\WhoIs\Traits\ResultNormalizer;
 use Pentagonal\WhoIs\Util\DataParser;
@@ -136,7 +137,10 @@ FAKE;
     /**
      * @var array
      */
-    protected $defaultOptions = [];
+    protected $defaultOptions = [
+        // default force IPv4
+        'force_ip_resolve' => 'v4'
+    ];
 
     /**
      * Checker constructor.
@@ -362,6 +366,23 @@ FAKE;
      */
     public function getRequest(string $target, string $server, array $options = []) : WhoIsRequest
     {
+        return $this->normalizeAfterRequestSend(
+            $this->getRequestPending($target, $server, $options),
+            $this->getValidator()
+        );
+    }
+
+    /**
+     * Get From Request async not yet send
+     *
+     * @param string $target
+     * @param string $server
+     * @param array $options
+     *
+     * @return WhoIsRequest
+     */
+    public function getRequestPending(string $target, string $server, array $options = []) : WhoIsRequest
+    {
         if (!isset($options['proxy'])) {
             $Proxy = $this->getProxy();
             if ($Proxy) {
@@ -370,10 +391,7 @@ FAKE;
         }
 
         $options = array_merge($this->getDefaultOptions(), $options);
-        return $this->normalizeAfterRequest(
-            $this->prepareForRequest($target, $server, $options),
-            $this->getValidator()
-        );
+        return $this->prepareForRequest($target, $server, $options);
     }
 
     /* --------------------------------------------------------------------------------*
@@ -523,60 +541,6 @@ FAKE;
     }
 
     /**
-     * Try Request Result
-     *
-     * @param string $target string domain name, IP or ASN
-     * @param string $server
-     * @param int $retry
-     *
-     * @return WhoIsRequest
-     * @throws \Throwable
-     */
-    protected function tryRequestResult(
-        string $target,
-        string $server,
-        int $retry = 2
-    ) : WhoIsRequest {
-
-        if (trim($target) === '') {
-            throw new \InvalidArgumentException(
-                'Argument selector could not be empty',
-                E_USER_WARNING
-            );
-        }
-
-        if (trim($target) === '') {
-            throw new \InvalidArgumentException(
-                'Target could not be empty',
-                E_USER_WARNING
-            );
-        }
-
-        if (trim($server) === '') {
-            throw new \InvalidArgumentException(
-                'Server could not be empty',
-                E_USER_WARNING
-            );
-        }
-
-        if ($retry > static::MAX_RETRY) {
-            $retry = static::MAX_RETRY;
-        }
-
-        $request = $this->getRequest($target, $server);
-        while ($request->isTimeOut() && $retry > 0) {
-            $retry -= 1;
-            $request = $this->getRequest($target, $server);
-        }
-
-        if ($request->isError()) {
-            throw $request->getResponse();
-        }
-
-        return $request;
-    }
-
-    /**
      * Prepare fallback for result
      *
      * @param RecordNetworkInterface $network
@@ -647,15 +611,67 @@ FAKE;
      */
 
     /**
-     * Get From Domain Name
+     * Try Request Result
      *
-     * @param string $domainName The domain Name to check
-     * @param string|null $server
+     * @param string $target string domain name, IP or ASN
+     * @param string $server
+     * @param int $retry
      *
-     * @return WhoIsResult
+     * @return WhoIsRequest
      * @throws \Throwable
      */
-    public function getFromDomain(string $domainName, string $server = null) : WhoIsResult
+    protected function tryRequestResult(
+        string $target,
+        string $server,
+        int $retry = 2
+    ) : WhoIsRequest {
+
+        if (trim($target) === '') {
+            throw new \InvalidArgumentException(
+                'Argument selector could not be empty',
+                E_USER_WARNING
+            );
+        }
+
+        if (trim($target) === '') {
+            throw new \InvalidArgumentException(
+                'Target could not be empty',
+                E_USER_WARNING
+            );
+        }
+
+        if (trim($server) === '') {
+            throw new \InvalidArgumentException(
+                'Server could not be empty',
+                E_USER_WARNING
+            );
+        }
+
+        if ($retry > static::MAX_RETRY) {
+            $retry = static::MAX_RETRY;
+        }
+
+        $request = $this->getRequest($target, $server);
+        while ($request->isTimeOut() && $retry > 0) {
+            $retry -= 1;
+            $request = $this->getRequest($target, $server);
+        }
+
+        if ($request->isError()) {
+            throw $request->getResponse();
+        }
+
+        return $request;
+    }
+
+    /**
+     * @param string $domainName
+     *
+     * @return RecordDomainNetworkInterface
+     * @throws \RuntimeException
+     * @throws InvalidDomainException
+     */
+    protected function getRecordValidateFromDomain(string $domainName) : RecordDomainNetworkInterface
     {
         $domainName = trim($domainName);
         if ($domainName === '') {
@@ -696,9 +712,28 @@ FAKE;
             );
         }
 
+        return $record;
+    }
+
+    /**
+     * Get From Domain Name
+     *
+     * @param string $domainName The domain Name to check
+     * @param string|null $server
+     *
+     * @return WhoIsResult
+     * @throws \Throwable
+     */
+    public function getFromDomain(string $domainName, string $server = null) : WhoIsResult
+    {
+        $record = $this->getRecordValidateFromDomain($domainName);
         $servers = $server && trim($server)
             ? [$server]
-            : $this->getWhoIsServerFor($record->getPointer());
+            : (
+                $record->getWhoIsServers()?:
+                // request from iana
+                $this->getWhoIsServerFor($record->getPointer(), true)
+            );
         $isLimit = false;
         $usedServer = null;
         foreach ($servers as $server) {
@@ -908,30 +943,34 @@ FAKE;
      *
      * @return WhoIsMultiResult
      */
-    public function getMultiResult(string $selector) : WhoIsMultiResult
+    public function getFollowServerResult(string $selector) : WhoIsMultiResult
     {
         $result = $this->getResult($selector);
+        $server = $result->getServer();
         $multiResult = new WhoIsMultiResult([
-            $result->getServer() => $result
+            $server => $result
         ]);
 
         $alternatedServer = DataParser::getWhoIsServerFromResultData($result->getOriginalResultString());
+        $alternatedServer = is_string($alternatedServer)
+            ? strtolower(trim($alternatedServer))
+            : null;
+        $alternatedServer = $alternatedServer !== DataParser::URI_IANA_WHOIS
+            ? $alternatedServer
+            : null;
 
-        if (! is_string($alternatedServer)
-            || trim($alternatedServer) == ''
-            || ! is_string($result->getServer())
-            || trim($result->getServer()) == ''
-            || strtolower(trim($alternatedServer)) == strtolower($result->getServer())
+        if ($alternatedServer
+            && is_string($server)
+            && trim($server) != ''
+            && $alternatedServer !== strtolower(trim($server))
         ) {
-            return $multiResult;
-        }
-
-        // try to get Other Result
-        try {
-            $result = $this->getResult($selector, $alternatedServer);
-            $multiResult[$alternatedServer] = $result;
-        } catch (\Throwable $e) {
-            // pass
+            // try to get Other Result
+            try {
+                $result = $this->getResult($selector, $alternatedServer);
+                $multiResult[$alternatedServer] = $result;
+            } catch (\Throwable $e) {
+                // pass
+            }
         }
 
         return $multiResult;
@@ -976,10 +1015,221 @@ FAKE;
 
         throw new \RuntimeException(
             sprintf(
-                'Selector %1$s is not valid IP, ASN or Domain',
+                'Selector %1$s is not valid IP, ASN, Domain or Handler',
                 $selector
             ),
             E_WARNING
         );
+    }
+
+    /**
+     * Get for record type
+     *
+     * @param string $domain
+     *
+     * @return RecordNetworkInterface
+     * @throws \Throwable
+     */
+    public function getForType(string $domain) : RecordNetworkInterface
+    {
+        $validator = $this->getValidator();
+        // ASN
+        if ($validator->isValidASN($domain)) {
+            $record = $validator->splitASN($domain);
+        }
+        // IP
+        if ($validator->isValidIP($domain)) {
+            $record = $validator->splitIP($domain);
+        }
+        // Domain
+        if ($validator->isValidDomain($domain)) {
+            $record = $this->getRecordValidateFromDomain($domain);
+        }
+        if ($validator->isValidHandler($domain)) {
+            $record = $validator->splitHandler($domain);
+        }
+        if (empty($record)) {
+            throw new \RuntimeException(
+                sprintf(
+                    'Selector %1$s is not valid IP, ASN, Domain or Handler',
+                    $domain
+                ),
+                E_WARNING
+            );
+        }
+        return $record;
+    }
+
+    /**
+     * Get Multiple Domain, using async request result
+     *
+     * @param array $targets domain|network list as
+     *          ['domain.name', 'domain.ext']
+     *          or ['domain.ext' => 'whois.server.ext']
+     *          or ['domain.ext' =>  null|bool|0 ... empty value]
+     *          or mixed [
+     *                  'domain.ext',
+     *                  'ASN124' => 'whois.arin.net',
+     *                  'domain.ext1' => 'whois.server.ext',
+     *                  'domain.ext2' =>  null|bool|0 ... empty value
+     *                  ]
+     *
+     * Note: this request will be not to try / check limit / timeout
+     *
+     * @return WhoIsMultiResult|WhoIsResult[]|\Throwable[]
+     */
+    public function getFromMultiple(array $targets) : WhoIsMultiResult
+    {
+        $targetLists = [];
+        $netWorkRecords = [];
+        foreach ($targets as $target => $server) {
+            $key = $target;
+            if (!is_string($target)) {
+                if (! is_string($server)) {
+                    throw new \InvalidArgumentException(
+                        sprintf(
+                            'Key for array must be as a string of target name, %s given',
+                            gettype($server)
+                        )
+                    );
+                }
+                $target = $server;
+                $server = null;
+            } else {
+                if (!$server || is_bool($server)) {
+                    $server = null;
+                } elseif ($server && $server !== null) {
+                    throw new \InvalidArgumentException(
+                        sprintf(
+                            'Server must be as a string, %s given',
+                            gettype($server)
+                        )
+                    );
+                }
+            }
+
+            if (trim($target) === '') {
+                throw new \InvalidArgumentException(
+                    'Invalid arguments for target lists'
+                );
+            }
+
+            try {
+                $record = $this->getForType($target);
+                if (!$server) {
+                    $servers = $record->getWhoIsServers();
+                    if (empty($servers)) {
+                        throw new WhoIsServerNotFoundException(
+                            sprintf(
+                                'Could not get whois server for: %s',
+                                $target
+                            ),
+                            E_NOTICE
+                        );
+                    }
+                    /**
+                     * @var string $server
+                     */
+                    $server = reset($servers);
+                }
+                $netWorkRecords[$key] = $record;
+                $targetLists[$key] = $this->getRequestPending($target, $server);
+            } catch (\Throwable $e) {
+                $targetLists[$key] = $e;
+            }
+        }
+
+        $whoIsRequests = [];
+        foreach ($targetLists as $key => $whoIsRequest) {
+            if ($whoIsRequest instanceof WhoIsRequest) {
+                $whoIsRequests[$key] = $whoIsRequest;
+            }
+        }
+
+        $whoIsRequests = new WhoIsMultiRequest($whoIsRequests);
+        foreach ($whoIsRequests->getSendRequests() as $targetName => $request) {
+            try {
+                $targetLists[$targetName] = $this->prepareForWhoIsResult(
+                    $netWorkRecords[$targetName],
+                    $request
+                );
+            } catch (\Throwable $e) {
+                $targetLists[$targetName] = $e;
+            }
+        }
+
+        unset($whoIsRequest, $netWorkRecords, $targets);
+        return new WhoIsMultiResult($targetLists);
+    }
+
+    /**
+     * Get Multi Result if possible follow given whois server from result
+     *
+     * @param array $targets selector target IP, Domain or AS Number
+     *
+     * @return WhoIsMultiResult
+     */
+    public function getFromMultipleFollowResultServer(array $targets) : WhoIsMultiResult
+    {
+        /**
+         * @var WhoIsMultiResult[] $multiResult
+         */
+        $multiResult = $this->getFromMultiple($targets);
+        $serversToFollow = [];
+        $networkRecords = [];
+        foreach ($multiResult as $key => $result) {
+            if (!$result instanceof WhoIsResult) {
+                $multiResult[$key] = new WhoIsMultiResult([
+                    $result
+                ]);
+                continue;
+            }
+
+            $server = $result->getServer();
+            $multiResult[$key] = new WhoIsMultiResult([
+                $server => $result
+            ]);
+            $alternatedServer = DataParser::getWhoIsServerFromResultData($result->getOriginalResultString());
+            if (is_string($alternatedServer)
+                && is_string($server)
+                && trim($server) != ''
+                && strtolower(trim($alternatedServer)) !== strtolower(trim($server))
+            ) {
+                try {
+                    $request = $this->getRequestPending($result->getPointer(), $alternatedServer);
+                    $serversToFollow[$key] = $request;
+                    $networkRecords[$key] = $result->getNetworkRecord();
+                } catch (\Throwable $e) {
+                    // pas
+                }
+            }
+        }
+
+        if (empty($serversToFollow)) {
+            return $multiResult;
+        }
+
+        try {
+            $serversToFollow = new WhoIsMultiRequest($serversToFollow);
+            foreach ($serversToFollow->getSendRequests() as $targetName => $request) {
+                if (!isset($multiResult[$targetName]) || !isset($networkRecords[$targetName])) {
+                    continue;
+                }
+                try {
+                    $result = $this->prepareForWhoIsResult(
+                        $networkRecords[$targetName],
+                        $request
+                    );
+                    $multiResult[$targetName]->set($result->getServer(), $result);
+                } catch (\Throwable $e) {
+                    // pass
+                }
+            }
+        } catch (\Throwable $e) {
+            // pass
+        }
+
+        unset($serversToFollow, $networkRecords);
+        return $multiResult;
     }
 }

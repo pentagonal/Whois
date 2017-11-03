@@ -52,7 +52,6 @@ class CurlHandlerInvoker
      */
     public static function invokeRequest(EasyHandle &$easy)
     {
-
         if ($easy->request->getUri()->getPort() !== 43) {
             return;
         }

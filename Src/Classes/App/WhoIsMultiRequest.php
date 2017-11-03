@@ -14,6 +14,7 @@ declare(strict_types=1);
 
 namespace Pentagonal\WhoIs\App;
 
+use GuzzleHttp\Promise\PromiseInterface;
 use function GuzzleHttp\Promise\settle;
 use Pentagonal\WhoIs\Abstracts\WhoIsRequestAbstract;
 
@@ -42,7 +43,7 @@ final class WhoIsMultiRequest extends WhoIsRequestAbstract
     public function __construct(array $whoIsRequests)
     {
         foreach ($whoIsRequests as $key => $whoIsRequest) {
-            if ($whoIsRequest instanceof WhoIsRequest) {
+            if (!$whoIsRequest instanceof WhoIsRequest) {
                 throw new \InvalidArgumentException(
                     'Argument array contain invalid values',
                     E_NOTICE
@@ -64,11 +65,25 @@ final class WhoIsMultiRequest extends WhoIsRequestAbstract
     }
 
     /**
-     * @return array
+     * @return WhoIsRequest[]
      */
     public function getSendRequests() : array
     {
         return $this->send()->whoIsRequests->toArray();
+    }
+
+    /**
+     * Get List of Promise Request
+     *
+     * @return array
+     */
+    public function getPromisesRequests() : array
+    {
+        $result = [];
+        foreach ($this->whoIsRequests as $key => $request) {
+            $result[$key] = $request->getPromiseRequest();
+        }
+        return $result;
     }
 
     /**
@@ -82,9 +97,12 @@ final class WhoIsMultiRequest extends WhoIsRequestAbstract
         if ($this->isPendingRequest()) {
             $this->status = self::PROGRESS;
             try {
-                $arrayPromise = settle($this->getRequests())->wait();
+                $arrayPromise = settle($this->getPromisesRequests())->wait(true);
                 // call wait settle
                 foreach ($arrayPromise as $key => $request) {
+                    $request = $request['state'] === PromiseInterface::FULFILLED
+                        ? $request['value']
+                        : $request['reason'];
                     $this->whoIsRequests[$key]->setResponseFromMultiRequest($request);
                 }
                 $this->status = self::SUCCESS;

@@ -147,7 +147,7 @@ class DataParser
                 (?:\>\>\>?)?\s*
                 (Last\s*Update\s*(?:[a-z0-9\s]+)?Whois\s*Database)\s*
                 \:\s*((?:[0-9]+[0-9\-\:\s\+TZGMU\.]+)?)
-            /ixU',
+            /ix',
             $data,
             $match
         );
@@ -175,7 +175,7 @@ class DataParser
             '/
                 URL\s+of(?:\s+the)?\s+ICANN[^\:]+\:\s*
                 (https?\:\/\/[^\n]+)
-            /ixU',
+            /ix',
             $data,
             $match
         );
@@ -242,7 +242,7 @@ class DataParser
             return self::STATUS_UNKNOWN;
         }
 
-        if (preg_match('~Failure\s+to\+locate\+a\+record in\s+~xiU', $cleanData)) {
+        if (preg_match('~Failure\s+to\+locate\+a\+record in\s+~xi', $cleanData)) {
             return self::STATUS_UNKNOWN;
         }
 
@@ -257,7 +257,7 @@ class DataParser
                 (^\s*Reserved\s*By)
                 | (?:Th(?:is|e))?\s*domain\s*(?:(?:can|could)(?:not|n\'t))\s*be\s*register(?:ed)?
                 | The(?:\s+requested)?\s+domain(?:\s+name)?(?:is)?\s+restricted
-                /ixU',
+                /ix',
             $cleanData
         )) {
             return self::STATUS_RESERVED;
@@ -297,7 +297,7 @@ class DataParser
                     | AC
                     | Tech(?:nical)?
                     )(?:[^\:]+)?\:
-                )~miU',
+                )~mi',
             $cleanData,
             $match
         ) && !empty($match);
@@ -311,7 +311,7 @@ class DataParser
         }
 
         preg_match(
-            '~\n?(query_status|(?:Domain\s+)?Status)(?:[^\:]+)?\:\s*([^\:\n]{2,})~xiU',
+            '~\n?(query_status|(?:Domain\s+)?Status)(?:[^\:]+)?\:\s*([^\:\n]{2,})~xi',
             $cleanData,
             $match
         );
@@ -333,7 +333,7 @@ class DataParser
                 | (?:th(?:is|e)\s+)?domain\s+name\s+(?:has\+not\+been|(?:is)?not)\s+register
                 | (?:the\s+)?queried\s+object(?:\s+does|(?:ha|i)s)?\s+not\s+exist
                 | (?:.+)\s*(?:No\s+match|not\s+exist\s+[io]n\s+database(?:[\!]+)?)
-            )~xiU',
+            )~xi',
             trim($cleanData, '. ')
         )) {
             return self::STATUS_UNREGISTERED;
@@ -414,18 +414,18 @@ class DataParser
         $currentObject = new static();
         $data = $currentObject->cleanComment($data);
         if (!preg_match(
-            '~(
+            '~(?:
                 Whois(?:\s*Server)?\s*[\:\]]\s*(?:whois\:\/\/)? # Domain
                 | ReferralServer\s*[\:]\s+whois\:\/\/   # ASN
             )
-            ([^\n]+)~ixU',
+            ([^\n]+)~ix',
             $data,
             $match
         ) || empty($match[1])) {
             return false;
         }
 
-        return strtolower(trim($match[1]));
+        return strtolower(trim($match[1]))?: false;
     }
 
     /**

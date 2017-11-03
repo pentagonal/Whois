@@ -20,10 +20,11 @@ namespace Pentagonal\WhoIs\App;
  */
 class WhoIsMultiResult extends ArrayCollector
 {
+    /** @noinspection PhpMissingParentConstructorInspection */
     /**
      * WhoIsMultiResult constructor.
      *
-     * @param WhoIsResult[] $input
+     * @param WhoIsResult[]|\Throwable $input
      */
     public function __construct(array $input)
     {
@@ -33,24 +34,24 @@ class WhoIsMultiResult extends ArrayCollector
                 E_WARNING
             );
         }
+
         foreach ($input as $server => $whoIsRequest) {
-            if (!is_string($server)) {
-                throw new \InvalidArgumentException(
-                    'Input whois result key name must be as a string server',
-                    E_WARNING
-                );
-            }
-            if (!$whoIsRequest instanceof WhoIsResult) {
+            // only allow throwable and WhoIsResult only
+            if (!$whoIsRequest instanceof WhoIsResult
+                && ! $whoIsRequest instanceof \Throwable
+                && ! $whoIsRequest instanceof WhoIsMultiResult
+            ) {
                 throw new \InvalidArgumentException(
                     sprintf(
-                        'Array of collection must be contains value instance of: %s',
-                        WhoIsResult::class
+                        'Array of collection must be contains value instance of: %1$s or %2$s',
+                        WhoIsResult::class,
+                        \Throwable::class
                     ),
                     E_WARNING
                 );
             }
-        }
 
-        parent::__construct($input);
+            $this[$server] = $whoIsRequest;
+        }
     }
 }

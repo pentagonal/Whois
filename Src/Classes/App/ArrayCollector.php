@@ -45,6 +45,17 @@ class ArrayCollector extends \ArrayObject implements ArrayCollectorInterface
     }
 
     /**
+     * Set value
+     *
+     * @param mixed $keyName
+     * @param mixed $value
+     */
+    public function set($keyName, $value)
+    {
+        $this[$keyName] = $value;
+    }
+
+    /**
      * {@inheritdoc}
      */
     public function exist($keyName) : bool

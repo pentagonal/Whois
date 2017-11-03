@@ -220,7 +220,8 @@ final class WhoIsRequest extends WhoIsRequestAbstract
      */
     public function setResponseFromMultiRequest($response) : WhoIsRequest
     {
-        $backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 1);
+        $backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
+        $backtrace =  $backtrace? next($backtrace) : [];
         if (empty($backtrace)
             || $backtrace['class'] !== WhoIsMultiRequest::class
         ) {
@@ -244,8 +245,7 @@ final class WhoIsRequest extends WhoIsRequestAbstract
      */
     public function getResponse()
     {
-        $this->send();
-        return $this->response;
+        return $this->send()->response;
     }
 
     /**
@@ -322,17 +322,18 @@ final class WhoIsRequest extends WhoIsRequestAbstract
     /**
      * Preparing Uri
      */
-    private function prepareUri()
+    private function prepareUri() : WhoIsRequest
     {
         if ($this->uri instanceof UriInterface) {
-            return;
+            return $this;
         }
 
         $this->uri = TransportClient::createUri($this->server);
         $this->socketMethod = $this->method;
         $this->isUseSocket = $this->uri->getPort() === TransportClient::DEFAULT_PORT;
         if ($this->isUseSocket) {
-            $validator = new Validator();
+            // using last instance
+            $validator = Validator::validatorDefaultInstance();
             if ($validator->isValidIP(trim($this->targetName))) {
                 $this->socketMethod = DataParser::buildNetworkAddressCommandServer(
                     trim($this->targetName) . "\r\n",
@@ -374,6 +375,8 @@ final class WhoIsRequest extends WhoIsRequestAbstract
             $this->uri  = $this->uri->withQuery($query);
             $this->query = $this->uri->getQuery();
         }
+
+        return $this;
     }
 
     /**
@@ -386,10 +389,10 @@ final class WhoIsRequest extends WhoIsRequestAbstract
         }
 
         $this->status = self::PROGRESS;
-        if ($this->isUseSocket()) {
-            $this->promiseRequest = TransportClient::whoIsRequest(
+        if ($this->prepareUri()->isUseSocket()) {
+            $this->promiseRequest = TransportClient::requestSocketConnectionWrite(
                 $this->socketMethod,
-                $this->getUri(),
+                $this->uri,
                 $this->options
             )->getCurrentPromiseRequest();
         } else {
@@ -399,12 +402,12 @@ final class WhoIsRequest extends WhoIsRequestAbstract
             }
             // auto referer
             if (!isset($options['headers']['referer'])) {
-                $options['headers']['referer'] = (string) $this->getUri()->withQuery('');
+                $options['headers']['referer'] = (string) $this->uri->withQuery('');
             }
 
             $this->promiseRequest = TransportClient::requestConnection(
-                $this->getUri(),
-                $this->getMethod(),
+                $this->uri,
+                $this->method,
                 $options
             )->getCurrentPromiseRequest();
         }
@@ -415,7 +418,7 @@ final class WhoIsRequest extends WhoIsRequestAbstract
     /**
      * @return PromiseInterface
      */
-    public function getPromiseRequest() : PromiseInterface
+    public function getPromiseRequest()
     {
         return $this->prepareRequest()->promiseRequest;
     }
@@ -428,6 +431,14 @@ final class WhoIsRequest extends WhoIsRequestAbstract
         $this->countRequest += 1;
         try {
             $this->response = $this->getPromiseRequest()->wait();
+            if (is_array($this->response)) {
+                if ($this->response['state'] === PromiseInterface::REJECTED) {
+                    throw $this->response['reason'];
+                }
+                $this->response = $this->response['value'];
+            } elseif ($this->response instanceof \Throwable) {
+                throw $this->response;
+            }
             $this->status = self::SUCCESS;
         } catch (\Throwable $e) {
             $this->status = self::FAILED;
@@ -446,7 +457,7 @@ final class WhoIsRequest extends WhoIsRequestAbstract
     }
 
     /**
-     * @return WhoIsRequestAbstract
+     * @return WhoIsRequestAbstract|WhoIsRequest
      */
     public function send() : WhoIsRequestAbstract
     {
