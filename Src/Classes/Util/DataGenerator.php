@@ -165,6 +165,8 @@ LICENSE;
                 || strpos($extension, 'blogspot') === 0
                 // amazon aws is not valid
                 || strpos($extension, 'amazonaws') !== false
+                // ebay is not valid
+                || strpos($extension, 'ebay') !== false
                 // contains dash (-) is not valid
                 || stripos($extension, 'xn--')  === false
                    && strpos($extension, '-') !== false
@@ -184,6 +186,7 @@ LICENSE;
             // ck domain has no STld
             if (!isset($arrayData[$ext])
                  || empty($extArray)
+                 || strpos($extension, ' ') !== false
                  || !in_array($ext, $collector->getCountryExtensionList())
             ) {
                 continue;

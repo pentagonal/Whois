@@ -430,24 +430,42 @@ class DataParser
 
     /**
      * @param RequestInterface $request
+     * @param int             $bufferLengthAsRead buffer length read max 8192 and min 128
+     * @param bool            $sanity             boolean true if try to sanity
      *
      * @return string
      */
-    public static function convertRequestBodyToString(RequestInterface $request) : string
-    {
-        return self::convertStreamToString($request->getBody());
+    public static function convertRequestBodyToString(
+        RequestInterface $request,
+        int $bufferLengthAsRead = 1024,
+        bool $sanity = true
+    ) : string {
+        return self::convertStreamToString(
+            $request->getBody(),
+            $bufferLengthAsRead,
+            $sanity
+        );
     }
 
     /**
      * Convert ResponseInterface body to string
      *
      * @param ResponseInterface $response
+     * @param int             $bufferLengthAsRead buffer length read max 8192 and min 128
+     * @param bool            $sanity             boolean true if try to sanity
      *
      * @return string
      */
-    public static function convertResponseBodyToString(ResponseInterface $response) : string
-    {
-        return self::convertStreamToString($response->getBody());
+    public static function convertResponseBodyToString(
+        ResponseInterface $response,
+        int $bufferLengthAsRead = 1024,
+        bool $sanity = true
+    ) : string {
+        return self::convertStreamToString(
+            $response->getBody(),
+            $bufferLengthAsRead,
+            $sanity
+        );
     }
 
     /**
@@ -456,13 +474,14 @@ class DataParser
      *
      * @param StreamInterface $stream             the stream resource
      * @param int             $bufferLengthAsRead buffer length read max 8192 and min 128
-     *                                            default 1024
+     * @param bool            $sanity             boolean true if try to sanity
      *
      * @return string
      */
     public static function convertStreamToString(
         StreamInterface $stream,
-        int $bufferLengthAsRead = 1024
+        int $bufferLengthAsRead = 1024,
+        bool $sanity = true
     ) : string {
         $currentPos = -1;
         try {
@@ -486,8 +505,10 @@ class DataParser
             // sanitize for safe utf8
             $data .= $stream->read($bufferLengthAsRead);
         }
+        if ($sanity) {
+            $data = Sanitizer::normalizeInvalidUTF8($data);
+        }
 
-        $data = Sanitizer::normalizeInvalidUTF8($data);
         // if seekable fallback to previous position
         if ($currentPos > -1 && $stream->isSeekable()) {
             $stream->seek($currentPos);
@@ -571,7 +592,7 @@ class DataParser
         }
 
         $tag = preg_quote($tag, '/');
-        $regex = '#<('.$tag.')\b(?P<selector>[^>]*)?>(?P<content>.*?)</\b\1>#s';
+        $regex = '#<('.$tag.')\b(?P<selector>[^>]*)?>(?P<content>.*?)<\/\b\1>#s';
         preg_match_all(
             $regex,
             $html,
