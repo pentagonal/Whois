@@ -55,7 +55,7 @@ class Sanitizer
                  * use trim if possible
                  * Serialized value could not start & end with white space
                  */
-                $result = iconv('windows-1250', 'UTF-8//IGNORE', $string);
+                $result = iconv('windows-1250', 'UTF-8', $string);
             } catch (\Exception $e) {
                 // pass
             }
