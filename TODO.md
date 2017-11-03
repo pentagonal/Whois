@@ -9,4 +9,5 @@
 - [DONE]        Add object class `WhoIsMultiRequest`
 - [DONE]        Add multi request for checker
 - [PROGRESS]    Create whois result logic for Result Data
+- [PROGRESS]    Code Coverage & Unit Testing
 ```
