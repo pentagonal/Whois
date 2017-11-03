@@ -736,6 +736,7 @@ return [
     ],
     'cc' => [
         'ccwhois.verisign-grs.com',
+        'ccwhois.verisign-grs.net',
     ],
     'cd' => [
         'whois.nic.cd',
@@ -903,6 +904,7 @@ return [
     ],
     'com' => [
         'whois.verisign-grs.com',
+        'whois.verisign-grs.net',
     ],
     'comcast' => [
         'whois.nic.comcast',
@@ -2811,6 +2813,7 @@ return [
     ],
     'net' => [
         'whois.verisign-grs.com',
+        'whois.verisign-grs.net',
     ],
     'netbank' => [
         'whois.nic.netbank',
