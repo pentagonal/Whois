@@ -160,13 +160,13 @@ $result = $checker->getFromMultiple($dataToCheck);
          [1] => WhoIsMultiResult Object (
             // of (AS123)
             [storage:ArrayObject:private] => array(
-                (WhoIsResult(object)|\Throwable),
+                WhoIsResult object|\Throwable, ....
             )
          )
          [2] => WhoIsMultiResult Object (
             // of (example.com)
             [storage:ArrayObject:private] => array(
-                (WhoIsResult(object)|\Throwable),
+                WhoIsResult object|\Throwable, ....
             )
          )
       )
