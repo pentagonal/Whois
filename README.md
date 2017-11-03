@@ -104,7 +104,7 @@ $result = $checker->getFollowServerResult($target);
 
 **Check Multiple Data**
 
-The checker support `multi_curl_init` to used for async request
+The checker support `curl_multi_init` to used for async request
 
 ```php
 <?php
