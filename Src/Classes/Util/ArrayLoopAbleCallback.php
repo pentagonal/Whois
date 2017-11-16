@@ -159,6 +159,14 @@ class ArrayLoopAbleCallback implements \Countable, \IteratorAggregate
     }
 
     /**
+     * Clear cached data
+     */
+    public function clear()
+    {
+        $this->contents = [];
+    }
+
+    /**
      * @return \Iterator
      */
     public function getIterator() : \Iterator

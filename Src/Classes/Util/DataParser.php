@@ -122,12 +122,21 @@ class DataParser
     ];
 
     /**
+     * Fake Comment that Domain is Registered from
+     */
+    const COMMENT_FAKE_RECORD = <<<FAKE
+% NOTE: The registry of domain does not provide or publish ownership information
+%       of domain for public usage. This data is represent for public domain data,
+%       data provide from Domain Name Server (DNS) existences.
+
+FAKE;
+    /**
      * DataParser constructor.
      * @final
      */
     final public function __construct()
     {
-        // pass empty for @fina;
+        // pass empty for @final;
     }
 
     /**

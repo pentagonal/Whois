@@ -83,9 +83,9 @@ class TransportClient
     protected $promiseRequests;
 
     /**
-     * @var string
+     * @var int|string|null
      */
-    protected $parallelKey;
+    protected $currentPromiseKey;
 
     /**
      * @var array
@@ -124,9 +124,18 @@ class TransportClient
      *
      * @return Promise\PromiseInterface|mixed
      */
-    public function getCurrentPromiseRequest()
+    public function getCurrentRequest()
     {
+        $this->currentPromiseKey = key($this->promiseRequests);
         return current($this->promiseRequests);
+    }
+
+    /**
+     * @return int|null|string
+     */
+    public function getCurrentRequestKey()
+    {
+        return $this->currentPromiseKey;
     }
 
     /**
@@ -136,7 +145,7 @@ class TransportClient
      */
     public function isEndOfRequest() : bool
     {
-        return ! $this->getCurrentPromiseRequest();
+        return ! $this->getCurrentRequest();
     }
 
     /**
@@ -146,7 +155,7 @@ class TransportClient
      * @return ResponseInterface
      * @throws \Throwable
      */
-    public function sendParallel()
+    public function sendSerial()
     {
         if (empty($this->promiseRequests)) {
             throw new \RuntimeException(
@@ -162,7 +171,7 @@ class TransportClient
             );
         }
 
-        $currentRequest = $this->getCurrentPromiseRequest();
+        $currentRequest = $this->getCurrentRequest();
         next($this->promiseRequests);
 
         $response = $currentRequest->wait();
@@ -183,7 +192,7 @@ class TransportClient
      * Sending Async request and convert it into Array Result
      * @see sendAsync()
      *
-     * @return array
+     * @return array|ResponseInterface[]|\Throwable[]
      */
     public function send() : array
     {
@@ -213,7 +222,7 @@ class TransportClient
     /**
      * Send all request and returning original promise wait response
      *
-     * @return array
+     * @return array|ResponseInterface[]|\Throwable[]
      */
     public function sendAsync() : array
     {

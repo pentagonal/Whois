@@ -113,7 +113,7 @@ LICENSE;
             }
             $iAnaResponse = $promise['iana'];
         } catch (TimeOutException $e) {
-            $iAnaResponse = Transport::get(DataParser::URI_IANA_IDN)->sendParallel();
+            $iAnaResponse = Transport::get(DataParser::URI_IANA_IDN)->sendSerial();
         } catch (\Exception $e) {
             throw $e;
         }
@@ -125,7 +125,7 @@ LICENSE;
 
             $suffixResponse = $promise['suffix'];
         } catch (TimeOutException $e) {
-            $suffixResponse = Transport::get(DataParser::URI_PUBLIC_SUFFIX)->sendParallel();
+            $suffixResponse = Transport::get(DataParser::URI_PUBLIC_SUFFIX)->sendSerial();
         } catch (\Exception $e) {
             throw $e;
         }
@@ -295,9 +295,9 @@ LICENSE;
         }
 
         try {
-            $response = Transport::get(DataParser::URI_CACERT)->sendParallel();
+            $response = Transport::get(DataParser::URI_CACERT)->sendSerial();
         } catch (TimeOutException $e) {
-            $response = Transport::get(DataParser::URI_CACERT)->sendParallel();
+            $response = Transport::get(DataParser::URI_CACERT)->sendSerial();
         } catch (\Exception $e) {
             throw $e;
         }
@@ -535,7 +535,7 @@ LICENSE;
 
         // backward compat
         if (empty($asNumber16) || empty($asNumber32)) {
-            $stream = TransportClient::requestConnection(DataParser::URI_IANA_ASN_TABLE)->sendParallel();
+            $stream = TransportClient::requestConnection(DataParser::URI_IANA_ASN_TABLE)->sendSerial();
             $body   = DataParser::convertResponseBodyToString($stream);
             foreach (DataParser::htmlParenthesisParser('table', $body) as $arrayCollector) {
                 $selector = $arrayCollector->get('selector');

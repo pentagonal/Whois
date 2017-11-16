@@ -46,12 +46,7 @@ class Checker
     /**
      * Fake Comment that Domain is Registered from
      */
-    const COMMENT_FAKE_RECORD = <<<FAKE
-% NOTE: The registry of domain does not provide or publish ownership information
-%       of domain for public usage. This data is represent for public domain data,
-%       data provide from Domain Name Server (DNS) existences.
-
-FAKE;
+    const COMMENT_FAKE_RECORD = DataParser::COMMENT_FAKE_RECORD;
 
     /**
      * cache Prefix
@@ -702,6 +697,7 @@ FAKE;
                 E_NOTICE
             );
         }
+
         if ($record->isSTLD() && $record->isMaybeDisAllowToRegistered()) {
             throw new InvalidDomainException(
                 sprintf(
@@ -909,6 +905,15 @@ FAKE;
         );
     }
 
+    /**
+     * Get By Handler Name (eg: person or organization id)
+     *
+     * @param string $id
+     * @param string|null $server
+     *
+     * @return WhoIsResult
+     * @throws \Throwable
+     */
     public function getFromHandler(string $id, string $server = null)
     {
         $handler = $this->getValidator()->splitHandler($id);

@@ -394,7 +394,7 @@ final class WhoIsRequest extends WhoIsRequestAbstract
                 $this->socketMethod,
                 $this->uri,
                 $this->options
-            )->getCurrentPromiseRequest();
+            )->getCurrentRequest();
         } else {
             $options = $this->options;
             if (!isset($options['headers'])) {
@@ -409,7 +409,7 @@ final class WhoIsRequest extends WhoIsRequestAbstract
                 $this->uri,
                 $this->method,
                 $options
-            )->getCurrentPromiseRequest();
+            )->getCurrentRequest();
         }
 
         return $this;
