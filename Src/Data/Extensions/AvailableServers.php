@@ -3243,6 +3243,7 @@ return [
         'whois.nic.prudential',
     ],
     'ps' => [
+        'whois.pnina.ps',
         'http://www.nic.ps/whois/?domain={{domain}}'
     ],
     'pt' => [
@@ -4503,7 +4504,9 @@ return [
     'xn--cg4bki' => [
         'whois.nic.xn--cg4bki',
     ],
-    'xn--clchc0ea0b2g2a9gcd' => [],
+    'xn--clchc0ea0b2g2a9gcd' => [
+        'whois.sgnic.sg'
+    ],
     'xn--czr694b' => [
         'whois.nic.xn--czr694b',
     ],
@@ -4516,8 +4519,12 @@ return [
     'xn--d1acj3b' => [
         'whois.nic.xn--d1acj3b',
     ],
-    'xn--d1alf' => [],
-    'xn--e1a4c' => [],
+    'xn--d1alf' => [
+        'whois.marnet.mk'
+    ],
+    'xn--e1a4c' => [
+        'whois.eu'
+    ],
     'xn--eckvdtc9d' => [
         'whois.nic.xn--eckvdtc9d',
     ],
@@ -4539,8 +4546,12 @@ return [
     'xn--fiq64b' => [
         'whois.nic.xn--fiq64b',
     ],
-    'xn--fiqs8s' => [],
-    'xn--fiqz9s' => [],
+    'xn--fiqs8s' => [
+        'cwhois.cnnic.cn'
+    ],
+    'xn--fiqz9s' => [
+        'cwhois.cnnic.cn'
+    ],
     'xn--fjq720a' => [
         'whois.nic.xn--fjq720a',
     ],
@@ -4555,14 +4566,24 @@ return [
     'xn--g2xx48c' => [
         'whois.nic.xn--g2xx48c',
     ],
-    'xn--gckr3f0f' => [],
-    'xn--gecrj9c' => [],
+    'xn--gckr3f0f' => [
+        'whois.xn--gckr3f0f'
+    ],
+    'xn--gecrj9c' => [
+        'whois.registry.in'
+    ],
     'xn--gk3at1e' => [
         'whois.nic.xn--gk3at1e',
     ],
-    'xn--h2breg3eve' => [],
-    'xn--h2brj9c' => [],
-    'xn--h2brj9c8c' => [],
+    'xn--h2breg3eve' => [
+        'whois.registry.in'
+    ],
+    'xn--h2brj9c' => [
+        'whois.registry.in'
+    ],
+    'xn--h2brj9c8c' => [
+        'whois.registry.in'
+    ],
     'xn--hxt814e' => [
         'whois.nic.xn--hxt814e',
     ],
@@ -4578,8 +4599,12 @@ return [
     'xn--j1aef' => [
         'whois.nic.xn--j1aef',
     ],
-    'xn--j1amh' => [],
-    'xn--j6w193g' => [],
+    'xn--j1amh' => [
+        'whois.dotukr.com'
+    ],
+    'xn--j6w193g' => [
+        'whois.hkirc.hk'
+    ],
     'xn--jlq61u9w7b' => [
         'whois.nic.xn--jlq61u9w7b',
     ],
@@ -4587,26 +4612,38 @@ return [
     'xn--kcrx77d1x4a' => [
         'whois.nic.xn--kcrx77d1x4a',
     ],
-    'xn--kprw13d' => [],
-    'xn--kpry57d' => [],
+    'xn--kprw13d' => [
+        'whois.twnic.net.tw'
+    ],
+    'xn--kpry57d' => [
+        'whois.twnic.net.tw'
+    ],
     'xn--kpu716f' => [],
     'xn--kput3i' => [
         'whois.nic.xn--kput3i',
     ],
     'xn--l1acc' => [],
-    'xn--lgbbat1ad8j' => [],
-    'xn--mgb9awbf' => [],
+    'xn--lgbbat1ad8j' => [
+        'whois.nic.dz'
+    ],
+    'xn--mgb9awbf' => [
+        'whois.registry.om'
+    ],
     'xn--mgba3a3ejt' => [
         'whois.nic.xn--mgba3a3ejt',
     ],
-    'xn--mgba3a4f16a' => [],
+    'xn--mgba3a4f16a' => [
+        'whois.nic.ir'
+    ],
     'xn--mgba7c0bbn0a' => [
         'whois.nic.xn--mgba7c0bbn0a',
     ],
     'xn--mgbaakc7dvf' => [
         'whois.nic.xn--mgbaakc7dvf',
     ],
-    'xn--mgbaam7a8h' => [],
+    'xn--mgbaam7a8h' => [
+        'whois.aeda.net.ae'
+    ],
     'xn--mgbab2bd' => [
         'whois.nic.xn--mgbab2bd',
     ],
@@ -4615,14 +4652,22 @@ return [
     'xn--mgbb9fbpob' => [
         'whois.nic.xn--mgbb9fbpob',
     ],
-    'xn--mgbbh1a' => [],
-    'xn--mgbbh1a71e' => [],
+    'xn--mgbbh1a' => [
+        'whois.registry.in'
+    ],
+    'xn--mgbbh1a71e' => [
+        'whois.registry.in'
+    ],
     'xn--mgbc0a9azcg' => [],
     'xn--mgbca7dzdo' => [
         'whois.nic.xn--mgbca7dzdo',
     ],
-    'xn--mgberp4a5d4ar' => [],
-    'xn--mgbgu82a' => [],
+    'xn--mgberp4a5d4ar' => [
+        'whois.nic.net.sa'
+    ],
+    'xn--mgbgu82a' => [
+        'whois.registry.in'
+    ],
     'xn--mgbi4ecexp' => [
         'whois.nic.xn--mgbi4ecexp',
     ],
@@ -4630,9 +4675,15 @@ return [
     'xn--mgbt3dhd' => [
         'whois.nic.xn--mgbt3dhd',
     ],
-    'xn--mgbtx2b' => [],
-    'xn--mgbx4cd0ab' => [],
-    'xn--mix891f' => [],
+    'xn--mgbtx2b' => [
+        'whois.cmc.iq'
+    ],
+    'xn--mgbx4cd0ab' => [
+        'whois.mynic.my'
+    ],
+    'xn--mix891f' => [
+        'whois.monic.mo'
+    ],
     'xn--mk1bu44c' => [
         'whois.nic.xn--mk1bu44c',
     ],
@@ -4648,7 +4699,9 @@ return [
     'xn--ngbrx' => [
         'whois.nic.xn--ngbrx',
     ],
-    'xn--node' => [],
+    'xn--node' => [
+        'whois.itdc.ge'
+    ],
     'xn--nqv7f' => [
         'whois.nic.xn--nqv7f',
     ],
@@ -4658,16 +4711,24 @@ return [
     'xn--nyqy26a' => [
         'whois.nic.xn--nyqy26a',
     ],
-    'xn--o3cw4h' => [],
-    'xn--ogbpf8fl' => [],
+    'xn--o3cw4h' => [
+        'whois.thnic.co.th'
+    ],
+    'xn--ogbpf8fl' => [
+        'whois.tld.sy'
+    ],
     'xn--p1acf' => [
         'whois.nic.xn--p1acf',
     ],
-    'xn--p1ai' => [],
+    'xn--p1ai' => [
+        'whois.tcinet.ru'
+    ],
     'xn--pbt977c' => [
         'whois.nic.xn--pbt977c',
     ],
-    'xn--pgbs0dh' => [],
+    'xn--pgbs0dh' => [
+        'whois.ati.tn'
+    ],
     'xn--pssy2u' => [
         'whois.nic.xn--pssy2u',
     ],
@@ -4682,8 +4743,12 @@ return [
         'whois.nic.xn--rhqv96g',
     ],
     'xn--rovu88b' => [],
-    'xn--rvc1e0am3e' => [],
-    'xn--s9brj9c' => [],
+    'xn--rvc1e0am3e' => [
+        'whois.registry.in'
+    ],
+    'xn--s9brj9c' => [
+        'whois.registry.in'
+    ],
     'xn--ses554g' => [
         'whois.nic.xn--ses554g',
     ],
@@ -4718,15 +4783,25 @@ return [
         'whois.nic.xn--w4rs40l',
     ],
     'xn--wgbh1c' => [],
-    'xn--wgbl6a' => [],
+    'xn--wgbl6a' => [
+        'whois.registry.qa'
+    ],
     'xn--xhq521b' => [
         'whois.nic.xn--xhq521b',
     ],
     'xn--xkc2al3hye2a' => [],
-    'xn--xkc2dl3a5ee0h' => [],
-    'xn--y9a3aq' => [],
-    'xn--yfro4i67o' => [],
-    'xn--ygbi2ammx' => [],
+    'xn--xkc2dl3a5ee0h' => [
+        'whois.registry.in'
+    ],
+    'xn--y9a3aq' => [
+        'whois.amnic.net'
+    ],
+    'xn--yfro4i67o' => [
+        'whois.sgnic.sg'
+    ],
+    'xn--ygbi2ammx' => [
+        'whois.pnina.ps'
+    ],
     'xn--zfr164b' => [
         'whois.nic.xn--zfr164b',
     ],
@@ -4753,7 +4828,9 @@ return [
         'whois.dnrs.neustar',
         'whois.den.dnrs.neustar',
     ],
-    'ye' => [],
+    'ye' => [
+        'whois.nic.ye'
+    ],
     'yodobashi' => [
         'whois.nic.gmo',
         'whois.nic.yodobashi',
