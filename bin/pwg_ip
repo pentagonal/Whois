@@ -27,7 +27,7 @@ do {
         require $file;
         break;
     }
-} while(!$break && $count < 4);
+} while (!$break && $count < 4);
 
 echo "==============================================\n";
 echo "    Starting Generate IP Range List data\n";
