@@ -29,18 +29,11 @@ class Puny implements TransCodeInterface
     protected $puny;
 
     /**
-     * @var bool
-     */
-    protected $isIntlEnabled = false;
-
-    /**
      * Puny constructor.
      */
     public function __construct()
     {
         $this->puny = new Punycode();
-        $this->isIntlEnabled = function_exists('idn_to_ascii')
-            && function_exists('idn_to_utf8');
     }
 
     /**
@@ -56,9 +49,7 @@ class Puny implements TransCodeInterface
             return $string;
         }
 
-        return $this->isIntlEnabled
-            ? (idn_to_ascii($string)?: $string)
-            : $this->puny->encode($string);
+        return $this->puny->encode($string);
     }
 
     /**
@@ -74,8 +65,6 @@ class Puny implements TransCodeInterface
             return $string;
         }
 
-        return $this->isIntlEnabled
-            ? (idn_to_utf8($string)?: $string)
-            : $this->puny->encode($string);
+        return $this->puny->decode($string);
     }
 }
