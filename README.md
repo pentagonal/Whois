@@ -13,6 +13,9 @@
 
 **\#\# UNDER DEVELOPMENT \#\#**
 
+## NOTE
+I do not have enough time to deploy & manage this repositories.
+Please make a pull request or add code to this repositories are welcome.
 
 ## DESCRIPTION
 
