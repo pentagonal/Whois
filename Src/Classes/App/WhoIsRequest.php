@@ -339,10 +339,10 @@ final class WhoIsRequest extends WhoIsRequestAbstract
                     trim($this->targetName) . "\r\n",
                     $this->uri->getHost()
                 );
-            } // resolve asn
-            elseif (preg_match(DataParser::ASN_REGEX, trim($this->targetName), $match)
+            } elseif (preg_match(DataParser::ASN_REGEX, trim($this->targetName), $match)
                 && ! empty($match[2])
             ) {
+                // resolve asn
                 $prefix = $this->uri->getHost() != DataParser::ARIN_SERVER
                     ? 'AS'
                     : '';
