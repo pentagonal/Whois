@@ -10,4 +10,14 @@
  * @author pentagonal <org@pentagonal.org>
  */
 
-require __DIR__ .'/../vendor/autoload.php';
+$count = 0;
+do {
+    $count++;
+    $file = __DIR__ .str_repeat('/..', $count).'/autoload.php';
+    $break = file_exists($file);
+    if ($break) {
+        echo $count;
+        require $file;
+        break;
+    }
+} while(!$break && $count < 4);
