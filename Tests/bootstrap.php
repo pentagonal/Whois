@@ -20,4 +20,4 @@ do {
         require $file;
         break;
     }
-} while(!$break && $count < 4);
+} while (!$break && $count < 4);
