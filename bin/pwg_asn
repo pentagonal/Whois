@@ -14,10 +14,19 @@
 if (php_sapi_name() != 'cli') {
     exit('Script must be run as CLI');
 }
-
-require __DIR__ .'/../vendor/autoload.php';
-
 use Pentagonal\WhoIs\Util\DataGenerator;
+
+$count = 0;
+do {
+    $count++;
+    $file = __DIR__ .str_repeat('/..', $count).'/autoload.php';
+    $break = file_exists($file);
+    if ($break) {
+        echo $count;
+        require $file;
+        break;
+    }
+} while(!$break && $count < 4);
 
 echo "==============================================\n";
 echo " Starting Generate AS Number Block List data\n";
