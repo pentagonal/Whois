@@ -3098,7 +3098,9 @@ return [
     'physio' => [
         'whois.nic.physio',
     ],
-    'piaget' => [],
+    'piaget' => [
+        'whois.nic.piaget'
+    ],
     'pics' => [
         'whois.uniregistry.net',
         'whois.nic.pics',
@@ -3131,7 +3133,9 @@ return [
         'whois.donuts.co',
         'whois.nic.pizza',
     ],
-    'pk' => [],
+    'pk' => [
+        'post[name={{domain}}]|https://pk6.pknic.net.pk/pk5/lookup.PK',
+    ],
     'pl' => [
         'whois.dns.pl',
     ],
@@ -3238,7 +3242,9 @@ return [
     'prudential' => [
         'whois.nic.prudential',
     ],
-    'ps' => [],
+    'ps' => [
+        'http://www.nic.ps/whois/?domain={{domain}}'
+    ],
     'pt' => [
         'whois.dns.pt',
     ],
@@ -4332,7 +4338,9 @@ return [
     'wiki' => [
         'whois.nic.wiki',
     ],
-    'williamhill' => [],
+    'williamhill' => [
+        'whoic.nic.williamhill'
+    ],
     'win' => [
         'whois.nic.win',
     ],
@@ -4803,11 +4811,26 @@ return [
         'whois.nic.zuerich',
     ],
     'zw' => [],
-    'charity' => [],
-    'inc' => [],
-    'llc' => [],
-    'sport' => [],
-    'ss' => [],
-    'xn--mgbah1a3hjkrd' => [],
-    'xn--otu796d' => [],
+    'charity' => [
+        'whois.nic.charity'
+    ],
+    'inc' => [
+        'whoic.nic.inc'
+    ],
+    'llc' => [
+        'whoic.nic.llc',
+        'whois.afilias.info'
+    ],
+    'sport' => [
+        'whois.nic.sport'
+    ],
+    'ss' => [
+        'whois.nic.ss'
+    ],
+    'xn--mgbah1a3hjkrd' => [
+        'whois.nic.mr'
+    ],
+    'xn--otu796d' => [
+        'whois.nic.xn--otu796d'
+    ],
 ];
